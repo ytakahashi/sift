@@ -38,7 +38,10 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <h1>Sift</h1>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+          <img src="/favicon.svg" alt="Sift Logo" style={{ width: '22px', height: '22px' }} />
+          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Sift</h1>
+        </div>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
           {(diffError || actionError) && (
             <span style={{ color: '#f85149' }}>{diffError || actionError}</span>

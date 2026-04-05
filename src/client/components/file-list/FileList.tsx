@@ -42,8 +42,8 @@ export function FileList({ files, selectedFileId, onSelect }: FileListProps) {
             style={{
               padding: '0.4rem 0.5rem',
               cursor: 'pointer',
-              backgroundColor: isSelected ? 'rgba(88, 166, 255, 0.15)' : 'transparent',
-              borderLeft: isSelected ? '3px solid #58a6ff' : '3px solid transparent',
+              backgroundColor: isSelected ? 'rgba(201, 50, 69, 0.15)' : 'transparent',
+              borderLeft: isSelected ? '3px solid var(--accent-color)' : '3px solid transparent',
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',

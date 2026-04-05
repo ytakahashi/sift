@@ -44,8 +44,7 @@ up a web server. Check `http://localhost:3000` in your browser.
 
 **Options**:
 
-- `--port <number>`: Specify a different port (default: 3000)
-- `--no-open`: Start the server without automatically opening the browser
+- `-o, --open`: Automatically open the browser after the server starts
 
 ### Building for Production
 
@@ -55,11 +54,27 @@ To build the client assets and compile the server-side TypeScript code:
 pnpm run build
 ```
 
-Then you can run the compiled CLI application directly:
+Then you can run the compiled CLI application directly from the repository:
 
 ```bash
 pnpm run start
 ```
+
+### Installing Globally
+
+For the best experience, you can link the CLI tool globally so you can run it from any Git repository on your machine:
+
+```bash
+pnpm link --global
+```
+
+Now you can start the viewer from any directory by simply running:
+
+```bash
+sift
+```
+
+> **Note**: If you change the source code, you only need to run `pnpm run build` in the project directory for the global `sift` command to pick up the latest changes.
 
 ### Code Quality (Linting & Formatting)
 

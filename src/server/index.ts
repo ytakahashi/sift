@@ -38,7 +38,9 @@ export async function startServer(repoRoot: string): Promise<string> {
   const __dirname = path.dirname(__filename);
   const clientDir = path.resolve(__dirname, '../../dist/client');
 
-  cliApp.use('/assets/*', serveStatic({ root: path.relative(process.cwd(), clientDir) }));
+  const relativeClientDir = path.relative(process.cwd(), clientDir);
+  cliApp.use('/assets/*', serveStatic({ root: relativeClientDir }));
+  cliApp.use('/favicon.svg', serveStatic({ root: relativeClientDir }));
 
   cliApp.get('*', async (c) => {
     try {

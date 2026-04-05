@@ -6,7 +6,10 @@
     "moduleResolution": "bundler",
     "allowSyntheticDefaultImports": true,
     "strict": true,
-    "target": "ES2022"
+    "target": "ES2022",
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "types": ["node"]
   },
-  "include": ["src/cli", "src/server", "src/domain", "vite.config.ts"]
+  "include": ["src/cli", "src/server", "src/domain"]
 }
