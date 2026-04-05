@@ -85,6 +85,12 @@ This project uses **ESLint** and **Prettier** to enforce a unified code style.
 - **Run Linter**: `pnpm run lint`
 - **Auto-Fix Lint Errors**: `pnpm run lint:fix`
 
+### Testing
+
+This project uses [Vitest](https://vitest.dev/) for unit testing.
+
+- **Run Tests**: `pnpm run test`
+
 ## 🛠 Tech Stack
 
 - **Server**: [Hono](https://hono.dev/) handling routing and static file serving
