@@ -29,20 +29,20 @@ export class RepositoryDiffProvider implements DiffProvider {
 
     const isStaged = bucket === 'staged';
     let rawDiff = '';
-    
+
     try {
       rawDiff = await this.gitClient.getDiffOutput(isStaged);
     } catch {
       // In case diff fails (e.g. empty repo edges)
     }
-    
+
     const files = rawDiff.trim() ? parseDiff(rawDiff, bucket) : [];
 
     if (!isStaged) {
       try {
         const untrackedFiles = await this.gitClient.getUntrackedFiles();
         for (const file of untrackedFiles) {
-          let hunks: DiffHunk[] = [];
+          const hunks: DiffHunk[] = [];
           try {
             const absolutePath = path.resolve(this.gitClient['repoRoot'], file);
             const content = await fs.readFile(absolutePath, 'utf8');
@@ -51,7 +51,7 @@ export class RepositoryDiffProvider implements DiffProvider {
               id: `line-${file}-untracked-${idx}`,
               type: 'add',
               newLineNumber: idx + 1,
-              content: line
+              content: line,
             }));
             hunks.push({
               id: `hunk-${file}-untracked`,
@@ -60,10 +60,10 @@ export class RepositoryDiffProvider implements DiffProvider {
               oldLines: 0,
               newStart: 1,
               newLines: lines.length,
-              lines: diffLines
+              lines: diffLines,
             });
-          } catch(e) {
-             // File might be binary or unreadable, leave hunks empty
+          } catch {
+            // File might be binary or unreadable, leave hunks empty
           }
 
           files.push({
@@ -73,7 +73,7 @@ export class RepositoryDiffProvider implements DiffProvider {
             status: 'untracked',
             kind: 'text',
             displayPath: file,
-            hunks
+            hunks,
           });
         }
       } catch {

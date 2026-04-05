@@ -10,8 +10,9 @@ actionRoutes.post('/stage-file', async (c) => {
   try {
     await service.stageFile(body.path);
     return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
   }
 });
 
@@ -21,8 +22,9 @@ actionRoutes.post('/unstage-file', async (c) => {
   try {
     await service.unstageFile(body.path);
     return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
   }
 });
 
@@ -32,8 +34,9 @@ actionRoutes.post('/stage-hunk', async (c) => {
   try {
     await service.stageHunk(body.path, body.hunkId);
     return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
   }
 });
 
@@ -43,7 +46,8 @@ actionRoutes.post('/unstage-hunk', async (c) => {
   try {
     await service.unstageHunk(body.path, body.hunkId);
     return c.json({ success: true });
-  } catch (err: any) {
-    return c.json({ error: err.message }, 500);
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
   }
 });

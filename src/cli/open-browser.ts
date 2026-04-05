@@ -3,7 +3,7 @@ import os from 'node:os';
 
 export function openBrowser(url: string): void {
   const platform = os.platform();
-  let command = '';
+  let command: string;
 
   if (platform === 'win32') {
     command = `start "" "${url}"`;

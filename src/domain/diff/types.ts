@@ -19,7 +19,7 @@ export interface DiffFile {
   kind: 'text' | 'image' | 'binary' | 'submodule';
   displayPath: string;
   hunks: DiffHunk[];
-};
+}
 
 export type DiffHunk = {
   id: string;

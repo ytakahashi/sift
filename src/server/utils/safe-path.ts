@@ -3,7 +3,7 @@ import { resolve, normalize, sep } from 'node:path';
 /**
  * Validates that a given target path is strictly within the specified base repository directory.
  * Prevents directory traversal attacks (e.g. using `..`).
- * 
+ *
  * @param basePath The fully resolved absolute path to the repository root.
  * @param targetPath The untrusted path requested by the client.
  * @returns The safely resolved absolute path, or throws an error.
@@ -12,10 +12,10 @@ export function resolveSafePath(basePath: string, targetPath: string): string {
   if (!basePath) {
     throw new Error('Base path must be provided');
   }
-  
+
   // Resolve base path to an absolute, normalized path
   const resolvedBase = resolve(normalize(basePath));
-  
+
   // Resolve target against base
   // Note: if targetPath is absolute, resolve() will use it as the root unless we process it.
   // Removing leading slash from target prevents it from escaping base via root path.

@@ -3,10 +3,10 @@ import { DiffFile, DiffHunk, DiffLineType, FileBucket } from './types';
 export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
   const files: DiffFile[] = [];
   const lines = rawDiff.split('\n');
-  
+
   let currentFile: DiffFile | null = null;
   let currentHunk: DiffHunk | null = null;
-  
+
   let oldLineNum = 0;
   let newLineNum = 0;
   let hunkCounter = 0;
@@ -21,11 +21,11 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
         }
         files.push(currentFile);
       }
-      
+
       const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
       const aPath = match ? match[1] : '';
       const bPath = match ? match[2] : '';
-      
+
       currentFile = {
         id: `file-${bPath}`,
         bucket,
@@ -41,7 +41,7 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
       hunkCounter = 0;
       continue;
     }
-    
+
     if (!currentFile) continue;
 
     if (line.startsWith('new file mode ')) {
@@ -85,7 +85,7 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
           currentFile.hunks.push(currentHunk);
         }
         hunkCounter++;
-        
+
         const oldStart = parseInt(match[1], 10);
         const oldLines = match[2] ? parseInt(match[2], 10) : 1;
         const newStart = parseInt(match[3], 10);
@@ -117,9 +117,9 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
       const isAdd = typeChar === '+';
       const isDel = typeChar === '-';
       const isContext = typeChar === ' ';
-      
+
       if (isAdd || isDel || isContext) {
-        let type: DiffLineType = 'context';
+        let type: DiffLineType;
         let oNum: number | undefined = undefined;
         let nNum: number | undefined = undefined;
 

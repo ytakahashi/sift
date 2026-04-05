@@ -8,22 +8,31 @@ interface FileListProps {
 
 function getStatusColor(status: string) {
   switch (status) {
-    case 'modified': return '#d2a8ff'; // purple
-    case 'added': return '#3fb950';    // green
-    case 'deleted': return '#f85149';  // red
-    case 'renamed': return '#a5d6ff';  // light blue
-    default: return '#8b949e';         // gray
+    case 'modified':
+      return '#d2a8ff'; // purple
+    case 'added':
+      return '#3fb950'; // green
+    case 'deleted':
+      return '#f85149'; // red
+    case 'renamed':
+      return '#a5d6ff'; // light blue
+    default:
+      return '#8b949e'; // gray
   }
 }
 
 export function FileList({ files, selectedFileId, onSelect }: FileListProps) {
   if (files.length === 0) {
-    return <div className="empty-state" style={{ color: '#8b949e' }}>No changes</div>;
+    return (
+      <div className="empty-state" style={{ color: '#8b949e' }}>
+        No changes
+      </div>
+    );
   }
 
   return (
     <div className="file-list">
-      {files.map(file => {
+      {files.map((file) => {
         const isSelected = selectedFileId === file.id;
         return (
           <div
@@ -45,11 +54,17 @@ export function FileList({ files, selectedFileId, onSelect }: FileListProps) {
                 textOverflow: 'ellipsis',
                 overflow: 'hidden',
                 whiteSpace: 'nowrap',
-                flex: 1
+                flex: 1,
               }}
               title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}
             >
-              {file.oldPath ? <span><span style={{opacity: 0.6}}>{file.oldPath}</span> &rarr; {file.path}</span> : file.path}
+              {file.oldPath ? (
+                <span>
+                  <span style={{ opacity: 0.6 }}>{file.oldPath}</span> &rarr; {file.path}
+                </span>
+              ) : (
+                file.path
+              )}
             </span>
             <span
               className="status-badge"
@@ -57,7 +72,7 @@ export function FileList({ files, selectedFileId, onSelect }: FileListProps) {
                 fontSize: '0.75rem',
                 color: getStatusColor(file.status),
                 marginLeft: '0.5rem',
-                fontWeight: 600
+                fontWeight: 600,
               }}
             >
               {file.status.charAt(0).toUpperCase()}

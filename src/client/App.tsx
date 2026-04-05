@@ -14,15 +14,22 @@ function App() {
     clearNotes();
   }, [refresh, clearNotes]);
 
-  const { stageFile, unstageFile, stageHunk, unstageHunk, error: actionError } = useWorkspaceActions(refreshAll);
+  const {
+    stageFile,
+    unstageFile,
+    stageHunk,
+    unstageHunk,
+    error: actionError,
+  } = useWorkspaceActions(refreshAll);
   const [selectedFile, setSelectedFile] = useState<DiffFile | null>(null);
   const [paneMode, setPaneMode] = useState<'working' | 'staged'>('working');
 
   useEffect(() => {
     if (selectedFile) {
       const targetList = paneMode === 'working' ? workingFiles : stagedFiles;
-      const updatedFile = targetList.find(f => f.path === selectedFile.path);
+      const updatedFile = targetList.find((f) => f.path === selectedFile.path);
       if (updatedFile !== selectedFile) {
+        // eslint-disable-next-line react-hooks/set-state-in-effect
         setSelectedFile(updatedFile || null);
       }
     }
@@ -33,12 +40,18 @@ function App() {
       <header className="app-header">
         <h1>Sift</h1>
         <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
-          {(diffError || actionError) && <span style={{ color: '#f85149' }}>{diffError || actionError}</span>}
-          <button 
+          {(diffError || actionError) && (
+            <span style={{ color: '#f85149' }}>{diffError || actionError}</span>
+          )}
+          <button
             onClick={refreshAll}
-            style={{ 
-              background: 'transparent', border: '1px solid #30363d', 
-              color: '#c9d1d9', padding: '0.2rem 0.5rem', borderRadius: '4px', cursor: 'pointer' 
+            style={{
+              background: 'transparent',
+              border: '1px solid #30363d',
+              color: '#c9d1d9',
+              padding: '0.2rem 0.5rem',
+              borderRadius: '4px',
+              cursor: 'pointer',
             }}
           >
             Refresh
@@ -53,42 +66,57 @@ function App() {
               {loading && workingFiles.length === 0 ? (
                 <div style={{ padding: '1rem' }}>Loading...</div>
               ) : (
-                <FileList 
-                  files={workingFiles} 
-                  selectedFileId={paneMode === 'working' ? selectedFile?.id ?? null : null}
-                  onSelect={(file) => { setSelectedFile(file); setPaneMode('working'); }}
+                <FileList
+                  files={workingFiles}
+                  selectedFileId={paneMode === 'working' ? (selectedFile?.id ?? null) : null}
+                  onSelect={(file) => {
+                    setSelectedFile(file);
+                    setPaneMode('working');
+                  }}
                 />
               )}
             </div>
           </div>
           <div className="sidebar-panel" style={{ borderTop: '1px solid var(--border-color)' }}>
-             <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
-             <div className="pane-content" style={{ padding: 0 }}>
+            <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
+            <div className="pane-content" style={{ padding: 0 }}>
               {loading && stagedFiles.length === 0 ? (
                 <div style={{ padding: '1rem' }}>Loading...</div>
               ) : (
-                <FileList 
-                  files={stagedFiles} 
-                  selectedFileId={paneMode === 'staged' ? selectedFile?.id ?? null : null}
-                  onSelect={(file) => { setSelectedFile(file); setPaneMode('staged'); }}
+                <FileList
+                  files={stagedFiles}
+                  selectedFileId={paneMode === 'staged' ? (selectedFile?.id ?? null) : null}
+                  onSelect={(file) => {
+                    setSelectedFile(file);
+                    setPaneMode('staged');
+                  }}
                 />
-             )}
-             </div>
+              )}
+            </div>
           </div>
         </div>
         <div className="pane main-diff">
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
             {selectedFile && (
-               <button 
-                 onClick={() => paneMode === 'working' ? stageFile(selectedFile.path) : unstageFile(selectedFile.path)}
-                 style={{
+              <button
+                onClick={() =>
+                  paneMode === 'working'
+                    ? stageFile(selectedFile.path)
+                    : unstageFile(selectedFile.path)
+                }
+                style={{
                   background: paneMode === 'working' ? '#238636' : '#da3633',
-                  color: '#fff', border: '1px solid rgba(240,246,252,0.1)',
-                  borderRadius: '4px', padding: '0.1rem 0.6rem', cursor: 'pointer', fontSize: '0.8rem'
-               }}>
-                 {paneMode === 'working' ? 'Stage file' : 'Unstage file'}
-               </button>
+                  color: '#fff',
+                  border: '1px solid rgba(240,246,252,0.1)',
+                  borderRadius: '4px',
+                  padding: '0.1rem 0.6rem',
+                  cursor: 'pointer',
+                  fontSize: '0.8rem',
+                }}
+              >
+                {paneMode === 'working' ? 'Stage file' : 'Unstage file'}
+              </button>
             )}
           </div>
           <div className="pane-content" style={{ padding: 0 }}>
@@ -97,12 +125,12 @@ function App() {
                 Select a file to view differences.
               </div>
             ) : (
-              <UnifiedDiffViewer 
-                file={selectedFile} 
-                paneMode={paneMode} 
+              <UnifiedDiffViewer
+                file={selectedFile}
+                paneMode={paneMode}
                 onStageHunk={(id) => stageHunk(selectedFile.path, id)}
                 onUnstageHunk={(id) => unstageHunk(selectedFile.path, id)}
-                notes={notes.filter(n => n.target.fileId === selectedFile.id)}
+                notes={notes.filter((n) => n.target.fileId === selectedFile.id)}
                 onAddNote={addNote}
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}

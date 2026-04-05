@@ -55,11 +55,20 @@ To build the client assets and compile the server-side TypeScript code:
 pnpm run build
 ```
 
-After building, you can start the production server:
+Then you can run the compiled CLI application directly:
 
 ```bash
-pnpm start
+pnpm run start
 ```
+
+### Code Quality (Linting & Formatting)
+
+This project uses **ESLint** and **Prettier** to enforce a unified code style.
+
+- **Check Formatting**: `pnpm run format`
+- **Auto-Fix Formatting**: `pnpm run format:fix`
+- **Run Linter**: `pnpm run lint`
+- **Auto-Fix Lint Errors**: `pnpm run lint:fix`
 
 ## 🛠 Tech Stack
 

@@ -13,8 +13,9 @@ export class GitClient {
         maxBuffer: 10 * 1024 * 1024, // 10MB
       });
       return stdout;
-    } catch (error: any) {
-      throw new Error(`Git command failed: git ${args.join(' ')}\n${error.message}`);
+    } catch (error: unknown) {
+      const msg = error instanceof Error ? error.message : String(error);
+      throw new Error(`Git command failed: git ${args.join(' ')}\n${msg}`, { cause: error });
     }
   }
 
@@ -23,14 +24,7 @@ export class GitClient {
     if (staged) {
       args.push('--cached');
     }
-    // Note: If no changes, this returns empty string.
-    try {
-      return await this.runGitCommand(args);
-    } catch (e: any) {
-      // Sometimes git diff exits with 1 if there are differences but --exit-code is not used. Oh wait, it exits with 0 by default.
-      // E.g. git diff returns 0 unless --exit-code.
-      throw e;
-    }
+    return await this.runGitCommand(args);
   }
 
   async getUntrackedFiles(): Promise<string[]> {

@@ -42,12 +42,17 @@ export class WorkspaceActionService {
     await this.applyHunkPatch(filePath, hunkId, 'staged', true);
   }
 
-  private async applyHunkPatch(filePath: string, hunkId: string, bucket: 'working'|'staged', reverse: boolean): Promise<void> {
+  private async applyHunkPatch(
+    filePath: string,
+    hunkId: string,
+    bucket: 'working' | 'staged',
+    reverse: boolean,
+  ): Promise<void> {
     const files = await this.provider.getFiles(bucket);
-    const targetFile = files.find(f => f.path === filePath);
+    const targetFile = files.find((f) => f.path === filePath);
     if (!targetFile) throw new Error('File not found in diff');
-    
-    const targetHunk = targetFile.hunks.find(h => h.id === hunkId);
+
+    const targetHunk = targetFile.hunks.find((h) => h.id === hunkId);
     if (!targetHunk) throw new Error('Hunk not found in diff');
 
     const patch = createPatchForHunk(targetFile, targetHunk);

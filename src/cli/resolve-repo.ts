@@ -1,5 +1,5 @@
 import { execSync } from 'node:child_process';
-import { resolve, join } from 'node:path';
+import { resolve } from 'node:path';
 import { statSync } from 'node:fs';
 
 export function resolveRepoRoot(targetPath: string = process.cwd()): string {
@@ -22,7 +22,8 @@ export function resolveRepoRoot(targetPath: string = process.cwd()): string {
       throw new Error('Not a git repository');
     }
     return repoRoot;
-  } catch (error: any) {
-    throw new Error(`Failed to resolve git repository: ${error.message}`);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    throw new Error(`Failed to resolve repository at ${targetPath}: ${msg}`, { cause: error });
   }
 }

@@ -9,17 +9,17 @@ export function useNotes() {
       id: crypto.randomUUID ? crypto.randomUUID() : Math.random().toString(36).substring(2, 9),
       target,
       body,
-      createdAt: Date.now()
+      createdAt: Date.now(),
     };
-    setNotes(prev => [...prev, newNote]);
+    setNotes((prev) => [...prev, newNote]);
   }, []);
 
   const updateNote = useCallback((id: string, body: string) => {
-    setNotes(prev => prev.map(n => n.id === id ? { ...n, body } : n));
+    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, body } : n)));
   }, []);
 
   const deleteNote = useCallback((id: string) => {
-    setNotes(prev => prev.filter(n => n.id !== id));
+    setNotes((prev) => prev.filter((n) => n.id !== id));
   }, []);
 
   const clearNotes = useCallback(() => {
@@ -31,6 +31,6 @@ export function useNotes() {
     addNote,
     updateNote,
     deleteNote,
-    clearNotes
+    clearNotes,
   };
 }

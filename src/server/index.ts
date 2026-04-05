@@ -39,7 +39,7 @@ export async function startServer(repoRoot: string): Promise<string> {
   const clientDir = path.resolve(__dirname, '../../dist/client');
 
   cliApp.use('/assets/*', serveStatic({ root: path.relative(process.cwd(), clientDir) }));
-  
+
   cliApp.get('*', async (c) => {
     try {
       const { readFile } = await import('node:fs/promises');
@@ -53,11 +53,14 @@ export async function startServer(repoRoot: string): Promise<string> {
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   return new Promise((resolve) => {
-    serve({
-      fetch: cliApp.fetch,
-      port,
-    }, (info) => {
-      resolve(`http://localhost:${info.port}`);
-    });
+    serve(
+      {
+        fetch: cliApp.fetch,
+        port,
+      },
+      (info) => {
+        resolve(`http://localhost:${info.port}`);
+      },
+    );
   });
 }

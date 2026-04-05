@@ -5,7 +5,7 @@ export const sessionRoutes = new Hono<Env>();
 
 sessionRoutes.get('/', (c) => {
   const repoRoot = c.get('repoRoot');
-  
+
   return c.json({
     mode: 'repository',
     repoRoot,

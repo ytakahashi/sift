@@ -6,13 +6,13 @@ export const diffRoutes = new Hono<Env>();
 
 diffRoutes.get('/', async (c) => {
   const repoRoot = c.get('repoRoot');
-  
+
   const provider = new RepositoryDiffProvider(repoRoot);
-  
+
   try {
     const [workingFiles, stagedFiles] = await Promise.all([
       provider.getFiles('working'),
-      provider.getFiles('staged')
+      provider.getFiles('staged'),
     ]);
 
     return c.json({
@@ -21,9 +21,10 @@ diffRoutes.get('/', async (c) => {
       metadata: {
         repoRoot,
         revision: 'HEAD',
-      }
+      },
     });
-  } catch (error: any) {
-    return c.json({ error: error.message }, 500);
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    return c.json({ error: msg }, 500);
   }
 });
