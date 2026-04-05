@@ -1,0 +1,45 @@
+{
+  "name": "sift",
+  "version": "1.0.0",
+  "description": "Sift before you commit. A lightweight local diff viewer.",
+  "main": "dist/cli/index.js",
+  "bin": {
+    "sift": "./dist/cli/index.js"
+  },
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:cli": "pnpm run build:client && tsx src/cli/index.ts",
+    "build:client": "vite build",
+    "build:server": "tsc -p tsconfig.node.json",
+    "build": "pnpm run build:client && pnpm run build:server",
+    "start": "node dist/cli/index.js",
+    "test": "vitest"
+  },
+  "keywords": [
+    "git",
+    "diff",
+    "viewer"
+  ],
+  "author": "",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.0",
+  "dependencies": {
+    "@hono/node-server": "1.19.12",
+    "commander": "14.0.3",
+    "hono": "4.12.10",
+    "react": "19.2.4",
+    "react-dom": "19.2.4"
+  },
+  "devDependencies": {
+    "@hono/vite-dev-server": "0.25.1",
+    "@types/node": "25.5.2",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "6.0.1",
+    "tsx": "4.21.0",
+    "typescript": "6.0.2",
+    "vite": "8.0.3",
+    "vitest": "4.1.2"
+  }
+}
