@@ -5,9 +5,20 @@ import { FileList } from './components/file-list/FileList';
 import { UnifiedDiffViewer } from './components/diff/UnifiedDiffViewer';
 import { useWorkspaceActions } from './hooks/useWorkspaceActions';
 import type { DiffFile } from '../domain/diff/types';
+import {
+  getFallbackSelectionIndex,
+  getSelectionByIndex,
+} from './components/file-list/file-list-selection';
+import { removeFileFromPane } from './components/file-list/file-list-optimistic';
 
 function App() {
-  const { workingFiles, stagedFiles, loading, error: diffError, refresh } = useDiffData();
+  const {
+    workingFiles: serverWorkingFiles,
+    stagedFiles: serverStagedFiles,
+    loading,
+    error: diffError,
+    refresh,
+  } = useDiffData();
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const refreshAll = useCallback(async () => {
     await refresh();
@@ -19,21 +30,104 @@ function App() {
     unstageFile,
     stageHunk,
     unstageHunk,
+    acting,
     error: actionError,
   } = useWorkspaceActions(refreshAll);
   const [selectedFile, setSelectedFile] = useState<DiffFile | null>(null);
   const [paneMode, setPaneMode] = useState<'working' | 'staged'>('working');
+  const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
+  const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
 
   useEffect(() => {
-    if (selectedFile) {
-      const targetList = paneMode === 'working' ? workingFiles : stagedFiles;
-      const updatedFile = targetList.find((f) => f.path === selectedFile.path);
-      if (updatedFile !== selectedFile) {
-        // eslint-disable-next-line react-hooks/set-state-in-effect
-        setSelectedFile(updatedFile || null);
-      }
+    setWorkingFiles(serverWorkingFiles);
+  }, [serverWorkingFiles]);
+
+  useEffect(() => {
+    setStagedFiles(serverStagedFiles);
+  }, [serverStagedFiles]);
+
+  useEffect(() => {
+    if (!selectedFile) {
+      return;
     }
-  }, [workingFiles, stagedFiles, paneMode, selectedFile]);
+
+    const targetList = paneMode === 'working' ? workingFiles : stagedFiles;
+    const updatedFile = targetList.find((file) => file.id === selectedFile.id);
+    if (updatedFile) {
+      if (updatedFile !== selectedFile) {
+        setSelectedFile(updatedFile);
+      }
+      return;
+    }
+
+    setSelectedFile(null);
+  }, [paneMode, selectedFile, stagedFiles, workingFiles]);
+
+  const handleSelect = useCallback((file: DiffFile, pane: 'working' | 'staged') => {
+    setSelectedFile(file);
+    setPaneMode(pane);
+  }, []);
+
+  const handleBoundaryNavigate = useCallback(
+    (pane: 'working' | 'staged', direction: 'previous' | 'next') => {
+      if (pane === 'staged' && direction === 'previous' && workingFiles.length > 0) {
+        setPaneMode('working');
+        setSelectedFile(workingFiles[workingFiles.length - 1]);
+        return;
+      }
+
+      if (pane === 'working' && direction === 'next' && stagedFiles.length > 0) {
+        setPaneMode('staged');
+        setSelectedFile(stagedFiles[0]);
+      }
+    },
+    [stagedFiles, workingFiles],
+  );
+
+  const handleActivate = useCallback(
+    async (
+      file: DiffFile,
+      pane: 'working' | 'staged',
+      files: DiffFile[],
+      action: (path: string) => Promise<void>,
+    ) => {
+      const previousWorkingFiles = workingFiles;
+      const previousStagedFiles = stagedFiles;
+      const previousSelectedFile = selectedFile;
+      const previousPaneMode = paneMode;
+      const currentIndex = files.findIndex((candidate) => candidate.id === file.id);
+      const fallbackIndex = getFallbackSelectionIndex(currentIndex, files.length);
+      const isWorkingPane = pane === 'working';
+      const sourceFiles = isWorkingPane ? workingFiles : stagedFiles;
+      const { nextSourceFiles, removedFile } = removeFileFromPane({
+        sourceFiles,
+        fileId: file.id,
+      });
+
+      if (!removedFile) {
+        return;
+      }
+
+      const fallbackFile = getSelectionByIndex(nextSourceFiles, fallbackIndex);
+      if (isWorkingPane) {
+        setWorkingFiles(nextSourceFiles);
+      } else {
+        setStagedFiles(nextSourceFiles);
+      }
+      setPaneMode(pane);
+      setSelectedFile(fallbackFile);
+
+      try {
+        await action(file.path);
+      } catch {
+        setWorkingFiles(previousWorkingFiles);
+        setStagedFiles(previousStagedFiles);
+        setSelectedFile(previousSelectedFile);
+        setPaneMode(previousPaneMode);
+      }
+    },
+    [paneMode, selectedFile, stagedFiles, workingFiles],
+  );
 
   return (
     <div className="app-container">
@@ -72,10 +166,13 @@ function App() {
                 <FileList
                   files={workingFiles}
                   selectedFileId={paneMode === 'working' ? (selectedFile?.id ?? null) : null}
-                  onSelect={(file) => {
-                    setSelectedFile(file);
-                    setPaneMode('working');
-                  }}
+                  disabled={acting}
+                  isActive={paneMode === 'working'}
+                  onSelect={(file) => handleSelect(file, 'working')}
+                  onActivate={(file) =>
+                    void handleActivate(file, 'working', workingFiles, stageFile)
+                  }
+                  onBoundaryNavigate={(direction) => handleBoundaryNavigate('working', direction)}
                 />
               )}
             </div>
@@ -89,10 +186,13 @@ function App() {
                 <FileList
                   files={stagedFiles}
                   selectedFileId={paneMode === 'staged' ? (selectedFile?.id ?? null) : null}
-                  onSelect={(file) => {
-                    setSelectedFile(file);
-                    setPaneMode('staged');
-                  }}
+                  disabled={acting}
+                  isActive={paneMode === 'staged'}
+                  onSelect={(file) => handleSelect(file, 'staged')}
+                  onActivate={(file) =>
+                    void handleActivate(file, 'staged', stagedFiles, unstageFile)
+                  }
+                  onBoundaryNavigate={(direction) => handleBoundaryNavigate('staged', direction)}
                 />
               )}
             </div>
@@ -104,9 +204,12 @@ function App() {
             {selectedFile && (
               <button
                 onClick={() =>
-                  paneMode === 'working'
-                    ? stageFile(selectedFile.path)
-                    : unstageFile(selectedFile.path)
+                  void handleActivate(
+                    selectedFile,
+                    paneMode,
+                    paneMode === 'working' ? workingFiles : stagedFiles,
+                    paneMode === 'working' ? stageFile : unstageFile,
+                  )
                 }
                 style={{
                   background: paneMode === 'working' ? '#238636' : '#da3633',

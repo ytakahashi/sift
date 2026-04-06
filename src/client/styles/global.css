@@ -88,3 +88,13 @@ body {
   overflow-y: auto;
   font-size: 0.85rem;
 }
+
+.file-list:focus-visible {
+  outline: 1px solid rgba(201, 50, 69, 0.45);
+  outline-offset: -2px;
+}
+
+.file-item.selected {
+  background-color: rgba(201, 50, 69, 0.15);
+  border-left: 3px solid var(--accent-color);
+}
