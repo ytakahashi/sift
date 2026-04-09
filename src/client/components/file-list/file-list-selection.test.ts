@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
-import { getFallbackSelectionIndex, getSelectionByIndex } from './file-list-selection';
+import {
+  findSelectedIndex,
+  getFallbackSelectionIndex,
+  getSelectionByIndex,
+} from './file-list-selection';
 
 function createFile(id: string): DiffFile {
   return {
@@ -16,6 +20,14 @@ function createFile(id: string): DiffFile {
 
 describe('file-list-selection', () => {
   const files = [createFile('a'), createFile('b'), createFile('c')];
+
+  it('finds the selected index by file id', () => {
+    expect(findSelectedIndex(files, 'b')).toBe(1);
+  });
+
+  it('returns -1 when no file is selected', () => {
+    expect(findSelectedIndex(files, null)).toBe(-1);
+  });
 
   it('keeps the same index when the removed file had a next sibling', () => {
     expect(getFallbackSelectionIndex(1, files.length)).toBe(1);

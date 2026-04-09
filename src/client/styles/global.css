@@ -94,6 +94,14 @@ body {
   outline-offset: -2px;
 }
 
+.file-item {
+  padding: 0.4rem 0.5rem;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-left: 3px solid transparent;
+}
+
 .file-item.selected {
   background-color: rgba(201, 50, 69, 0.15);
   border-left: 3px solid var(--accent-color);

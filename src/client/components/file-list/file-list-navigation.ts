@@ -1,14 +1,4 @@
-import type { DiffFile } from '../../../domain/diff/types';
-
 export type FileListKeyAction = 'previous' | 'next' | 'first' | 'last' | 'activate' | null;
-
-export function findSelectedIndex(files: DiffFile[], selectedFileId: string | null): number {
-  if (!selectedFileId) {
-    return -1;
-  }
-
-  return files.findIndex((file) => file.id === selectedFileId);
-}
 
 export function getFileListKeyAction(key: string): FileListKeyAction {
   switch (key) {

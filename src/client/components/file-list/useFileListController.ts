@@ -1,11 +1,8 @@
 import { useCallback } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
-import {
-  findSelectedIndex,
-  getFileListKeyAction,
-  getNextSelectedIndex,
-} from './file-list-navigation';
+import { getFileListKeyAction, getNextSelectedIndex } from './file-list-navigation';
+import { findSelectedIndex } from './file-list-selection';
 
 interface UseFileListControllerOptions {
   files: DiffFile[];

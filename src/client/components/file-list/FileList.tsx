@@ -90,13 +90,7 @@ export function FileList({
               }
             }}
             style={{
-              padding: '0.4rem 0.5rem',
               cursor: disabled ? 'default' : 'pointer',
-              backgroundColor: isSelected ? 'rgba(201, 50, 69, 0.15)' : 'transparent',
-              borderLeft: isSelected ? '3px solid var(--accent-color)' : '3px solid transparent',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
               opacity: disabled ? 0.7 : 1,
             }}
           >

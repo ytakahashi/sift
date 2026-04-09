@@ -129,6 +129,23 @@ function App() {
     [paneMode, selectedFile, stagedFiles, workingFiles],
   );
 
+  const handleWorkingActivate = useCallback(
+    (file: DiffFile) => void handleActivate(file, 'working', workingFiles, stageFile),
+    [handleActivate, workingFiles, stageFile],
+  );
+
+  const handleStagedActivate = useCallback(
+    (file: DiffFile) => void handleActivate(file, 'staged', stagedFiles, unstageFile),
+    [handleActivate, stagedFiles, unstageFile],
+  );
+
+  const handleSelectedFileActivate = useCallback(() => {
+    if (!selectedFile) return;
+    const files = paneMode === 'working' ? workingFiles : stagedFiles;
+    const action = paneMode === 'working' ? stageFile : unstageFile;
+    void handleActivate(selectedFile, paneMode, files, action);
+  }, [handleActivate, paneMode, selectedFile, stageFile, stagedFiles, unstageFile, workingFiles]);
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -169,9 +186,7 @@ function App() {
                   disabled={acting}
                   isActive={paneMode === 'working'}
                   onSelect={(file) => handleSelect(file, 'working')}
-                  onActivate={(file) =>
-                    void handleActivate(file, 'working', workingFiles, stageFile)
-                  }
+                  onActivate={handleWorkingActivate}
                   onBoundaryNavigate={(direction) => handleBoundaryNavigate('working', direction)}
                 />
               )}
@@ -189,9 +204,7 @@ function App() {
                   disabled={acting}
                   isActive={paneMode === 'staged'}
                   onSelect={(file) => handleSelect(file, 'staged')}
-                  onActivate={(file) =>
-                    void handleActivate(file, 'staged', stagedFiles, unstageFile)
-                  }
+                  onActivate={handleStagedActivate}
                   onBoundaryNavigate={(direction) => handleBoundaryNavigate('staged', direction)}
                 />
               )}
@@ -203,14 +216,7 @@ function App() {
             <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
             {selectedFile && (
               <button
-                onClick={() =>
-                  void handleActivate(
-                    selectedFile,
-                    paneMode,
-                    paneMode === 'working' ? workingFiles : stagedFiles,
-                    paneMode === 'working' ? stageFile : unstageFile,
-                  )
-                }
+                onClick={handleSelectedFileActivate}
                 style={{
                   background: paneMode === 'working' ? '#238636' : '#da3633',
                   color: '#fff',
