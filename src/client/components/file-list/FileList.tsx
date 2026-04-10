@@ -1,9 +1,15 @@
+import { useEffect, useRef } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
+import { useFileListController } from './useFileListController';
 
 interface FileListProps {
   files: DiffFile[];
   selectedFileId: string | null;
   onSelect: (file: DiffFile) => void;
+  onActivate: (file: DiffFile) => void;
+  disabled?: boolean;
+  isActive?: boolean;
+  onBoundaryNavigate?: (direction: 'previous' | 'next') => void;
 }
 
 function getStatusColor(status: string) {
@@ -21,7 +27,36 @@ function getStatusColor(status: string) {
   }
 }
 
-export function FileList({ files, selectedFileId, onSelect }: FileListProps) {
+export function FileList({
+  files,
+  selectedFileId,
+  onSelect,
+  onActivate,
+  disabled = false,
+  isActive = false,
+  onBoundaryNavigate,
+}: FileListProps) {
+  const listRef = useRef<HTMLDivElement | null>(null);
+  const { onKeyDown } = useFileListController({
+    files,
+    selectedFileId,
+    disabled,
+    onSelect,
+    onActivate,
+    onBoundaryNavigate,
+  });
+
+  useEffect(() => {
+    if (isActive && selectedFileId) {
+      // Focus the list unconditionally so that keyboard boundary navigation
+      // (ArrowDown past the last item) correctly transfers focus to the newly
+      // active pane. Guarding with list.contains(document.activeElement) would
+      // prevent that transfer while only marginally improving the rare case
+      // where a server refresh changes selectedFileId while focus is elsewhere.
+      listRef.current?.focus();
+    }
+  }, [isActive, selectedFileId]);
+
   if (files.length === 0) {
     return (
       <div className="empty-state" style={{ color: '#8b949e' }}>
@@ -31,22 +66,37 @@ export function FileList({ files, selectedFileId, onSelect }: FileListProps) {
   }
 
   return (
-    <div className="file-list">
+    <div
+      className="file-list"
+      role="listbox"
+      aria-label="Changed files"
+      aria-activedescendant={selectedFileId ? `file-item-${selectedFileId}` : undefined}
+      tabIndex={0}
+      ref={listRef}
+      onKeyDown={onKeyDown}
+    >
       {files.map((file) => {
         const isSelected = selectedFileId === file.id;
         return (
           <div
             key={file.id}
+            id={`file-item-${file.id}`}
             className={`file-item ${isSelected ? 'selected' : ''}`}
-            onClick={() => onSelect(file)}
+            role="option"
+            aria-selected={isSelected}
+            onClick={() => {
+              listRef.current?.focus();
+              onSelect(file);
+            }}
+            onDoubleClick={() => {
+              listRef.current?.focus();
+              if (!disabled) {
+                onActivate(file);
+              }
+            }}
             style={{
-              padding: '0.4rem 0.5rem',
-              cursor: 'pointer',
-              backgroundColor: isSelected ? 'rgba(201, 50, 69, 0.15)' : 'transparent',
-              borderLeft: isSelected ? '3px solid var(--accent-color)' : '3px solid transparent',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
+              cursor: disabled ? 'default' : 'pointer',
+              opacity: disabled ? 0.7 : 1,
             }}
           >
             <span

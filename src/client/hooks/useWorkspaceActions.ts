@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-export function useWorkspaceActions(onRefresh?: () => void) {
+export function useWorkspaceActions(onRefresh?: () => Promise<void> | void) {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -20,9 +20,12 @@ export function useWorkspaceActions(onRefresh?: () => void) {
         if (!res.ok || !data.success) {
           throw new Error(data.error || 'Action failed');
         }
-        if (onRefresh) onRefresh();
+        if (onRefresh) {
+          await onRefresh();
+        }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : String(err));
+        throw err;
       } finally {
         setActing(false);
       }

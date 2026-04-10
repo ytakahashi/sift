@@ -52,12 +52,23 @@ defined commands.
   `server/`.
 - Use `unknown` (not `any`) in `catch` blocks, with `instanceof Error` guards.
 
+### Code Comments
+
+- Add comments to explain user scenarios and design rationale when necessary to
+  provide context for complex logic.
+- In unit tests, add explanatory comments if the verification items or expected
+  values are not intuitive (e.g., when testing a controlled component's behavior
+  without rerendering), so readers can understand the intent without tracing the
+  full component lifecycle.
+
 ### Testing
 
 - Test files are colocated with source files.
 - Test runner is Vitest (config: `vitest.config.ts`).
 - Tests use explicit imports (`import { describe, it, expect } from 'vitest'`),
   not globals.
+- Use **Given / When / Then** style with explicit comment blocks to structure
+  test cases for better readability.
 - Avoid tests that require real Git repositories or filesystem access.
 
 ### Imports
