@@ -48,6 +48,11 @@ export function FileList({
 
   useEffect(() => {
     if (isActive && selectedFileId) {
+      // Focus the list unconditionally so that keyboard boundary navigation
+      // (ArrowDown past the last item) correctly transfers focus to the newly
+      // active pane. Guarding with list.contains(document.activeElement) would
+      // prevent that transfer while only marginally improving the rare case
+      // where a server refresh changes selectedFileId while focus is elsewhere.
       listRef.current?.focus();
     }
   }, [isActive, selectedFileId]);

@@ -85,22 +85,18 @@ function App() {
   );
 
   const handleActivate = useCallback(
-    async (
-      file: DiffFile,
-      pane: 'working' | 'staged',
-      files: DiffFile[],
-      action: (path: string) => Promise<void>,
-    ) => {
+    async (file: DiffFile, pane: 'working' | 'staged') => {
       const previousWorkingFiles = workingFiles;
       const previousStagedFiles = stagedFiles;
       const previousSelectedFile = selectedFile;
       const previousPaneMode = paneMode;
+      const isWorkingPane = pane === 'working';
+      const files = isWorkingPane ? workingFiles : stagedFiles;
+      const action = isWorkingPane ? stageFile : unstageFile;
       const currentIndex = files.findIndex((candidate) => candidate.id === file.id);
       const fallbackIndex = getFallbackSelectionIndex(currentIndex, files.length);
-      const isWorkingPane = pane === 'working';
-      const sourceFiles = isWorkingPane ? workingFiles : stagedFiles;
       const { nextSourceFiles, removedFile } = removeFileFromPane({
-        sourceFiles,
+        sourceFiles: files,
         fileId: file.id,
       });
 
@@ -117,6 +113,11 @@ function App() {
       setPaneMode(pane);
       setSelectedFile(fallbackFile);
 
+      // On failure, useWorkspaceActions sets acting=false (via finally) before
+      // this catch block runs. React 18+ automatic batching ensures all state
+      // updates within the same microtask are committed in a single render, so
+      // the intermediate state (acting=false, files not yet rolled back) is
+      // never visible to the user.
       try {
         await action(file.path);
       } catch {
@@ -126,25 +127,23 @@ function App() {
         setPaneMode(previousPaneMode);
       }
     },
-    [paneMode, selectedFile, stagedFiles, workingFiles],
+    [paneMode, selectedFile, stageFile, stagedFiles, unstageFile, workingFiles],
   );
 
   const handleWorkingActivate = useCallback(
-    (file: DiffFile) => void handleActivate(file, 'working', workingFiles, stageFile),
-    [handleActivate, workingFiles, stageFile],
+    (file: DiffFile) => void handleActivate(file, 'working'),
+    [handleActivate],
   );
 
   const handleStagedActivate = useCallback(
-    (file: DiffFile) => void handleActivate(file, 'staged', stagedFiles, unstageFile),
-    [handleActivate, stagedFiles, unstageFile],
+    (file: DiffFile) => void handleActivate(file, 'staged'),
+    [handleActivate],
   );
 
   const handleSelectedFileActivate = useCallback(() => {
     if (!selectedFile) return;
-    const files = paneMode === 'working' ? workingFiles : stagedFiles;
-    const action = paneMode === 'working' ? stageFile : unstageFile;
-    void handleActivate(selectedFile, paneMode, files, action);
-  }, [handleActivate, paneMode, selectedFile, stageFile, stagedFiles, unstageFile, workingFiles]);
+    void handleActivate(selectedFile, paneMode);
+  }, [handleActivate, paneMode, selectedFile]);
 
   return (
     <div className="app-container">
