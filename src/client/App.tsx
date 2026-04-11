@@ -10,6 +10,7 @@ import {
   getSelectionByIndex,
 } from './components/file-list/file-list-selection';
 import { removeFileFromPane } from './components/file-list/file-list-optimistic';
+import { NotesListModal } from './components/notes/NotesListModal';
 
 function App() {
   const {
@@ -35,6 +36,7 @@ function App() {
   } = useWorkspaceActions(refreshAll);
   const [selectedFile, setSelectedFile] = useState<DiffFile | null>(null);
   const [paneMode, setPaneMode] = useState<'working' | 'staged'>('working');
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   // Local mirrors of the server file lists. These exist to support optimistic UI:
   // when the user stages/unstages a file we remove it from the mirror immediately,
   // before the server confirms the action. On success the server refresh overwrites
@@ -73,6 +75,13 @@ function App() {
 
     setSelectedFile(null);
   }, [paneMode, selectedFile, stagedFiles, workingFiles]);
+
+  // Close notes modal if all notes are deleted
+  useEffect(() => {
+    if (isNotesModalOpen && notes.length === 0) {
+      setIsNotesModalOpen(false);
+    }
+  }, [isNotesModalOpen, notes.length]);
 
   const handleSelect = useCallback((file: DiffFile, pane: 'working' | 'staged') => {
     setSelectedFile(file);
@@ -170,6 +179,16 @@ function App() {
     void handleActivate(selectedFile, paneMode);
   }, [handleActivate, paneMode, selectedFile]);
 
+  const resolveFilePath = useCallback(
+    (fileId: string) => {
+      const found =
+        workingFiles.find((f) => f.id === fileId) || stagedFiles.find((f) => f.id === fileId);
+      if (found) return found.displayPath;
+      return fileId.replace(/^file-/, '');
+    },
+    [workingFiles, stagedFiles],
+  );
+
   return (
     <div className="app-container">
       <header className="app-header">
@@ -194,8 +213,33 @@ function App() {
           >
             Refresh
           </button>
+          {notes.length > 0 && (
+            <button
+              onClick={() => setIsNotesModalOpen(!isNotesModalOpen)}
+              style={{
+                background: '#238636',
+                color: '#fff',
+                border: 'none',
+                padding: '0.2rem 0.6rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+              }}
+            >
+              View Notes ({notes.length})
+            </button>
+          )}
         </div>
       </header>
+      <div style={{ position: 'relative' }}>
+        {isNotesModalOpen && (
+          <NotesListModal
+            notes={notes}
+            onClose={() => setIsNotesModalOpen(false)}
+            onDeleteNote={deleteNote}
+            resolveFilePath={resolveFilePath}
+          />
+        )}
+      </div>
       <main className="app-main">
         <div className="pane sidebar-container">
           <div className="sidebar-panel">

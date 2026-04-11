@@ -165,3 +165,149 @@ describe('App file list interactions', () => {
     expect(screen.getByTestId('diff-viewer').textContent).toBe('c.ts');
   });
 });
+
+describe('App Notes Interactions', () => {
+  const refresh = vi.fn();
+  const clearNotes = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDiffData).mockReturnValue({
+      workingFiles: [],
+      stagedFiles: [],
+      loading: false,
+      error: null,
+      refresh,
+    });
+    vi.mocked(useWorkspaceActions).mockReturnValue({
+      stageFile: vi.fn(),
+      unstageFile: vi.fn(),
+      stageHunk: vi.fn(),
+      unstageHunk: vi.fn(),
+      acting: false,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+  });
+
+  it('renders "View Notes" button conditionally based on notes length', () => {
+    // Given: an empty notes list
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    const { rerender } = render(<App />);
+
+    // Then: button is not in document
+    expect(screen.queryByRole('button', { name: /View Notes/i })).toBeNull();
+
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          body: 'hello',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    rerender(<App />);
+
+    // Then: button should be present
+    expect(screen.getByRole('button', { name: 'View Notes (1)' })).toBeDefined();
+  });
+
+  it('toggles the NotesListModal on button click', async () => {
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          body: 'hello note',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    const user = userEvent.setup();
+    render(<App />);
+
+    // Then: modal is not open yet
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+
+    // When clicked
+    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+
+    // Then: modal is visible
+    expect(screen.getByText('Your Notes (1)')).toBeDefined();
+
+    // When close button clicked
+    await user.click(screen.getByRole('button', { name: '×' }));
+
+    // Then: modal is hidden
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+  });
+
+  it('closes the modal automatically when all notes are deleted', async () => {
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          body: 'hello note',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    const user = userEvent.setup();
+    const { rerender } = render(<App />);
+
+    // When clicked to open
+    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+
+    // Then: modal is visible
+    expect(screen.getByText('Your Notes (1)')).toBeDefined();
+
+    // When all notes are deleted
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+    rerender(<App />);
+
+    // Then: modal is automatically hidden
+    expect(screen.queryByText('Your Notes (0)')).toBeNull();
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+  });
+});
