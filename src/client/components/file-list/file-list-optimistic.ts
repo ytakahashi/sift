@@ -1,3 +1,6 @@
+// Pure helpers for optimistic UI updates. These functions compute the next state
+// synchronously so the UI can reflect a user action (stage / unstage) before the
+// server responds. On failure the caller restores the previous snapshot.
 import type { DiffFile } from '../../../domain/diff/types';
 
 interface RemoveFileFromPaneInput {
@@ -7,6 +10,9 @@ interface RemoveFileFromPaneInput {
 
 interface RemoveFileFromPaneResult {
   nextSourceFiles: DiffFile[];
+  // The removed file, or null if it was not found. Callers use this as a signal
+  // to detect race conditions (e.g. double-click after the file was already
+  // removed) and abort the action early.
   removedFile: DiffFile | null;
 }
 

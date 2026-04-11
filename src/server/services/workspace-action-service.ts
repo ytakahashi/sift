@@ -13,7 +13,6 @@ export class WorkspaceActionService {
   }
 
   private sanitizePath(targetPath: string): string {
-    // Throws if invalid
     resolveSafePath(this.repoRoot, targetPath);
     return targetPath;
   }

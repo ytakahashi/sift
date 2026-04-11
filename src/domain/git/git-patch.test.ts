@@ -41,10 +41,14 @@ function createHunk(overrides: Partial<DiffHunk> = {}): DiffHunk {
 
 describe('createPatchForHunk', () => {
   it('generates a valid unified diff patch', () => {
+    // Given: a file and a hunk with context, delete, and add lines
     const file = createFile();
     const hunk = createHunk();
+
+    // When: generating a patch for the hunk
     const patch = createPatchForHunk(file, hunk);
 
+    // Then: it produces a valid unified diff string
     const lines = patch.split('\n');
     expect(lines[0]).toBe('diff --git a/example.ts b/example.ts');
     expect(lines[1]).toBe('--- a/example.ts');
@@ -57,10 +61,14 @@ describe('createPatchForHunk', () => {
   });
 
   it('uses oldPath for the "---" line when available (rename)', () => {
+    // Given: a renamed file with an oldPath
     const file = createFile({ path: 'new-name.ts', oldPath: 'old-name.ts' });
     const hunk = createHunk({ lines: [] });
+
+    // When: generating a patch
     const patch = createPatchForHunk(file, hunk);
 
+    // Then: it uses the oldPath for the "a/" side and the "---" line
     const lines = patch.split('\n');
     expect(lines[0]).toBe('diff --git a/old-name.ts b/new-name.ts');
     expect(lines[1]).toBe('--- a/old-name.ts');
@@ -68,10 +76,14 @@ describe('createPatchForHunk', () => {
   });
 
   it('uses path for both sides when no oldPath is set', () => {
+    // Given: a file without an oldPath
     const file = createFile({ path: 'same.ts', oldPath: undefined });
     const hunk = createHunk({ lines: [] });
+
+    // When: generating a patch
     const patch = createPatchForHunk(file, hunk);
 
+    // Then: it uses the current path for both "a/" and "b/" sides
     const lines = patch.split('\n');
     expect(lines[0]).toBe('diff --git a/same.ts b/same.ts');
     expect(lines[1]).toBe('--- a/same.ts');

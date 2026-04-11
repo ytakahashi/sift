@@ -35,9 +35,15 @@ function App() {
   } = useWorkspaceActions(refreshAll);
   const [selectedFile, setSelectedFile] = useState<DiffFile | null>(null);
   const [paneMode, setPaneMode] = useState<'working' | 'staged'>('working');
+  // Local mirrors of the server file lists. These exist to support optimistic UI:
+  // when the user stages/unstages a file we remove it from the mirror immediately,
+  // before the server confirms the action. On success the server refresh overwrites
+  // the mirrors; on failure the mirrors are rolled back to the previous snapshot.
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
 
+  // One-way sync: propagate server data into the local mirrors.
+  // Optimistic removals are overwritten when the next server refresh arrives.
   useEffect(() => {
     setWorkingFiles(serverWorkingFiles);
   }, [serverWorkingFiles]);
@@ -46,6 +52,11 @@ function App() {
     setStagedFiles(serverStagedFiles);
   }, [serverStagedFiles]);
 
+  // Keep the selected-file reference in sync with the current file lists.
+  // After a server refresh the same logical file may be a new object, so we
+  // replace the stale reference with the updated one. If the file no longer
+  // exists in the list (e.g. it was moved to another pane by another process),
+  // we clear the selection so the diff viewer does not show stale content.
   useEffect(() => {
     if (!selectedFile) {
       return;
@@ -68,6 +79,11 @@ function App() {
     setPaneMode(pane);
   }, []);
 
+  // Cross-pane keyboard navigation. The sidebar layout places Working Directory
+  // above Staged Changes, so ArrowDown past the last working file jumps to the
+  // first staged file, and ArrowUp past the first staged file jumps to the last
+  // working file. The opposite directions (ArrowUp in working, ArrowDown in staged)
+  // have no adjacent pane to jump to, so they are intentionally ignored.
   const handleBoundaryNavigate = useCallback(
     (pane: 'working' | 'staged', direction: 'previous' | 'next') => {
       if (pane === 'staged' && direction === 'previous' && workingFiles.length > 0) {
@@ -84,6 +100,13 @@ function App() {
     [stagedFiles, workingFiles],
   );
 
+  // Optimistic stage/unstage flow:
+  //   1. Snapshot current state for rollback.
+  //   2. Compute which file to select after removal (fallback selection).
+  //   3. Remove the file from the local mirror immediately (optimistic update).
+  //   4. Await the server action.
+  //   5. On failure, restore all snapshots to roll back the optimistic change.
+  //      The server refresh triggered on success will reconcile the mirrors.
   const handleActivate = useCallback(
     async (file: DiffFile, pane: 'working' | 'staged') => {
       const previousWorkingFiles = workingFiles;
@@ -100,6 +123,8 @@ function App() {
         fileId: file.id,
       });
 
+      // Guard against race conditions (e.g. double-click before the first action
+      // completes and the file has already been removed from the mirror).
       if (!removedFile) {
         return;
       }

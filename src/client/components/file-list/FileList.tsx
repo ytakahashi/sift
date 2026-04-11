@@ -85,11 +85,15 @@ export function FileList({
             role="option"
             aria-selected={isSelected}
             onClick={() => {
+              // Move keyboard focus to the listbox so that Arrow / Enter keys
+              // work immediately after a mouse click without a second interaction.
               listRef.current?.focus();
               onSelect(file);
             }}
             onDoubleClick={() => {
               listRef.current?.focus();
+              // Skip activation while an action is in flight to prevent
+              // double-submission during the optimistic update window.
               if (!disabled) {
                 onActivate(file);
               }

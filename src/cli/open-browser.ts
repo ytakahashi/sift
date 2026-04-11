@@ -10,7 +10,6 @@ export function openBrowser(url: string): void {
   } else if (platform === 'darwin') {
     command = `open "${url}"`;
   } else {
-    // Linux and others
     command = `xdg-open "${url}"`;
   }
 

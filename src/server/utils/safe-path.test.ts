@@ -1,39 +1,66 @@
 import { describe, it, expect } from 'vitest';
 import { resolveSafePath, isSafePath } from './safe-path';
-import { sep } from 'node:path';
 
 describe('resolveSafePath', () => {
   const base = '/repo/root';
 
   it('resolves a valid relative path', () => {
-    const result = resolveSafePath(base, 'src/file.ts');
-    expect(result).toBe(`${base}${sep}src${sep}file.ts`);
+    // Given: base path is "/repo/root" and relative path is "src/file.ts"
+    const relativePath = 'src/file.ts';
+
+    // When: resolving the path
+    const result = resolveSafePath(base, relativePath);
+
+    // Then: returns the resolved path
+    expect(result).toBe('/repo/root/src/file.ts');
   });
 
   it('throws on directory traversal with ..', () => {
-    expect(() => resolveSafePath(base, '../etc/passwd')).toThrow('Path traversal detected');
+    // Given: base path is "/repo/root" and relative path is "../etc/passwd"
+    const relativePath = '../etc/passwd';
+
+    // When/Then: resolving the path throws an error
+    expect(() => resolveSafePath(base, relativePath)).toThrow('Path traversal detected');
   });
 
   it('throws on deeply nested traversal', () => {
-    expect(() => resolveSafePath(base, 'a/b/../../../../../../etc/passwd')).toThrow(
-      'Path traversal detected',
-    );
+    // Given: base path is "/repo/root" and a deeply nested traversal path
+    const relativePath = 'a/b/../../../../../../etc/passwd';
+
+    // When/Then: resolving the path throws an error
+    expect(() => resolveSafePath(base, relativePath)).toThrow('Path traversal detected');
   });
 
   it('strips leading slashes and resolves safely', () => {
+    // Given: base path is "/repo/root" and a path with a leading slash
     // An absolute path like "/some/other/path" gets its leading slash stripped,
     // so it becomes relative and resolves inside base.
-    const result = resolveSafePath(base, '/some/other/path');
+    const relativePath = '/some/other/path';
+
+    // When: resolving the path
+    const result = resolveSafePath(base, relativePath);
+
+    // Then: it resolves safely inside the base path
     expect(result.startsWith(base)).toBe(true);
+    expect(result).toBe('/repo/root/some/other/path');
   });
 
   it('throws when basePath is empty', () => {
-    expect(() => resolveSafePath('', 'file.ts')).toThrow('Base path must be provided');
+    // Given: an empty base path
+    const emptyBase = '';
+
+    // When/Then: resolving any path throws an error
+    expect(() => resolveSafePath(emptyBase, 'file.ts')).toThrow('Base path must be provided');
   });
 
   it('accepts the base path itself', () => {
-    // Resolving '.' against base should return the base itself
-    const result = resolveSafePath(base, '.');
+    // Given: base path and the "." relative path
+    const relativePath = '.';
+
+    // When: resolving "." against base
+    const result = resolveSafePath(base, relativePath);
+
+    // Then: returns the base path itself
     expect(result).toBe(base);
   });
 });
@@ -42,10 +69,24 @@ describe('isSafePath', () => {
   const base = '/repo/root';
 
   it('returns true for a safe path', () => {
-    expect(isSafePath(base, 'src/file.ts')).toBe(true);
+    // Given: base path and a safe relative path
+    const relativePath = 'src/file.ts';
+
+    // When: checking if the path is safe
+    const result = isSafePath(base, relativePath);
+
+    // Then: returns true
+    expect(result).toBe(true);
   });
 
   it('returns false for a traversal path', () => {
-    expect(isSafePath(base, '../etc/passwd')).toBe(false);
+    // Given: base path and a traversal path
+    const relativePath = '../etc/passwd';
+
+    // When: checking if the path is safe
+    const result = isSafePath(base, relativePath);
+
+    // Then: returns false
+    expect(result).toBe(false);
   });
 });

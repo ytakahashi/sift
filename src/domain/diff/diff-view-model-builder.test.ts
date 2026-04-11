@@ -23,12 +23,24 @@ function createHunk(overrides: Partial<DiffHunk> = {}): DiffHunk {
 describe('DiffViewModelBuilder', () => {
   describe('buildUnified', () => {
     it('returns an empty array for empty hunks', () => {
-      expect(DiffViewModelBuilder.buildUnified([])).toEqual([]);
+      // Given: an empty list of hunks
+      const hunks: DiffHunk[] = [];
+
+      // When: building the unified view rows
+      const rows = DiffViewModelBuilder.buildUnified(hunks);
+
+      // Then: returns an empty array
+      expect(rows).toEqual([]);
     });
 
     it('produces a hunk-header row followed by line rows', () => {
-      const rows = DiffViewModelBuilder.buildUnified([createHunk()]);
+      // Given: a hunk with context, delete, and add lines
+      const hunk = createHunk();
 
+      // When: building the unified view rows
+      const rows = DiffViewModelBuilder.buildUnified([hunk]);
+
+      // Then: it produces a header row followed by the correctly mapped line rows
       expect(rows).toHaveLength(5); // 1 header + 4 lines
       expect(rows[0].type).toBe('hunk-header');
       expect(rows[0].content).toBe('@@ -1,3 +1,3 @@');
@@ -41,18 +53,27 @@ describe('DiffViewModelBuilder', () => {
     });
 
     it('handles multiple hunks with separate headers', () => {
+      // Given: two separate hunks
       const hunk1 = createHunk({ id: 'hunk-1', header: '@@ -1,1 +1,1 @@', lines: [] });
       const hunk2 = createHunk({ id: 'hunk-2', header: '@@ -10,1 +10,1 @@', lines: [] });
 
+      // When: building the unified view rows
       const rows = DiffViewModelBuilder.buildUnified([hunk1, hunk2]);
+
+      // Then: it produces a header row for each hunk
       expect(rows).toHaveLength(2);
       expect(rows[0].hunkId).toBe('hunk-1');
       expect(rows[1].hunkId).toBe('hunk-2');
     });
 
     it('preserves line numbers from the source', () => {
-      const rows = DiffViewModelBuilder.buildUnified([createHunk()]);
+      // Given: a hunk with specific line numbers
+      const hunk = createHunk();
 
+      // When: building the unified view rows
+      const rows = DiffViewModelBuilder.buildUnified([hunk]);
+
+      // Then: the row line numbers match the source hunk lines
       expect(rows[1].oldLineNumber).toBe(1);
       expect(rows[1].newLineNumber).toBe(1);
       expect(rows[2].oldLineNumber).toBe(2);
@@ -64,13 +85,25 @@ describe('DiffViewModelBuilder', () => {
 
   describe('buildSplit', () => {
     it('returns an empty array for empty hunks', () => {
-      expect(DiffViewModelBuilder.buildSplit([])).toEqual([]);
+      // Given: an empty list of hunks
+      const hunks: DiffHunk[] = [];
+
+      // When: building the split view rows
+      const rows = DiffViewModelBuilder.buildSplit(hunks);
+
+      // Then: returns an empty array
+      expect(rows).toEqual([]);
     });
 
     it('sets oldContent only for delete lines and newContent only for add lines', () => {
-      const rows = DiffViewModelBuilder.buildSplit([createHunk()]);
+      // Given: a hunk with context, delete, and add lines
+      const hunk = createHunk();
 
-      // header
+      // When: building the split view rows
+      const rows = DiffViewModelBuilder.buildSplit([hunk]);
+
+      // Then: context rows have content on both sides, delete on left, add on right
+      // hunk-header
       expect(rows[0].type).toBe('hunk-header');
 
       // context: both sides

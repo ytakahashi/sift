@@ -1,5 +1,7 @@
 import { useCallback, useState } from 'react';
 
+// onRefresh is awaited when provided so that the file lists are up to date
+// before acting is cleared and the UI is re-enabled.
 export function useWorkspaceActions(onRefresh?: () => Promise<void> | void) {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -25,6 +27,9 @@ export function useWorkspaceActions(onRefresh?: () => Promise<void> | void) {
         }
       } catch (err: unknown) {
         setError(err instanceof Error ? err.message : String(err));
+        // Re-throw so callers can run their own failure logic (e.g. optimistic
+        // rollback in App). Error display is handled via the error state above;
+        // callers should not add their own error UI.
         throw err;
       } finally {
         setActing(false);
