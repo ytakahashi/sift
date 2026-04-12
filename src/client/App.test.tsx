@@ -164,6 +164,23 @@ describe('App file list interactions', () => {
     // Then: selection crosses back into the working pane and the diff viewer updates
     expect(screen.getByTestId('diff-viewer').textContent).toBe('c.ts');
   });
+
+  it('renders resize splitters for sidebar and stacked panes', () => {
+    // Given: the app is rendered
+    render(<App />);
+
+    // When: querying the separator elements
+    const verticalSplitter = screen.getByRole('separator', {
+      name: 'Resize sidebar and diff panes',
+    });
+    const horizontalSplitter = screen.getByRole('separator', {
+      name: 'Resize Working and Staged panes',
+    });
+
+    // Then: both splitters are present in the layout
+    expect(verticalSplitter).toBeDefined();
+    expect(horizontalSplitter).toBeDefined();
+  });
 });
 
 describe('App Notes Interactions', () => {

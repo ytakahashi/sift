@@ -11,6 +11,7 @@ import {
 } from './components/file-list/file-list-selection';
 import { removeFileFromPane } from './components/file-list/file-list-optimistic';
 import { NotesListModal } from './components/notes/NotesListModal';
+import { usePaneResize } from './hooks/usePaneResize';
 
 function App() {
   const {
@@ -43,6 +44,14 @@ function App() {
   // the mirrors; on failure the mirrors are rolled back to the previous snapshot.
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
+  const {
+    appMainRef,
+    sidebarRef,
+    sidebarStyle,
+    workingPaneStyle,
+    sidebarSplitterProps,
+    paneSplitterProps,
+  } = usePaneResize();
 
   // One-way sync: propagate server data into the local mirrors.
   // Optimistic removals are overwritten when the next server refresh arrives.
@@ -243,9 +252,9 @@ function App() {
           />
         )}
       </div>
-      <main className="app-main">
-        <div className="pane sidebar-container">
-          <div className="sidebar-panel">
+      <main className="app-main" ref={appMainRef}>
+        <div className="pane sidebar-container" ref={sidebarRef} style={sidebarStyle}>
+          <div className="sidebar-panel" style={workingPaneStyle}>
             <div className="pane-header">Working Directory ({workingFiles.length})</div>
             <div className="pane-content" style={{ padding: 0 }}>
               {loading && workingFiles.length === 0 ? (
@@ -263,7 +272,8 @@ function App() {
               )}
             </div>
           </div>
-          <div className="sidebar-panel" style={{ borderTop: '1px solid var(--border-color)' }}>
+          <div {...paneSplitterProps} />
+          <div className="sidebar-panel">
             <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
             <div className="pane-content" style={{ padding: 0 }}>
               {loading && stagedFiles.length === 0 ? (
@@ -282,6 +292,7 @@ function App() {
             </div>
           </div>
         </div>
+        <div {...sidebarSplitterProps} />
         <div className="pane main-diff">
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
