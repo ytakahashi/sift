@@ -1,10 +1,4 @@
-import {
-  useCallback,
-  useState,
-  useEffect,
-  useRef,
-  type PointerEvent as ReactPointerEvent,
-} from 'react';
+import { useCallback, useState, useEffect } from 'react';
 import { useDiffData } from './hooks/useDiffData';
 import { useNotes } from './hooks/useNotes';
 import { FileList } from './components/file-list/FileList';
@@ -17,9 +11,7 @@ import {
 } from './components/file-list/file-list-selection';
 import { removeFileFromPane } from './components/file-list/file-list-optimistic';
 import { NotesListModal } from './components/notes/NotesListModal';
-import { clampSidebarWidth, clampWorkingPanelHeight } from './layout/pane-size';
-
-type DragTarget = 'sidebar-width' | 'working-height';
+import { usePaneResize } from './hooks/usePaneResize';
 
 function App() {
   const {
@@ -52,12 +44,14 @@ function App() {
   // the mirrors; on failure the mirrors are rolled back to the previous snapshot.
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
-  const [sidebarWidthPx, setSidebarWidthPx] = useState<number>(300);
-  const [workingPaneHeightPx, setWorkingPaneHeightPx] = useState<number | null>(null);
-  const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
-  const appMainRef = useRef<HTMLElement | null>(null);
-  const sidebarRef = useRef<HTMLDivElement | null>(null);
-  const dragTargetRef = useRef<DragTarget | null>(null);
+  const {
+    appMainRef,
+    sidebarRef,
+    sidebarStyle,
+    workingPaneStyle,
+    sidebarSplitterProps,
+    paneSplitterProps,
+  } = usePaneResize();
 
   // One-way sync: propagate server data into the local mirrors.
   // Optimistic removals are overwritten when the next server refresh arrives.
@@ -97,109 +91,6 @@ function App() {
       setIsNotesModalOpen(false);
     }
   }, [isNotesModalOpen, notes.length]);
-
-  const stopDrag = useCallback(() => {
-    dragTargetRef.current = null;
-    setDragTarget(null);
-    document.body.style.userSelect = '';
-    document.body.style.cursor = '';
-  }, []);
-
-  useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
-      const currentDragTarget = dragTargetRef.current;
-      if (!currentDragTarget) {
-        return;
-      }
-
-      if (currentDragTarget === 'sidebar-width') {
-        const appMain = appMainRef.current;
-        if (!appMain) {
-          return;
-        }
-        const appRect = appMain.getBoundingClientRect();
-        const widthPx = event.clientX - appRect.left;
-        setSidebarWidthPx(clampSidebarWidth(widthPx, appRect.width));
-        return;
-      }
-
-      const sidebar = sidebarRef.current;
-      if (!sidebar) {
-        return;
-      }
-      const sidebarRect = sidebar.getBoundingClientRect();
-      const heightPx = event.clientY - sidebarRect.top;
-      setWorkingPaneHeightPx(clampWorkingPanelHeight(heightPx, sidebarRect.height));
-    };
-
-    const handlePointerUp = () => {
-      if (!dragTargetRef.current) {
-        return;
-      }
-      stopDrag();
-    };
-
-    window.addEventListener('pointermove', handlePointerMove);
-    window.addEventListener('pointerup', handlePointerUp);
-    return () => {
-      window.removeEventListener('pointermove', handlePointerMove);
-      window.removeEventListener('pointerup', handlePointerUp);
-    };
-  }, [stopDrag]);
-
-  // Keep pane sizes valid if the app is resized after the user has dragged splitters.
-  useEffect(() => {
-    const clampCurrentLayout = () => {
-      const appMain = appMainRef.current;
-      if (appMain) {
-        const appRect = appMain.getBoundingClientRect();
-        setSidebarWidthPx((currentWidthPx) => clampSidebarWidth(currentWidthPx, appRect.width));
-      }
-
-      const sidebar = sidebarRef.current;
-      if (sidebar) {
-        const sidebarRect = sidebar.getBoundingClientRect();
-        setWorkingPaneHeightPx((currentHeightPx) =>
-          currentHeightPx === null
-            ? currentHeightPx
-            : clampWorkingPanelHeight(currentHeightPx, sidebarRect.height),
-        );
-      }
-    };
-
-    clampCurrentLayout();
-    window.addEventListener('resize', clampCurrentLayout);
-    return () => {
-      window.removeEventListener('resize', clampCurrentLayout);
-    };
-  }, []);
-
-  useEffect(() => {
-    return () => {
-      dragTargetRef.current = null;
-      document.body.style.userSelect = '';
-      document.body.style.cursor = '';
-    };
-  }, []);
-
-  const handleSidebarSplitterPointerDown = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      dragTargetRef.current = 'sidebar-width';
-      setDragTarget('sidebar-width');
-      document.body.style.userSelect = 'none';
-      document.body.style.cursor = 'col-resize';
-    },
-    [],
-  );
-
-  const handlePaneSplitterPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
-    event.preventDefault();
-    dragTargetRef.current = 'working-height';
-    setDragTarget('working-height');
-    document.body.style.userSelect = 'none';
-    document.body.style.cursor = 'row-resize';
-  }, []);
 
   const handleSelect = useCallback((file: DiffFile, pane: 'working' | 'staged') => {
     setSelectedFile(file);
@@ -362,19 +253,8 @@ function App() {
         )}
       </div>
       <main className="app-main" ref={appMainRef}>
-        <div
-          className="pane sidebar-container"
-          ref={sidebarRef}
-          style={{ width: `${sidebarWidthPx}px` }}
-        >
-          <div
-            className="sidebar-panel"
-            style={
-              workingPaneHeightPx === null
-                ? undefined
-                : { flex: '0 0 auto', height: `${workingPaneHeightPx}px` }
-            }
-          >
+        <div className="pane sidebar-container" ref={sidebarRef} style={sidebarStyle}>
+          <div className="sidebar-panel" style={workingPaneStyle}>
             <div className="pane-header">Working Directory ({workingFiles.length})</div>
             <div className="pane-content" style={{ padding: 0 }}>
               {loading && workingFiles.length === 0 ? (
@@ -392,15 +272,7 @@ function App() {
               )}
             </div>
           </div>
-          <div
-            className={`pane-splitter pane-splitter-horizontal ${
-              dragTarget === 'working-height' ? 'is-dragging' : ''
-            }`}
-            role="separator"
-            aria-label="Resize Working and Staged panes"
-            aria-orientation="horizontal"
-            onPointerDown={handlePaneSplitterPointerDown}
-          />
+          <div {...paneSplitterProps} />
           <div className="sidebar-panel">
             <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
             <div className="pane-content" style={{ padding: 0 }}>
@@ -420,15 +292,7 @@ function App() {
             </div>
           </div>
         </div>
-        <div
-          className={`pane-splitter pane-splitter-vertical ${
-            dragTarget === 'sidebar-width' ? 'is-dragging' : ''
-          }`}
-          role="separator"
-          aria-label="Resize sidebar and diff panes"
-          aria-orientation="vertical"
-          onPointerDown={handleSidebarSplitterPointerDown}
-        />
+        <div {...sidebarSplitterProps} />
         <div className="pane main-diff">
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
