@@ -345,13 +345,13 @@ describe('App Notes Interactions', () => {
       deleteNote: vi.fn(),
       clearNotes,
     });
-    
+
     vi.useFakeTimers();
     render(<App />);
 
     // Open modal using fireEvent
     fireEvent.click(screen.getByRole('button', { name: 'View Notes (1)' }));
-    
+
     // Tooltip should not be there initially
     expect(screen.queryByText('Copied!')).toBeNull();
 
