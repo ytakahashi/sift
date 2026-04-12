@@ -17,6 +17,7 @@ describe('pane-size', () => {
 
     // Then: the result is clamped to the defined limits
     expect(belowMin).toBe(SIDEBAR_MIN_WIDTH_PX);
+    // appMainWidthPx - DIFF_VIEW_MIN_WIDTH_PX = 1000 - 360 = 640
     expect(aboveMax).toBe(640);
   });
 
@@ -30,6 +31,7 @@ describe('pane-size', () => {
 
     // Then: the result is clamped to the defined limits
     expect(belowMin).toBe(PANEL_MIN_HEIGHT_PX);
+    // sidebarHeightPx - PANEL_MIN_HEIGHT_PX = 500 - 120 = 380
     expect(aboveMax).toBe(380);
   });
 

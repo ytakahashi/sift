@@ -22,14 +22,14 @@ interface SplitterProps {
 interface UsePaneResizeResult {
   appMainRef: RefObject<HTMLElement | null>;
   sidebarRef: RefObject<HTMLDivElement | null>;
-  sidebarStyle: CSSProperties;
+  sidebarStyle: CSSProperties | undefined;
   workingPaneStyle: CSSProperties | undefined;
   sidebarSplitterProps: SplitterProps;
   paneSplitterProps: SplitterProps;
 }
 
 export function usePaneResize(): UsePaneResizeResult {
-  const [sidebarWidthPx, setSidebarWidthPx] = useState<number>(300);
+  const [sidebarWidthPx, setSidebarWidthPx] = useState<number | null>(null);
   const [workingPaneHeightPx, setWorkingPaneHeightPx] = useState<number | null>(null);
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
   const appMainRef = useRef<HTMLElement | null>(null);
@@ -93,7 +93,15 @@ export function usePaneResize(): UsePaneResizeResult {
       const appMain = appMainRef.current;
       if (appMain) {
         const appRect = appMain.getBoundingClientRect();
-        setSidebarWidthPx((currentWidthPx) => clampSidebarWidth(currentWidthPx, appRect.width));
+        setSidebarWidthPx((currentWidthPx) => {
+          const sidebarWidthPxFromDom = sidebarRef.current?.getBoundingClientRect().width;
+          const widthToClamp =
+            currentWidthPx ??
+            (sidebarWidthPxFromDom && sidebarWidthPxFromDom > 0 ? sidebarWidthPxFromDom : null);
+          return widthToClamp === null
+            ? currentWidthPx
+            : clampSidebarWidth(widthToClamp, appRect.width);
+        });
       }
 
       const sidebar = sidebarRef.current;
@@ -144,7 +152,7 @@ export function usePaneResize(): UsePaneResizeResult {
   return {
     appMainRef,
     sidebarRef,
-    sidebarStyle: { width: `${sidebarWidthPx}px` },
+    sidebarStyle: sidebarWidthPx === null ? undefined : { width: `${sidebarWidthPx}px` },
     workingPaneStyle:
       workingPaneHeightPx === null
         ? undefined
@@ -153,8 +161,8 @@ export function usePaneResize(): UsePaneResizeResult {
       role: 'separator',
       'aria-label': 'Resize sidebar and diff panes',
       'aria-orientation': 'vertical',
-      className: `pane-splitter pane-splitter-vertical ${
-        dragTarget === 'sidebar-width' ? 'is-dragging' : ''
+      className: `pane-splitter pane-splitter-vertical${
+        dragTarget === 'sidebar-width' ? ' is-dragging' : ''
       }`,
       onPointerDown: handleSidebarSplitterPointerDown,
     },
@@ -162,8 +170,8 @@ export function usePaneResize(): UsePaneResizeResult {
       role: 'separator',
       'aria-label': 'Resize Working and Staged panes',
       'aria-orientation': 'horizontal',
-      className: `pane-splitter pane-splitter-horizontal ${
-        dragTarget === 'working-height' ? 'is-dragging' : ''
+      className: `pane-splitter pane-splitter-horizontal${
+        dragTarget === 'working-height' ? ' is-dragging' : ''
       }`,
       onPointerDown: handlePaneSplitterPointerDown,
     },
