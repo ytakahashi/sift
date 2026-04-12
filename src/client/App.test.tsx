@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, act } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../domain/diff/types';
@@ -163,5 +163,216 @@ describe('App file list interactions', () => {
 
     // Then: selection crosses back into the working pane and the diff viewer updates
     expect(screen.getByTestId('diff-viewer').textContent).toBe('c.ts');
+  });
+});
+
+describe('App Notes Interactions', () => {
+  const refresh = vi.fn();
+  const clearNotes = vi.fn();
+  const originalClipboard = navigator.clipboard;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    Object.defineProperty(navigator, 'clipboard', {
+      value: {
+        writeText: vi.fn().mockResolvedValue(undefined),
+      },
+      writable: true,
+      configurable: true,
+    });
+    vi.mocked(useDiffData).mockReturnValue({
+      workingFiles: [],
+      stagedFiles: [],
+      loading: false,
+      error: null,
+      refresh,
+    });
+    vi.mocked(useWorkspaceActions).mockReturnValue({
+      stageFile: vi.fn(),
+      unstageFile: vi.fn(),
+      stageHunk: vi.fn(),
+      unstageHunk: vi.fn(),
+      acting: false,
+      error: null,
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    if (originalClipboard) {
+      Object.defineProperty(navigator, 'clipboard', {
+        value: originalClipboard,
+        writable: true,
+        configurable: true,
+      });
+    } else {
+      // @ts-expect-error: cleanup requires deletion of mocked property
+      delete navigator.clipboard;
+    }
+  });
+
+  it('renders "View Notes" button conditionally based on notes length', () => {
+    // Given: an empty notes list
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    const { rerender } = render(<App />);
+
+    // Then: button is not in document
+    expect(screen.queryByRole('button', { name: /View Notes/i })).toBeNull();
+
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          body: 'hello',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    rerender(<App />);
+
+    // Then: button should be present
+    expect(screen.getByRole('button', { name: 'View Notes (1)' })).toBeDefined();
+  });
+
+  it('toggles the NotesListModal on button click', async () => {
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          body: 'hello note',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    const user = userEvent.setup();
+    render(<App />);
+
+    // Then: modal is not open yet
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+
+    // When clicked
+    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+
+    // Then: modal is visible
+    expect(screen.getByText('Your Notes (1)')).toBeDefined();
+
+    // When close button clicked
+    await user.click(screen.getByRole('button', { name: '×' }));
+
+    // Then: modal is hidden
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+  });
+
+  it('closes the modal automatically when all notes are deleted', async () => {
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          body: 'hello note',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    // When
+    const user = userEvent.setup();
+    const { rerender } = render(<App />);
+
+    // When clicked to open
+    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+
+    // Then: modal is visible
+    expect(screen.getByText('Your Notes (1)')).toBeDefined();
+
+    // When all notes are deleted
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+    rerender(<App />);
+
+    // Then: modal is automatically hidden
+    expect(screen.queryByText('Your Notes (0)')).toBeNull();
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+  });
+
+  it('copies notes to clipboard and shows tooltip', async () => {
+    // Given: one note is available
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 10, endNewLineNumber: 10 },
+          body: 'hello clipboard',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+    });
+
+    vi.useFakeTimers();
+    render(<App />);
+
+    // Open modal using fireEvent because combining `userEvent` and `vi.useFakeTimers` causes async processing to hang
+    fireEvent.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+
+    // Tooltip should not be there initially
+    expect(screen.queryByText('Copied!')).toBeNull();
+
+    // Click copy
+    await act(async () => {
+      fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
+    });
+
+    // Then: writeText was called with formatted string
+    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('> f1#L10\nhello clipboard');
+
+    // Tooltip should appear
+    expect(screen.getByText('Copied!')).toBeDefined();
+
+    // When 2 seconds pass
+    act(() => {
+      vi.advanceTimersByTime(2000);
+    });
+
+    // Then tooltip disappears
+    expect(screen.queryByText('Copied!')).toBeNull();
+    vi.useRealTimers();
   });
 });
