@@ -93,15 +93,9 @@ export function usePaneResize(): UsePaneResizeResult {
       const appMain = appMainRef.current;
       if (appMain) {
         const appRect = appMain.getBoundingClientRect();
-        setSidebarWidthPx((currentWidthPx) => {
-          const sidebarWidthPxFromDom = sidebarRef.current?.getBoundingClientRect().width;
-          const widthToClamp =
-            currentWidthPx ??
-            (sidebarWidthPxFromDom && sidebarWidthPxFromDom > 0 ? sidebarWidthPxFromDom : null);
-          return widthToClamp === null
-            ? currentWidthPx
-            : clampSidebarWidth(widthToClamp, appRect.width);
-        });
+        setSidebarWidthPx((currentWidthPx) =>
+          currentWidthPx === null ? null : clampSidebarWidth(currentWidthPx, appRect.width),
+        );
       }
 
       const sidebar = sidebarRef.current;
@@ -109,7 +103,7 @@ export function usePaneResize(): UsePaneResizeResult {
         const sidebarRect = sidebar.getBoundingClientRect();
         setWorkingPaneHeightPx((currentHeightPx) =>
           currentHeightPx === null
-            ? currentHeightPx
+            ? null
             : clampWorkingPanelHeight(currentHeightPx, sidebarRect.height),
         );
       }

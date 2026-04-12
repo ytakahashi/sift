@@ -1,4 +1,4 @@
-export const SIDEBAR_MIN_WIDTH_PX = 220;
+export const SIDEBAR_MIN_WIDTH_PX = 180;
 export const DIFF_VIEW_MIN_WIDTH_PX = 360;
 export const PANEL_MIN_HEIGHT_PX = 120;
 

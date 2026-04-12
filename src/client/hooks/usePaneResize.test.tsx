@@ -63,11 +63,11 @@ describe('usePaneResize', () => {
     const expandedWidth2 = sidebar.style.width;
     // 3. decrease width
     fireEvent.pointerMove(window, { clientX: 300 });
-    const shrunedkWidth = sidebar.style.width;
+    const shrunkWidth = sidebar.style.width;
     // 4. decrease width more (below the minimum)
     fireEvent.pointerMove(window, { clientX: 100 });
     fireEvent.pointerUp(window);
-    const shrunedkWidth2 = sidebar.style.width;
+    const shrunkWidth2 = sidebar.style.width;
 
     // Then: sidebar width updates to:
     // 1. the moved position (500px)
@@ -75,9 +75,9 @@ describe('usePaneResize', () => {
     // 2. width (1200) - diff view min width (360px) = 840px
     expect(expandedWidth2).toBe('840px');
     // 3. the moved position (300px)
-    expect(shrunedkWidth).toBe('300px');
-    // 4. the sidebar min width (220px)
-    expect(shrunedkWidth2).toBe('220px');
+    expect(shrunkWidth).toBe('300px');
+    // 4. the sidebar min width (180px)
+    expect(shrunkWidth2).toBe('180px');
   });
 
   it('resizes working pane height by dragging the horizontal splitter', () => {
