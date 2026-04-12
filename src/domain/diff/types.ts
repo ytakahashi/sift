@@ -11,7 +11,7 @@ export type DiffContext = {
 export type FileBucket = 'working' | 'staged' | 'single';
 
 export interface DiffFile {
-  id: string; // Typically file path
+  id: string; // Typically file path, consider creating a "FileId" type
   bucket: FileBucket;
   path: string;
   oldPath?: string;

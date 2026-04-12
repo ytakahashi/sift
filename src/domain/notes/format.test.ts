@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { formatNotesForClipboard } from './format';
-import { Note } from './types';
+import type { Note } from './types';
 
 describe('formatNotesForClipboard', () => {
   it('formats multiple notes into a clipboard string', () => {

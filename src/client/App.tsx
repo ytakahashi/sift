@@ -183,8 +183,11 @@ function App() {
     (fileId: string) => {
       const found =
         workingFiles.find((f) => f.id === fileId) || stagedFiles.find((f) => f.id === fileId);
-      if (found) return found.displayPath;
-      return fileId.replace(/^file-/, '');
+      if (found) {
+        return found.displayPath;
+      }
+      // Once we decide to use a dedicated FileId type, consider changing this to other value.
+      return fileId;
     },
     [workingFiles, stagedFiles],
   );
@@ -215,7 +218,7 @@ function App() {
           </button>
           {notes.length > 0 && (
             <button
-              onClick={() => setIsNotesModalOpen(!isNotesModalOpen)}
+              onClick={() => setIsNotesModalOpen((prev) => !prev)}
               style={{
                 background: '#238636',
                 color: '#fff',

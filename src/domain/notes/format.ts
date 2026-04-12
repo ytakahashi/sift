@@ -1,4 +1,4 @@
-import { Note } from './types';
+import type { Note } from './types';
 
 export function formatNotesForClipboard(
   notes: Note[],

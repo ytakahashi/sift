@@ -349,7 +349,7 @@ describe('App Notes Interactions', () => {
     vi.useFakeTimers();
     render(<App />);
 
-    // Open modal using fireEvent
+    // Open modal using fireEvent because combining `userEvent` and `vi.useFakeTimers` causes async processing to hang
     fireEvent.click(screen.getByRole('button', { name: 'View Notes (1)' }));
 
     // Tooltip should not be there initially

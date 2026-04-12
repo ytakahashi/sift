@@ -171,7 +171,7 @@ export function NotesListModal({
               </span>
             )}
             <button
-              onClick={handleCopy}
+              onClick={() => void handleCopy()}
               style={{
                 background: '#238636',
                 color: '#fff',
