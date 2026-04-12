@@ -1,3 +1,4 @@
+import { useState, useEffect } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import { formatNotesForClipboard } from '../../../domain/notes/format';
 
@@ -14,10 +15,22 @@ export function NotesListModal({
   onDeleteNote,
   resolveFilePath,
 }: NotesListModalProps) {
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    if (copied) {
+      const timer = setTimeout(() => {
+        setCopied(false);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copied]);
+
   const handleCopy = async () => {
     const text = formatNotesForClipboard(notes, resolveFilePath);
     try {
       await navigator.clipboard.writeText(text);
+      setCopied(true);
     } catch (e) {
       if (e instanceof Error) {
         console.error('Failed to copy notes:', e.message);
@@ -138,20 +151,40 @@ export function NotesListModal({
             justifyContent: 'flex-end',
           }}
         >
-          <button
-            onClick={handleCopy}
-            style={{
-              background: '#238636',
-              color: '#fff',
-              border: 'none',
-              padding: '0.3rem 0.8rem',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
-            Copy
-          </button>
+          <div style={{ position: 'relative' }}>
+            {copied && (
+              <span
+                style={{
+                  position: 'absolute',
+                  bottom: 'calc(100% + 8px)',
+                  right: 0,
+                  backgroundColor: '#373434ff',
+                  color: '#ffffff',
+                  padding: '0.4rem 0.6rem',
+                  borderRadius: '4px',
+                  fontSize: '0.75rem',
+                  whiteSpace: 'nowrap',
+                  animation: 'fadeIn 0.2s ease-in-out',
+                }}
+              >
+                Copied!
+              </span>
+            )}
+            <button
+              onClick={handleCopy}
+              style={{
+                background: '#238636',
+                color: '#fff',
+                border: 'none',
+                padding: '0.3rem 0.8rem',
+                borderRadius: '4px',
+                cursor: 'pointer',
+                fontSize: '0.85rem',
+              }}
+            >
+              Copy
+            </button>
+          </div>
         </div>
       </div>
     </>
