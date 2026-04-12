@@ -48,6 +48,7 @@ body {
   display: flex;
   flex: 1;
   overflow: hidden;
+  min-width: 0;
 }
 
 .pane {
@@ -60,6 +61,7 @@ body {
 .sidebar-container {
   width: 300px;
   flex-shrink: 0;
+  border-right: none;
 }
 
 .sidebar-panel {
@@ -67,11 +69,55 @@ body {
   flex-direction: column;
   flex: 1;
   overflow: hidden;
+  min-height: 0;
 }
 
 .main-diff {
   flex: 1;
   border-right: none;
+  min-width: 0;
+}
+
+.pane-splitter {
+  position: relative;
+  flex-shrink: 0;
+  background-color: var(--header-bg);
+}
+
+.pane-splitter::before {
+  content: '';
+  position: absolute;
+  background-color: var(--border-color);
+  transition: background-color 0.15s ease;
+}
+
+.pane-splitter:hover::before,
+.pane-splitter.is-dragging::before {
+  background-color: var(--accent-color);
+}
+
+.pane-splitter-vertical {
+  width: 6px;
+  cursor: col-resize;
+}
+
+.pane-splitter-vertical::before {
+  left: 2px;
+  top: 0;
+  width: 2px;
+  height: 100%;
+}
+
+.pane-splitter-horizontal {
+  height: 6px;
+  cursor: row-resize;
+}
+
+.pane-splitter-horizontal::before {
+  top: 2px;
+  left: 0;
+  height: 2px;
+  width: 100%;
 }
 
 .pane-header {
