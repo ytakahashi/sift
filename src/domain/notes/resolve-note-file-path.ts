@@ -1,9 +1,12 @@
-import type { DiffFile } from '../diff/types';
+export interface NotePathResolvableFile {
+  id: string;
+  displayPath: string;
+}
 
 export function resolveNoteFilePath(
   fileId: string,
-  workingFiles: DiffFile[],
-  stagedFiles: DiffFile[],
+  workingFiles: NotePathResolvableFile[],
+  stagedFiles: NotePathResolvableFile[],
 ): string {
   const found =
     workingFiles.find((file) => file.id === fileId) ??

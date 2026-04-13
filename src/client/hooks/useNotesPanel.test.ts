@@ -1,18 +1,13 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { DiffFile } from '../../domain/diff/types';
+import type { NotePathResolvableFile } from '../../domain/notes/resolve-note-file-path';
 import type { Note } from '../../domain/notes/types';
 import { useNotesPanel } from './useNotesPanel';
 
-function createFile(id: string, bucket: 'working' | 'staged', displayPath = `${id}.ts`): DiffFile {
+function createFile(id: string, displayPath = `${id}.ts`): NotePathResolvableFile {
   return {
     id,
-    bucket,
-    path: `${id}.ts`,
-    status: 'modified',
-    kind: 'text',
     displayPath,
-    hunks: [],
   };
 }
 
@@ -108,8 +103,8 @@ describe('useNotesPanel', () => {
 
   it('resolves file paths across working and staged lists', () => {
     // Given: working and staged lists both contain distinct file IDs
-    const workingFiles = [createFile('file-a', 'working', 'src/file-a.ts')];
-    const stagedFiles = [createFile('file-b', 'staged', 'src/file-b.ts')];
+    const workingFiles = [createFile('file-a', 'src/file-a.ts')];
+    const stagedFiles = [createFile('file-b', 'src/file-b.ts')];
     const { result } = renderHook(() =>
       useNotesPanel({
         notes: [createNote('n1', 'file-a')],

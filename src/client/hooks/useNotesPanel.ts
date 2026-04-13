@@ -1,13 +1,15 @@
-import { useCallback, useEffect, useState } from 'react';
-import type { DiffFile } from '../../domain/diff/types';
-import { resolveNoteFilePath } from '../../domain/notes/resolve-note-file-path';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import {
+  resolveNoteFilePath,
+  type NotePathResolvableFile,
+} from '../../domain/notes/resolve-note-file-path';
 import { selectNotesForFile } from '../../domain/notes/select-notes-for-file';
 import type { Note } from '../../domain/notes/types';
 
 export interface UseNotesPanelOptions {
   notes: Note[];
-  workingFiles: DiffFile[];
-  stagedFiles: DiffFile[];
+  workingFiles: NotePathResolvableFile[];
+  stagedFiles: NotePathResolvableFile[];
   selectedFileId: string | null;
 }
 
@@ -63,7 +65,10 @@ export function useNotesPanel({
     [workingFiles, stagedFiles],
   );
 
-  const selectedFileNotes = selectNotesForFile(notes, selectedFileId);
+  const selectedFileNotes = useMemo(
+    () => selectNotesForFile(notes, selectedFileId),
+    [notes, selectedFileId],
+  );
 
   return {
     isOpen,
