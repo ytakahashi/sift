@@ -14,5 +14,4 @@ export type SessionInfo = {
   mode: AppMode;
   repository: RepositoryInfo;
   capabilities: SessionCapabilities;
-  availableViewModes: string[];
 };

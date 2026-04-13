@@ -14,6 +14,7 @@ export function useSession(): UseSessionResult {
   const [error, setError] = useState<string | null>(null);
 
   const fetchSession = useCallback(async () => {
+    // Both initial load and manual refresh use the same loading state.
     setLoading(true);
     setError(null);
 

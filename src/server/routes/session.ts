@@ -7,6 +7,7 @@ export const sessionRoutes = new Hono<Env>();
 
 sessionRoutes.get('/', (c) => {
   const repoRoot = c.get('repoRoot');
+  // basename("/") returns an empty string, so keep repoRoot itself as a safe fallback.
   const repositoryName = path.basename(repoRoot) || repoRoot;
 
   const response: SessionInfo = {
@@ -19,7 +20,6 @@ sessionRoutes.get('/', (c) => {
       splitView: false, // Flag indicating if split view is currently supported
       stdinMode: false,
     },
-    availableViewModes: ['unified'],
   };
 
   return c.json(response);

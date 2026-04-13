@@ -32,7 +32,6 @@ describe('useSession', () => {
           splitView: false,
           stdinMode: false,
         },
-        availableViewModes: ['unified'],
       }),
     );
     vi.stubGlobal('fetch', fetchMock);
@@ -83,7 +82,6 @@ describe('useSession', () => {
             splitView: false,
             stdinMode: false,
           },
-          availableViewModes: ['unified'],
         }),
       )
       .mockResolvedValueOnce(
@@ -97,7 +95,6 @@ describe('useSession', () => {
             splitView: false,
             stdinMode: false,
           },
-          availableViewModes: ['unified'],
         }),
       );
     vi.stubGlobal('fetch', fetchMock);
