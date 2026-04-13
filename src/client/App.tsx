@@ -4,12 +4,10 @@ import { useNotes } from './hooks/useNotes';
 import { FileList } from './components/file-list/FileList';
 import { UnifiedDiffViewer } from './components/diff/UnifiedDiffViewer';
 import { useWorkspaceActions } from './hooks/useWorkspaceActions';
+import { useWorkingPane } from './hooks/useWorkingPane';
+import { useStagedPane } from './hooks/useStagedPane';
+import { useFileSelection } from './hooks/useFileSelection';
 import type { DiffFile } from '../domain/diff/types';
-import {
-  getFallbackSelectionIndex,
-  getSelectionByIndex,
-} from './components/file-list/file-list-selection';
-import { removeFileFromPane } from './components/file-list/file-list-optimistic';
 import { NotesListModal } from './components/notes/NotesListModal';
 import { usePaneResize } from './hooks/usePaneResize';
 
@@ -35,15 +33,13 @@ function App() {
     acting,
     error: actionError,
   } = useWorkspaceActions(refreshAll);
-  const [selectedFile, setSelectedFile] = useState<DiffFile | null>(null);
-  const [paneMode, setPaneMode] = useState<'working' | 'staged'>('working');
+
+  const { files: workingFiles, stage } = useWorkingPane(serverWorkingFiles, stageFile);
+  const { files: stagedFiles, unstage } = useStagedPane(serverStagedFiles, unstageFile);
+  const { selectedFile, paneMode, select, applyActionResult, handleBoundaryNavigate } =
+    useFileSelection(workingFiles, stagedFiles);
+
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  // Local mirrors of the server file lists. These exist to support optimistic UI:
-  // when the user stages/unstages a file we remove it from the mirror immediately,
-  // before the server confirms the action. On success the server refresh overwrites
-  // the mirrors; on failure the mirrors are rolled back to the previous snapshot.
-  const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
-  const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const {
     appMainRef,
     sidebarRef,
@@ -53,140 +49,38 @@ function App() {
     paneSplitterProps,
   } = usePaneResize();
 
-  // One-way sync: propagate server data into the local mirrors.
-  // Optimistic removals are overwritten when the next server refresh arrives.
-  useEffect(() => {
-    setWorkingFiles(serverWorkingFiles);
-  }, [serverWorkingFiles]);
-
-  useEffect(() => {
-    setStagedFiles(serverStagedFiles);
-  }, [serverStagedFiles]);
-
-  // Keep the selected-file reference in sync with the current file lists.
-  // After a server refresh the same logical file may be a new object, so we
-  // replace the stale reference with the updated one. If the file no longer
-  // exists in the list (e.g. it was moved to another pane by another process),
-  // we clear the selection so the diff viewer does not show stale content.
-  useEffect(() => {
-    if (!selectedFile) {
-      return;
-    }
-
-    const targetList = paneMode === 'working' ? workingFiles : stagedFiles;
-    const updatedFile = targetList.find((file) => file.id === selectedFile.id);
-    if (updatedFile) {
-      if (updatedFile !== selectedFile) {
-        setSelectedFile(updatedFile);
-      }
-      return;
-    }
-
-    setSelectedFile(null);
-  }, [paneMode, selectedFile, stagedFiles, workingFiles]);
-
   // Close notes modal if all notes are deleted
   useEffect(() => {
     if (isNotesModalOpen && notes.length === 0) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: close modal when external notes state becomes empty
       setIsNotesModalOpen(false);
     }
   }, [isNotesModalOpen, notes.length]);
 
-  const handleSelect = useCallback((file: DiffFile, pane: 'working' | 'staged') => {
-    setSelectedFile(file);
-    setPaneMode(pane);
-  }, []);
-
-  // Cross-pane keyboard navigation. The sidebar layout places Working Directory
-  // above Staged Changes, so ArrowDown past the last working file jumps to the
-  // first staged file, and ArrowUp past the first staged file jumps to the last
-  // working file. The opposite directions (ArrowUp in working, ArrowDown in staged)
-  // have no adjacent pane to jump to, so they are intentionally ignored.
-  const handleBoundaryNavigate = useCallback(
-    (pane: 'working' | 'staged', direction: 'previous' | 'next') => {
-      if (pane === 'staged' && direction === 'previous' && workingFiles.length > 0) {
-        setPaneMode('working');
-        setSelectedFile(workingFiles[workingFiles.length - 1]);
-        return;
-      }
-
-      if (pane === 'working' && direction === 'next' && stagedFiles.length > 0) {
-        setPaneMode('staged');
-        setSelectedFile(stagedFiles[0]);
-      }
+  const handleStage = useCallback(
+    async (file: DiffFile) => {
+      const result = await stage(file);
+      applyActionResult(result, 'working');
     },
-    [stagedFiles, workingFiles],
+    [stage, applyActionResult],
   );
 
-  // Optimistic stage/unstage flow:
-  //   1. Snapshot current state for rollback.
-  //   2. Compute which file to select after removal (fallback selection).
-  //   3. Remove the file from the local mirror immediately (optimistic update).
-  //   4. Await the server action.
-  //   5. On failure, restore all snapshots to roll back the optimistic change.
-  //      The server refresh triggered on success will reconcile the mirrors.
-  const handleActivate = useCallback(
-    async (file: DiffFile, pane: 'working' | 'staged') => {
-      const previousWorkingFiles = workingFiles;
-      const previousStagedFiles = stagedFiles;
-      const previousSelectedFile = selectedFile;
-      const previousPaneMode = paneMode;
-      const isWorkingPane = pane === 'working';
-      const files = isWorkingPane ? workingFiles : stagedFiles;
-      const action = isWorkingPane ? stageFile : unstageFile;
-      const currentIndex = files.findIndex((candidate) => candidate.id === file.id);
-      const fallbackIndex = getFallbackSelectionIndex(currentIndex, files.length);
-      const { nextSourceFiles, removedFile } = removeFileFromPane({
-        sourceFiles: files,
-        fileId: file.id,
-      });
-
-      // Guard against race conditions (e.g. double-click before the first action
-      // completes and the file has already been removed from the mirror).
-      if (!removedFile) {
-        return;
-      }
-
-      const fallbackFile = getSelectionByIndex(nextSourceFiles, fallbackIndex);
-      if (isWorkingPane) {
-        setWorkingFiles(nextSourceFiles);
-      } else {
-        setStagedFiles(nextSourceFiles);
-      }
-      setPaneMode(pane);
-      setSelectedFile(fallbackFile);
-
-      // On failure, useWorkspaceActions sets acting=false (via finally) before
-      // this catch block runs. React 18+ automatic batching ensures all state
-      // updates within the same microtask are committed in a single render, so
-      // the intermediate state (acting=false, files not yet rolled back) is
-      // never visible to the user.
-      try {
-        await action(file.path);
-      } catch {
-        setWorkingFiles(previousWorkingFiles);
-        setStagedFiles(previousStagedFiles);
-        setSelectedFile(previousSelectedFile);
-        setPaneMode(previousPaneMode);
-      }
+  const handleUnstage = useCallback(
+    async (file: DiffFile) => {
+      const result = await unstage(file);
+      applyActionResult(result, 'staged');
     },
-    [paneMode, selectedFile, stageFile, stagedFiles, unstageFile, workingFiles],
-  );
-
-  const handleWorkingActivate = useCallback(
-    (file: DiffFile) => void handleActivate(file, 'working'),
-    [handleActivate],
-  );
-
-  const handleStagedActivate = useCallback(
-    (file: DiffFile) => void handleActivate(file, 'staged'),
-    [handleActivate],
+    [unstage, applyActionResult],
   );
 
   const handleSelectedFileActivate = useCallback(() => {
     if (!selectedFile) return;
-    void handleActivate(selectedFile, paneMode);
-  }, [handleActivate, paneMode, selectedFile]);
+    if (paneMode === 'working') {
+      void handleStage(selectedFile);
+    } else {
+      void handleUnstage(selectedFile);
+    }
+  }, [handleStage, handleUnstage, paneMode, selectedFile]);
 
   const resolveFilePath = useCallback(
     (fileId: string) => {
@@ -265,8 +159,8 @@ function App() {
                   selectedFileId={paneMode === 'working' ? (selectedFile?.id ?? null) : null}
                   disabled={acting}
                   isActive={paneMode === 'working'}
-                  onSelect={(file) => handleSelect(file, 'working')}
-                  onActivate={handleWorkingActivate}
+                  onSelect={(file) => select(file, 'working')}
+                  onActivate={(file) => void handleStage(file)}
                   onBoundaryNavigate={(direction) => handleBoundaryNavigate('working', direction)}
                 />
               )}
@@ -284,8 +178,8 @@ function App() {
                   selectedFileId={paneMode === 'staged' ? (selectedFile?.id ?? null) : null}
                   disabled={acting}
                   isActive={paneMode === 'staged'}
-                  onSelect={(file) => handleSelect(file, 'staged')}
-                  onActivate={handleStagedActivate}
+                  onSelect={(file) => select(file, 'staged')}
+                  onActivate={(file) => void handleUnstage(file)}
                   onBoundaryNavigate={(direction) => handleBoundaryNavigate('staged', direction)}
                 />
               )}
