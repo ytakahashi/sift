@@ -71,6 +71,12 @@ defined commands.
   test cases for better readability.
 - Avoid tests that require real Git repositories or filesystem access.
 
+### App.tsx
+
+- `App.tsx` is responsible for **wiring hooks together and rendering JSX only**.
+  Business logic must not be added directly to `App.tsx`; extract it to a hook
+  or a pure function instead.
+
 ### Imports
 
 - Use relative imports within each layer (`./`, `../`).
@@ -78,6 +84,10 @@ defined commands.
   resolves `.ts` files directly.
 - Do **not** import across layer boundaries except as documented above (e.g.,
   `client/` must not import from `server/`).
+- Within `client/`, each sub-directory has additional import restrictions:
+  - `hooks/` may only import from within `hooks/` and from `domain/`.
+  - `components/<name>/` may only import from within the same component
+    directory and from `domain/`.
 
 ## Implementation Checklist
 
