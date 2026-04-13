@@ -2,7 +2,6 @@ import { useCallback } from 'react';
 import type { KeyboardEvent } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
 import { getFileListKeyAction, getNextSelectedIndex } from './file-list-navigation';
-import { findSelectedIndex } from './file-list-selection';
 
 // Handles keyboard navigation and activation for a single FileList pane.
 //
@@ -20,6 +19,17 @@ interface UseFileListControllerOptions {
   onSelect: (file: DiffFile) => void;
   onActivate: (file: DiffFile) => void;
   onBoundaryNavigate?: (direction: 'previous' | 'next') => void;
+}
+
+/**
+ * Returns the index of the file matching `selectedFileId`, or -1 if not found.
+ */
+export function findSelectedIndex(files: DiffFile[], selectedFileId: string | null): number {
+  if (!selectedFileId) {
+    return -1;
+  }
+
+  return files.findIndex((file) => file.id === selectedFileId);
 }
 
 export function useFileListController({
