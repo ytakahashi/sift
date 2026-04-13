@@ -1,4 +1,4 @@
-import { useCallback, useState, useEffect } from 'react';
+import { useCallback } from 'react';
 import { useDiffData } from './hooks/useDiffData';
 import { useNotes } from './hooks/useNotes';
 import { FileList } from './components/file-list/FileList';
@@ -10,6 +10,7 @@ import { useFileSelection } from './hooks/useFileSelection';
 import type { DiffFile } from '../domain/diff/types';
 import { NotesListModal } from './components/notes/NotesListModal';
 import { usePaneResize } from './hooks/usePaneResize';
+import { useNotesPanel } from './hooks/useNotesPanel';
 
 function App() {
   const {
@@ -38,8 +39,13 @@ function App() {
   const { files: stagedFiles, unstage } = useStagedPane(serverStagedFiles, unstageFile);
   const { selectedFile, paneMode, select, applyActionResult, handleBoundaryNavigate } =
     useFileSelection(workingFiles, stagedFiles);
+  const notesPanel = useNotesPanel({
+    notes,
+    workingFiles,
+    stagedFiles,
+    selectedFileId: selectedFile?.id ?? null,
+  });
 
-  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
   const {
     appMainRef,
     sidebarRef,
@@ -48,14 +54,6 @@ function App() {
     sidebarSplitterProps,
     paneSplitterProps,
   } = usePaneResize();
-
-  // Close notes modal if all notes are deleted
-  useEffect(() => {
-    if (isNotesModalOpen && notes.length === 0) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- intentional: close modal when external notes state becomes empty
-      setIsNotesModalOpen(false);
-    }
-  }, [isNotesModalOpen, notes.length]);
 
   const handleStage = useCallback(
     async (file: DiffFile) => {
@@ -82,19 +80,6 @@ function App() {
     }
   }, [handleStage, handleUnstage, paneMode, selectedFile]);
 
-  const resolveFilePath = useCallback(
-    (fileId: string) => {
-      const found =
-        workingFiles.find((f) => f.id === fileId) || stagedFiles.find((f) => f.id === fileId);
-      if (found) {
-        return found.displayPath;
-      }
-      // Once we decide to use a dedicated FileId type, consider changing this to other value.
-      return fileId;
-    },
-    [workingFiles, stagedFiles],
-  );
-
   return (
     <div className="app-container">
       <header className="app-header">
@@ -119,9 +104,9 @@ function App() {
           >
             Refresh
           </button>
-          {notes.length > 0 && (
+          {notesPanel.canOpen && (
             <button
-              onClick={() => setIsNotesModalOpen((prev) => !prev)}
+              onClick={notesPanel.toggle}
               style={{
                 background: '#238636',
                 color: '#fff',
@@ -137,12 +122,12 @@ function App() {
         </div>
       </header>
       <div style={{ position: 'relative' }}>
-        {isNotesModalOpen && (
+        {notesPanel.isOpen && (
           <NotesListModal
             notes={notes}
-            onClose={() => setIsNotesModalOpen(false)}
+            onClose={notesPanel.close}
             onDeleteNote={deleteNote}
-            resolveFilePath={resolveFilePath}
+            resolveFilePath={notesPanel.resolveFilePath}
           />
         )}
       </div>
@@ -218,7 +203,7 @@ function App() {
                 paneMode={paneMode}
                 onStageHunk={(id) => stageHunk(selectedFile.path, id)}
                 onUnstageHunk={(id) => unstageHunk(selectedFile.path, id)}
-                notes={notes.filter((n) => n.target.fileId === selectedFile.id)}
+                notes={notesPanel.selectedFileNotes}
                 onAddNote={addNote}
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}
