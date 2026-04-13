@@ -5,6 +5,7 @@ import type { DiffFile } from '../domain/diff/types';
 import App from './App';
 import { useDiffData } from './hooks/useDiffData';
 import { useNotes } from './hooks/useNotes';
+import { useSession } from './hooks/useSession';
 import { useWorkspaceActions } from './hooks/useWorkspaceActions';
 
 vi.mock('./hooks/useDiffData', () => ({
@@ -13,6 +14,10 @@ vi.mock('./hooks/useDiffData', () => ({
 
 vi.mock('./hooks/useNotes', () => ({
   useNotes: vi.fn(),
+}));
+
+vi.mock('./hooks/useSession', () => ({
+  useSession: vi.fn(),
 }));
 
 vi.mock('./hooks/useWorkspaceActions', () => ({
@@ -65,6 +70,15 @@ describe('App file list interactions', () => {
     };
 
     vi.mocked(useDiffData).mockImplementation(() => diffState);
+    vi.mocked(useSession).mockReturnValue({
+      repository: {
+        name: 'sift',
+        root: '/Users/dev/projects/sift',
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
     vi.mocked(useNotes).mockReturnValue({
       notes: [],
       addNote: vi.fn(),
@@ -181,6 +195,43 @@ describe('App file list interactions', () => {
     expect(verticalSplitter).toBeDefined();
     expect(horizontalSplitter).toBeDefined();
   });
+
+  it('renders repository name in the header with absolute path tooltip', () => {
+    // Given: session data includes repository information
+    vi.mocked(useSession).mockReturnValue({
+      repository: {
+        name: 'demo-repo',
+        root: '/absolute/path/to/demo-repo',
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
+
+    // When: the app is rendered
+    render(<App />);
+
+    // Then: repository name is shown and title exposes absolute path
+    const repositoryName = screen.getByText('demo-repo');
+    expect(repositoryName).toBeDefined();
+    expect(repositoryName.getAttribute('title')).toBe('/absolute/path/to/demo-repo');
+  });
+
+  it('does not render repository name when session has no repository', () => {
+    // Given: session data has no repository information
+    vi.mocked(useSession).mockReturnValue({
+      repository: null,
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
+    });
+
+    // When: the app is rendered
+    render(<App />);
+
+    // Then: repository name element is omitted
+    expect(screen.queryByText('demo-repo')).toBeNull();
+  });
 });
 
 describe('App Notes Interactions', () => {
@@ -203,6 +254,15 @@ describe('App Notes Interactions', () => {
       loading: false,
       error: null,
       refresh,
+    });
+    vi.mocked(useSession).mockReturnValue({
+      repository: {
+        name: 'sift',
+        root: '/Users/dev/projects/sift',
+      },
+      loading: false,
+      error: null,
+      refresh: vi.fn(),
     });
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile: vi.fn(),

@@ -11,6 +11,7 @@ import type { DiffFile } from '../domain/diff/types';
 import { NotesListModal } from './components/notes/NotesListModal';
 import { usePaneResize } from './hooks/usePaneResize';
 import { useNotesPanel } from './hooks/useNotesPanel';
+import { useSession } from './hooks/useSession';
 
 function App() {
   const {
@@ -20,6 +21,7 @@ function App() {
     error: diffError,
     refresh,
   } = useDiffData();
+  const { repository } = useSession();
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const refreshAll = useCallback(async () => {
     await refresh();
@@ -83,11 +85,16 @@ function App() {
   return (
     <div className="app-container">
       <header className="app-header">
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.6rem' }}>
+        <div className="app-brand">
           <img src="/favicon.svg" alt="Sift Logo" style={{ width: '22px', height: '22px' }} />
           <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Sift</h1>
+          {repository && (
+            <span className="app-repository-name" title={repository.root}>
+              {repository.name}
+            </span>
+          )}
         </div>
-        <div style={{ display: 'flex', gap: '1rem', alignItems: 'center' }}>
+        <div className="app-header-actions">
           {(diffError || actionError) && (
             <span style={{ color: '#f85149' }}>{diffError || actionError}</span>
           )}
