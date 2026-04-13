@@ -1,11 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
 import { type FileActionResult, runOptimisticPaneAction } from './pane-action';
-import { removeFileFromPane } from '../components/file-list/file-list-optimistic';
-import {
-  getFallbackSelectionIndex,
-  getSelectionByIndex,
-} from '../components/file-list/file-list-selection';
+import { getFallbackSelectionIndex, getSelectionByIndex, removeFileFromPane } from './pane-files';
 
 export interface UseWorkingPaneResult {
   /** Local mirror of the Working Directory file list with optimistic updates applied. */
