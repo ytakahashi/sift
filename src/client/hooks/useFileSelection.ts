@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
-import type { FileActionResult } from '../components/file-list/file-list-optimistic';
+import type { FileActionResult } from './pane-action';
 
 export interface UseFileSelectionResult {
   selectedFile: DiffFile | null;

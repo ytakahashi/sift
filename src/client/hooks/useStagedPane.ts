@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
-import {
-  type FileActionResult,
-  removeFileFromPane,
-  runOptimistic,
-} from '../components/file-list/file-list-optimistic';
+import { type FileActionResult, runOptimisticPaneAction } from './pane-action';
+import { removeFileFromPane } from '../components/file-list/file-list-optimistic';
 import {
   getFallbackSelectionIndex,
   getSelectionByIndex,
@@ -52,7 +49,7 @@ export function useStagedPane(
         return { nextSelectedFile: getSelectionByIndex(files, fallbackIndex) };
       }
 
-      const succeeded = await runOptimistic(
+      const succeeded = await runOptimisticPaneAction(
         () => files,
         () => setFiles(nextSourceFiles),
         () => unstageFile(file.path),

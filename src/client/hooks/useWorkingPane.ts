@@ -1,10 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
-import {
-  type FileActionResult,
-  removeFileFromPane,
-  runOptimistic,
-} from '../components/file-list/file-list-optimistic';
+import { type FileActionResult, runOptimisticPaneAction } from './pane-action';
+import { removeFileFromPane } from '../components/file-list/file-list-optimistic';
 import {
   getFallbackSelectionIndex,
   getSelectionByIndex,
@@ -26,6 +23,7 @@ export interface UseWorkingPaneResult {
   stage: (file: DiffFile) => Promise<FileActionResult>;
 }
 
+// This function is almost the same as "useStagedPane", so consider refactoring when adding remove action.
 export function useWorkingPane(
   serverFiles: DiffFile[],
   stageFile: (path: string) => Promise<void>,
@@ -53,7 +51,7 @@ export function useWorkingPane(
         return { nextSelectedFile: getSelectionByIndex(files, fallbackIndex) };
       }
 
-      const succeeded = await runOptimistic(
+      const succeeded = await runOptimisticPaneAction(
         () => files,
         () => setFiles(nextSourceFiles),
         () => stageFile(file.path),
