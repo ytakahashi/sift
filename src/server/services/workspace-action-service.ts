@@ -67,6 +67,8 @@ export class WorkspaceActionService {
       return;
     }
 
+    // For tracked working-tree changes (`modified`, `deleted`, `binary`),
+    // restore the file content from HEAD.
     await this.git.restoreWorktree([safePath]);
   }
 

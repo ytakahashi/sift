@@ -80,6 +80,8 @@ function App() {
 
   const handleDiscard = useCallback(
     async (file: DiffFile) => {
+      // Intentionally no confirmation dialog for now to keep parity with other
+      // immediate actions. A future UX pass may add a confirmation step here.
       const result = await discard(file);
       applyActionResult(result, 'working');
     },
