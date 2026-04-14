@@ -36,4 +36,12 @@ export class GitClient {
   async getStatus(): Promise<string> {
     return await this.runGitCommand(['status', '--short', '--porcelain']);
   }
+
+  async cleanPath(path: string): Promise<void> {
+    await this.runGitCommand(['clean', '-f', '--', path]);
+  }
+
+  async restoreWorktree(paths: string[]): Promise<void> {
+    await this.runGitCommand(['restore', '--worktree', '--source=HEAD', '--', ...paths]);
+  }
 }

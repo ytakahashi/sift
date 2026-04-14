@@ -47,6 +47,7 @@ describe('App file list interactions', () => {
   const clearNotes = vi.fn();
   const stageFile = vi.fn(async () => {});
   const unstageFile = vi.fn(async () => {});
+  const discardWorkingFile = vi.fn(async () => {});
   let diffState: {
     workingFiles: DiffFile[];
     stagedFiles: DiffFile[];
@@ -89,6 +90,7 @@ describe('App file list interactions', () => {
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile,
       unstageFile,
+      discardWorkingFile,
       stageHunk: vi.fn(),
       unstageHunk: vi.fn(),
       acting: false,
@@ -142,6 +144,37 @@ describe('App file list interactions', () => {
 
     // Then: unstageFile is called with the file's path
     expect(unstageFile).toHaveBeenCalledWith('s.ts');
+  });
+
+  it('shows Discard button only for working pane selection', async () => {
+    // Given: app is rendered
+    const user = userEvent.setup();
+    render(<App />);
+
+    // When: selecting a working file
+    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
+
+    // Then: Discard is visible
+    expect(screen.getByRole('button', { name: 'Discard' })).toBeDefined();
+
+    // When: selecting a staged file
+    await user.click(screen.getByRole('option', { name: 's.tsM' }));
+
+    // Then: Discard is hidden
+    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+
+  it('calls discardWorkingFile when Discard is clicked from working pane', async () => {
+    // Given: app with a selected working file
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
+
+    // When: Discard button is clicked
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+
+    // Then: discard action is sent for selected path
+    expect(discardWorkingFile).toHaveBeenCalledWith('b.ts');
   });
 
   it('moves from the last working file to the first staged file with ArrowDown', async () => {
@@ -267,6 +300,7 @@ describe('App Notes Interactions', () => {
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile: vi.fn(),
       unstageFile: vi.fn(),
+      discardWorkingFile: vi.fn(),
       stageHunk: vi.fn(),
       unstageHunk: vi.fn(),
       acting: false,

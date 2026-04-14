@@ -41,6 +41,35 @@ export class WorkspaceActionService {
     await this.applyHunkPatch(filePath, hunkId, 'staged', true);
   }
 
+  async discardWorkingFile(filePath: string): Promise<void> {
+    const files = await this.provider.getFiles('working');
+    const targetFile = files.find((f) => f.path === filePath);
+    if (!targetFile) throw new Error('File not found in working tree');
+
+    const safePath = this.sanitizePath(targetFile.path);
+
+    if (targetFile.status === 'untracked') {
+      await this.git.cleanPath(safePath);
+      return;
+    }
+
+    if (targetFile.status === 'submodule') {
+      throw new Error('Discard is not supported for submodule changes');
+    }
+
+    if (targetFile.status === 'renamed') {
+      const oldPath = targetFile.oldPath;
+      if (!oldPath) {
+        throw new Error('Renamed file is missing oldPath');
+      }
+      const safeOldPath = this.sanitizePath(oldPath);
+      await this.git.restoreWorktree([safeOldPath, safePath]);
+      return;
+    }
+
+    await this.git.restoreWorktree([safePath]);
+  }
+
   private async applyHunkPatch(
     filePath: string,
     hunkId: string,

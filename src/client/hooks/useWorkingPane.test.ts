@@ -21,7 +21,7 @@ describe('useWorkingPane', () => {
     const serverFiles = [createFile('a'), createFile('b')];
 
     // When: the hook is rendered
-    const { result } = renderHook(() => useWorkingPane(serverFiles, vi.fn()));
+    const { result } = renderHook(() => useWorkingPane(serverFiles, vi.fn(), vi.fn()));
 
     // Then: the local mirror matches serverFiles
     expect(result.current.files.map((f) => f.id)).toEqual(['a', 'b']);
@@ -30,8 +30,10 @@ describe('useWorkingPane', () => {
   it('updates the local mirror when serverFiles changes', () => {
     // Given: the hook is rendered with an initial file list
     const stageFile = vi.fn();
+    const discardWorkingFile = vi.fn();
     const { result, rerender } = renderHook(
-      ({ serverFiles }: { serverFiles: DiffFile[] }) => useWorkingPane(serverFiles, stageFile),
+      ({ serverFiles }: { serverFiles: DiffFile[] }) =>
+        useWorkingPane(serverFiles, stageFile, discardWorkingFile),
       { initialProps: { serverFiles: [createFile('a')] } },
     );
 
@@ -45,8 +47,9 @@ describe('useWorkingPane', () => {
   it('removes the staged file optimistically and returns the fallback on success', async () => {
     // Given: three files in the working directory
     const stageFile = vi.fn().mockResolvedValue(undefined);
+    const discardWorkingFile = vi.fn();
     const files = [createFile('a'), createFile('b'), createFile('c')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile));
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
 
     // When: the middle file ('b') is staged
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -63,8 +66,9 @@ describe('useWorkingPane', () => {
   it('selects the previous file when the last item in the list is staged', async () => {
     // Given: two files where the last one is staged
     const stageFile = vi.fn().mockResolvedValue(undefined);
+    const discardWorkingFile = vi.fn();
     const files = [createFile('a'), createFile('b')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile));
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
 
     // When: the last file ('b') is staged
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -80,8 +84,9 @@ describe('useWorkingPane', () => {
   it('returns null as nextSelectedFile when the only file is staged', async () => {
     // Given: only one file in the list
     const stageFile = vi.fn().mockResolvedValue(undefined);
+    const discardWorkingFile = vi.fn();
     const files = [createFile('a')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile));
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
 
     // When: the sole file is staged
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -97,8 +102,9 @@ describe('useWorkingPane', () => {
   it('rolls back the file list and returns the original file when staging fails', async () => {
     // Given: stageFile rejects (e.g. network error)
     const stageFile = vi.fn().mockRejectedValue(new Error('network error'));
+    const discardWorkingFile = vi.fn();
     const files = [createFile('a'), createFile('b')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile));
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
 
     // When: staging 'a' fails
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -115,8 +121,9 @@ describe('useWorkingPane', () => {
   it('returns early without calling stageFile when the file is not in the list', async () => {
     // Given: the file to stage does not exist in the mirror (race condition)
     const stageFile = vi.fn();
+    const discardWorkingFile = vi.fn();
     const files = [createFile('a')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile));
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
     const missingFile = createFile('missing');
 
     // When
@@ -128,5 +135,42 @@ describe('useWorkingPane', () => {
     // Then: no server call is made and nextSelectedFile is null (empty fallback)
     expect(stageFile).not.toHaveBeenCalled();
     expect(actionResult!.nextSelectedFile).toBeNull();
+  });
+
+  it('removes the discarded file optimistically and returns fallback on success', async () => {
+    // Given: discardWorkingFile resolves
+    const stageFile = vi.fn();
+    const discardWorkingFile = vi.fn().mockResolvedValue(undefined);
+    const files = [createFile('a'), createFile('b'), createFile('c')];
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+
+    // When: middle file is discarded
+    let actionResult: Awaited<ReturnType<typeof result.current.discard>>;
+    await act(async () => {
+      actionResult = await result.current.discard(files[1]);
+    });
+
+    // Then: same-index fallback is returned and file is removed optimistically
+    expect(result.current.files.map((f) => f.id)).toEqual(['a', 'c']);
+    expect(actionResult!.nextSelectedFile?.id).toBe('c');
+    expect(discardWorkingFile).toHaveBeenCalledWith('b.ts');
+  });
+
+  it('rolls back and returns original file when discard fails', async () => {
+    // Given: discardWorkingFile rejects
+    const stageFile = vi.fn();
+    const discardWorkingFile = vi.fn().mockRejectedValue(new Error('network error'));
+    const files = [createFile('a'), createFile('b')];
+    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+
+    // When: discard fails
+    let actionResult: Awaited<ReturnType<typeof result.current.discard>>;
+    await act(async () => {
+      actionResult = await result.current.discard(files[0]);
+    });
+
+    // Then: mirror is rolled back and original file is returned
+    expect(result.current.files.map((f) => f.id)).toEqual(['a', 'b']);
+    expect(actionResult!.nextSelectedFile?.id).toBe('a');
   });
 });

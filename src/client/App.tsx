@@ -31,13 +31,18 @@ function App() {
   const {
     stageFile,
     unstageFile,
+    discardWorkingFile,
     stageHunk,
     unstageHunk,
     acting,
     error: actionError,
   } = useWorkspaceActions(refreshAll);
 
-  const { files: workingFiles, stage } = useWorkingPane(serverWorkingFiles, stageFile);
+  const {
+    files: workingFiles,
+    stage,
+    discard,
+  } = useWorkingPane(serverWorkingFiles, stageFile, discardWorkingFile);
   const { files: stagedFiles, unstage } = useStagedPane(serverStagedFiles, unstageFile);
   const { selectedFile, paneMode, select, applyActionResult, handleBoundaryNavigate } =
     useFileSelection(workingFiles, stagedFiles);
@@ -71,6 +76,14 @@ function App() {
       applyActionResult(result, 'staged');
     },
     [unstage, applyActionResult],
+  );
+
+  const handleDiscard = useCallback(
+    async (file: DiffFile) => {
+      const result = await discard(file);
+      applyActionResult(result, 'working');
+    },
+    [applyActionResult, discard],
   );
 
   const handleSelectedFileActivate = useCallback(() => {
@@ -183,20 +196,38 @@ function App() {
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
             {selectedFile && (
-              <button
-                onClick={handleSelectedFileActivate}
-                style={{
-                  background: paneMode === 'working' ? '#238636' : '#da3633',
-                  color: '#fff',
-                  border: '1px solid rgba(240,246,252,0.1)',
-                  borderRadius: '4px',
-                  padding: '0.1rem 0.6rem',
-                  cursor: 'pointer',
-                  fontSize: '0.8rem',
-                }}
-              >
-                {paneMode === 'working' ? 'Stage file' : 'Unstage file'}
-              </button>
+              <div style={{ display: 'flex', gap: '0.5rem' }}>
+                <button
+                  onClick={handleSelectedFileActivate}
+                  style={{
+                    background: paneMode === 'working' ? '#238636' : '#da3633',
+                    color: '#fff',
+                    border: '1px solid rgba(240,246,252,0.1)',
+                    borderRadius: '4px',
+                    padding: '0.1rem 0.6rem',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  {paneMode === 'working' ? 'Stage file' : 'Unstage file'}
+                </button>
+                {paneMode === 'working' && (
+                  <button
+                    onClick={() => void handleDiscard(selectedFile)}
+                    style={{
+                      background: '#f85149',
+                      color: '#fff',
+                      border: '1px solid rgba(240,246,252,0.1)',
+                      borderRadius: '4px',
+                      padding: '0.1rem 0.6rem',
+                      cursor: 'pointer',
+                      fontSize: '0.8rem',
+                    }}
+                  >
+                    Discard
+                  </button>
+                )}
+              </div>
             )}
           </div>
           <div className="pane-content" style={{ padding: 0 }}>
