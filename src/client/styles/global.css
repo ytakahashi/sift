@@ -45,6 +45,29 @@ body {
   font-size: 0.9rem;
 }
 
+.app-brand {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-width: 0;
+}
+
+.app-repository-name {
+  color: #8b949e;
+  font-size: 0.9rem;
+  max-width: 22rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.app-header-actions {
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  flex-shrink: 0;
+}
+
 .app-main {
   display: flex;
   flex: 1;
