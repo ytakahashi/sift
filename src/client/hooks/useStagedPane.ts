@@ -1,7 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
-import { type FileActionResult, runOptimisticPaneAction } from './pane-action';
-import { getFallbackSelectionIndex, getSelectionByIndex, removeFileFromPane } from './pane-files';
+import type { FileActionResult } from './pane-action';
+import { useOptimisticPaneFiles } from './useOptimisticPaneFiles';
 
 export interface UseStagedPaneResult {
   /** Local mirror of the Staged Changes file list with optimistic updates applied. */
@@ -22,44 +22,11 @@ export function useStagedPane(
   serverFiles: DiffFile[],
   unstageFile: (path: string) => Promise<void>,
 ): UseStagedPaneResult {
-  // One-way sync: propagate server data into the local mirror.
-  // Optimistic removals are overwritten when the next server refresh arrives.
-  const [files, setFiles] = useState<DiffFile[]>([]);
-
-  useEffect(() => {
-    setFiles(serverFiles);
-  }, [serverFiles]);
+  const { files, runRemoveAction } = useOptimisticPaneFiles(serverFiles);
 
   const unstage = useCallback(
-    async (file: DiffFile): Promise<FileActionResult> => {
-      const currentIndex = files.findIndex((f) => f.id === file.id);
-      const fallbackIndex = getFallbackSelectionIndex(currentIndex, files.length);
-      const { nextSourceFiles, removedFile } = removeFileFromPane({
-        sourceFiles: files,
-        fileId: file.id,
-      });
-
-      // Guard against race conditions (e.g. double-click before the first action
-      // completes and the file has already been removed from the mirror).
-      if (!removedFile) {
-        return { nextSelectedFile: getSelectionByIndex(files, fallbackIndex) };
-      }
-
-      const succeeded = await runOptimisticPaneAction(
-        () => files,
-        () => setFiles(nextSourceFiles),
-        () => unstageFile(file.path),
-        (snapshot) => setFiles(snapshot),
-      );
-
-      return {
-        // Success: select the fallback in the shortened list.
-        // Failure: the mirror has been rolled back, so return the original file
-        // to keep the selection pointing at an item that still exists.
-        nextSelectedFile: succeeded ? getSelectionByIndex(nextSourceFiles, fallbackIndex) : file,
-      };
-    },
-    [files, unstageFile],
+    async (file: DiffFile): Promise<FileActionResult> => runRemoveAction(file, unstageFile),
+    [runRemoveAction, unstageFile],
   );
 
   return { files, unstage };

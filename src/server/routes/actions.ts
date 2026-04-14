@@ -51,3 +51,15 @@ actionRoutes.post('/unstage-hunk', async (c) => {
     return c.json({ error: msg }, 500);
   }
 });
+
+actionRoutes.post('/discard-working-file', async (c) => {
+  const body = await c.req.json();
+  const service = new WorkspaceActionService(c.get('repoRoot'));
+  try {
+    await service.discardWorkingFile(body.path);
+    return c.json({ success: true });
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    return c.json({ error: msg }, 500);
+  }
+});

@@ -46,6 +46,10 @@ export function useWorkspaceActions(onRefresh?: () => Promise<void> | void) {
     (path: string) => performAction('unstage-file', { path }),
     [performAction],
   );
+  const discardWorkingFile = useCallback(
+    (path: string) => performAction('discard-working-file', { path }),
+    [performAction],
+  );
   const stageHunk = useCallback(
     (path: string, hunkId: string) => performAction('stage-hunk', { path, hunkId }),
     [performAction],
@@ -55,5 +59,13 @@ export function useWorkspaceActions(onRefresh?: () => Promise<void> | void) {
     [performAction],
   );
 
-  return { stageFile, unstageFile, stageHunk, unstageHunk, acting, error };
+  return {
+    stageFile,
+    unstageFile,
+    discardWorkingFile,
+    stageHunk,
+    unstageHunk,
+    acting,
+    error,
+  };
 }
