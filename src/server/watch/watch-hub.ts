@@ -51,6 +51,10 @@ export function createWatchHub(): WatchHub {
   };
 
   const close = (): void => {
+    // `close()` is used during server shutdown to drop the currently connected
+    // clients. The hub itself remains reusable; if something subscribes after
+    // this point it will be tracked again, but the surrounding runtime is
+    // expected to stop accepting requests immediately afterwards.
     clients.clear();
   };
 

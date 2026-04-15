@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import { createWatchHub, type WatchStream } from './watch-hub';
 
-function createStream(overrides: Partial<WatchStream> = {}): WatchStream {
+interface TestWatchStream extends WatchStream {
+  triggerAbort: () => void | Promise<void>;
+}
+
+function createStream(overrides: Partial<WatchStream> = {}): TestWatchStream {
   let abortListener: (() => void | Promise<void>) | null = null;
 
   return {
@@ -12,8 +16,14 @@ function createStream(overrides: Partial<WatchStream> = {}): WatchStream {
     }),
     writeSSE: vi.fn().mockResolvedValue(undefined),
     ...overrides,
-    triggerAbort: abortListener,
-  } as WatchStream & { triggerAbort: (() => void | Promise<void>) | null };
+    triggerAbort: () => {
+      if (!abortListener) {
+        throw new Error('Abort listener is not registered');
+      }
+
+      return abortListener();
+    },
+  };
 }
 
 describe('createWatchHub', () => {
@@ -65,5 +75,21 @@ describe('createWatchHub', () => {
 
     // Then: the failed client is only attempted once
     expect(stream.writeSSE).toHaveBeenCalledTimes(1);
+  });
+
+  it('unsubscribes clients when the stream aborts', async () => {
+    // Given: a subscribed client with an abort hook
+    const hub = createWatchHub();
+    const stream = createStream();
+    hub.subscribe(stream);
+
+    // When: the client aborts and another change is broadcast
+    stream.aborted = true;
+    await stream.triggerAbort();
+    hub.broadcastChanged();
+    await Promise.resolve();
+
+    // Then: the aborted client is not written to again
+    expect(stream.writeSSE).not.toHaveBeenCalled();
   });
 });

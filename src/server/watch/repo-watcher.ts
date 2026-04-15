@@ -3,6 +3,7 @@ import { execFile, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { promisify } from 'node:util';
+import { createRepoIgnoreMatcher } from './repo-ignore-matcher';
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -82,10 +83,10 @@ function createWatchPaths(repoRoot: string): string[] {
   ];
 }
 
-function createFileWatcher(paths: string[]): FSWatcher {
+function createFileWatcher(repoRoot: string, paths: string[]): FSWatcher {
   return chokidar.watch(paths, {
     ignoreInitial: true,
-    ignored: [/(^|[/\\])\.git[/\\]objects([/\\]|$)/, /(^|[/\\])node_modules([/\\]|$)/],
+    ignored: createRepoIgnoreMatcher(repoRoot, paths),
   });
 }
 
@@ -110,7 +111,7 @@ export function createRepoWatcher(repoRoot: string, onChanged: () => void): Repo
 
     try {
       const nextFingerprint = await getGitStateFingerprint(repoRoot);
-      if (nextFingerprint !== lastFingerprint) {
+      if (!stopped && nextFingerprint !== lastFingerprint) {
         lastFingerprint = nextFingerprint;
         onChanged();
       }
@@ -141,7 +142,8 @@ export function createRepoWatcher(repoRoot: string, onChanged: () => void): Repo
     }, 200);
   };
 
-  const watcher = createFileWatcher(createWatchPaths(repoRoot));
+  const watchPaths = createWatchPaths(repoRoot);
+  const watcher = createFileWatcher(repoRoot, watchPaths);
   watcher.on('all', () => {
     scheduleCheck();
   });

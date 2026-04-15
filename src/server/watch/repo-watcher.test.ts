@@ -47,6 +47,8 @@ function createExecFileMock() {
 let allHandler: WatchHandler | null = null;
 let asyncStatusOutput = '';
 let asyncHeadOutput = '';
+let statusGate: Promise<void> | null = null;
+let releaseStatusGate: (() => void) | null = null;
 
 describe('createRepoWatcher', () => {
   beforeEach(() => {
@@ -56,6 +58,8 @@ describe('createRepoWatcher', () => {
     allHandler = null;
     asyncStatusOutput = 'status-initial\n';
     asyncHeadOutput = 'HEAD-initial\n';
+    statusGate = null;
+    releaseStatusGate = null;
 
     execFileSyncMock.mockImplementation((_file: string, args: string[]) => {
       const command = args.join(' ');
@@ -84,10 +88,35 @@ describe('createRepoWatcher', () => {
         return '.git/packed-refs\n';
       }
 
+      if (command === 'rev-parse --git-path .') {
+        return '.git\n';
+      }
+
       throw new Error(`Unexpected sync command: ${command}`);
     });
 
-    execFileMock.mockImplementation(createExecFileMock());
+    execFileMock.mockImplementation(
+      (
+        file: string,
+        args: string[],
+        options: unknown,
+        callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+      ) => {
+        const command = args.join(' ');
+
+        if (
+          command === 'status --porcelain=v2 --branch --untracked-files=all' &&
+          statusGate !== null
+        ) {
+          void statusGate.then(() => {
+            createExecFileMock()(file, args, options, callback);
+          });
+          return;
+        }
+
+        createExecFileMock()(file, args, options, callback);
+      },
+    );
 
     watchMock.mockImplementation((_paths: string[], _options: unknown) => ({
       on: vi.fn((event: string, handler: WatchHandler) => {
@@ -147,5 +176,29 @@ describe('createRepoWatcher', () => {
 
     // Then: chokidar is closed
     expect(closeMock).toHaveBeenCalledTimes(1);
+  });
+
+  it('does not notify after stop when an in-flight fingerprint changes', async () => {
+    // Given: the next status check is delayed until after stop is called
+    let release!: () => void;
+    statusGate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    releaseStatusGate = release;
+    asyncStatusOutput = 'status-updated\n';
+
+    const onChanged = vi.fn();
+    const watcher = createRepoWatcher('/repo/root', onChanged);
+
+    // When: a check starts, then the watcher is stopped before git returns
+    allHandler?.();
+    await vi.advanceTimersByTimeAsync(200);
+    const stopPromise = watcher.stop();
+    releaseStatusGate?.();
+    await stopPromise;
+    await Promise.resolve();
+
+    // Then: no late notification is emitted after stop
+    expect(onChanged).not.toHaveBeenCalled();
   });
 });
