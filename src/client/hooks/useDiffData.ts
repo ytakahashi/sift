@@ -7,7 +7,10 @@ export function useDiffData() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchDiffs = useCallback(async () => {
+  const fetchDiffs = useCallback(async (): Promise<{
+    workingFiles: DiffFile[];
+    stagedFiles: DiffFile[];
+  } | null> => {
     setLoading(true);
     setError(null);
     try {
@@ -16,10 +19,14 @@ export function useDiffData() {
         throw new Error(`Failed to fetch diff: ${res.statusText}`);
       }
       const data = await res.json();
-      setWorkingFiles(data.workingFiles || []);
-      setStagedFiles(data.stagedFiles || []);
+      const working = data.workingFiles || [];
+      const staged = data.stagedFiles || [];
+      setWorkingFiles(working);
+      setStagedFiles(staged);
+      return { workingFiles: working, stagedFiles: staged };
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : String(err));
+      return null;
     } finally {
       setLoading(false);
     }
