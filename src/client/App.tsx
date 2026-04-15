@@ -12,6 +12,7 @@ import { NotesListModal } from './components/notes/NotesListModal';
 import { usePaneResize } from './hooks/usePaneResize';
 import { useNotesPanel } from './hooks/useNotesPanel';
 import { useSession } from './hooks/useSession';
+import { computeDiffContentHash } from '../domain/diff/diff-content-hash';
 
 function App() {
   const {
@@ -24,9 +25,17 @@ function App() {
   const { repository } = useSession();
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const refreshAll = useCallback(async () => {
-    await refresh();
-    clearNotes();
-  }, [refresh, clearNotes]);
+    const hashBefore = computeDiffContentHash(serverWorkingFiles, serverStagedFiles);
+    const result = await refresh();
+
+    // If result is null (e.g., fetch error), we keep the notes and do not clear them.
+    if (result) {
+      const hashAfter = computeDiffContentHash(result.workingFiles, result.stagedFiles);
+      if (hashBefore !== hashAfter) {
+        clearNotes();
+      }
+    }
+  }, [refresh, clearNotes, serverWorkingFiles, serverStagedFiles]);
 
   const {
     stageFile,
