@@ -27,6 +27,8 @@ function App() {
   const refreshAll = useCallback(async () => {
     const hashBefore = computeDiffContentHash(serverWorkingFiles, serverStagedFiles);
     const result = await refresh();
+
+    // If result is null (e.g., fetch error), we keep the notes and do not clear them.
     if (result) {
       const hashAfter = computeDiffContentHash(result.workingFiles, result.stagedFiles);
       if (hashBefore !== hashAfter) {

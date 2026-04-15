@@ -18,8 +18,8 @@ export function computeDiffContentHash(workingFiles: DiffFile[], stagedFiles: Di
     .sort(([pathA], [pathB]) => pathA.localeCompare(pathB))
     .map(([path, lines]) => {
       // Sort lines to ensure stable hash regardless of hunk movement between working and staged
-      lines.sort();
-      return `${path}\0${lines.join('')}`;
+      const sortedLines = [...lines].sort();
+      return `${path}\0${sortedLines.join('')}`;
     })
     .join('\n');
 }

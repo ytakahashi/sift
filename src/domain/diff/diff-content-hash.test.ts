@@ -60,8 +60,8 @@ describe('computeDiffContentHash', () => {
     const hashAfter = computeDiffContentHash(afterWorking, afterStaged);
 
     // Then
-    // The hashes must be identical because we ignore context lines and
-    // sort the remaining add/delete lines, so the order of hunk evaluation does not matter.
+    // The hashes must be identical because we sort the add/delete lines,
+    // so the order of hunk evaluation (working vs staged) does not matter.
     expect(hashBefore).toEqual(hashAfter);
   });
 
@@ -109,6 +109,7 @@ describe('computeDiffContentHash', () => {
     );
 
     // Then
+    // Context lines are ignored, so the hashes must be identical.
     expect(hashMore).toEqual(hashLess);
   });
 
