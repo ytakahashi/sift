@@ -1,4 +1,3 @@
-import { useCallback } from 'react';
 import { useDiffData } from './hooks/useDiffData';
 import { useNotes } from './hooks/useNotes';
 import { FileList } from './components/file-list/FileList';
@@ -7,13 +6,13 @@ import { useWorkspaceActions } from './hooks/useWorkspaceActions';
 import { useWorkingPane } from './hooks/useWorkingPane';
 import { useStagedPane } from './hooks/useStagedPane';
 import { useFileSelection } from './hooks/useFileSelection';
-import type { DiffFile } from '../domain/diff/types';
 import { NotesListModal } from './components/notes/NotesListModal';
 import { usePaneResize } from './hooks/usePaneResize';
 import { useNotesPanel } from './hooks/useNotesPanel';
 import { useSession } from './hooks/useSession';
 import { useRefreshController } from './hooks/useRefreshController';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
+import { usePaneFileActions } from './hooks/usePaneFileActions';
 
 function App() {
   const {
@@ -52,6 +51,14 @@ function App() {
   const { files: stagedFiles, unstage } = useStagedPane(serverStagedFiles, unstageFile);
   const { selectedFile, paneMode, select, applyActionResult, handleBoundaryNavigate } =
     useFileSelection(workingFiles, stagedFiles);
+  const paneFileActions = usePaneFileActions({
+    selectedFile,
+    paneMode,
+    stage,
+    unstage,
+    discard,
+    applyActionResult,
+  });
   const notesPanel = useNotesPanel({
     notes,
     workingFiles,
@@ -67,41 +74,6 @@ function App() {
     sidebarSplitterProps,
     paneSplitterProps,
   } = usePaneResize();
-
-  const handleStage = useCallback(
-    async (file: DiffFile) => {
-      const result = await stage(file);
-      applyActionResult(result, 'working');
-    },
-    [stage, applyActionResult],
-  );
-
-  const handleUnstage = useCallback(
-    async (file: DiffFile) => {
-      const result = await unstage(file);
-      applyActionResult(result, 'staged');
-    },
-    [unstage, applyActionResult],
-  );
-
-  const handleDiscard = useCallback(
-    async (file: DiffFile) => {
-      // Intentionally no confirmation dialog for now to keep parity with other
-      // immediate actions. A future UX pass may add a confirmation step here.
-      const result = await discard(file);
-      applyActionResult(result, 'working');
-    },
-    [applyActionResult, discard],
-  );
-
-  const handleSelectedFileActivate = useCallback(() => {
-    if (!selectedFile) return;
-    if (paneMode === 'working') {
-      void handleStage(selectedFile);
-    } else {
-      void handleUnstage(selectedFile);
-    }
-  }, [handleStage, handleUnstage, paneMode, selectedFile]);
 
   return (
     <div className="app-container">
@@ -173,7 +145,7 @@ function App() {
                   disabled={acting}
                   isActive={paneMode === 'working'}
                   onSelect={(file) => select(file, 'working')}
-                  onActivate={(file) => void handleStage(file)}
+                  onActivate={(file) => void paneFileActions.stageFile(file)}
                   onBoundaryNavigate={(direction) => handleBoundaryNavigate('working', direction)}
                 />
               )}
@@ -192,7 +164,7 @@ function App() {
                   disabled={acting}
                   isActive={paneMode === 'staged'}
                   onSelect={(file) => select(file, 'staged')}
-                  onActivate={(file) => void handleUnstage(file)}
+                  onActivate={(file) => void paneFileActions.unstageFile(file)}
                   onBoundaryNavigate={(direction) => handleBoundaryNavigate('staged', direction)}
                 />
               )}
@@ -206,7 +178,7 @@ function App() {
             {selectedFile && (
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
-                  onClick={handleSelectedFileActivate}
+                  onClick={paneFileActions.toggleSelectedFileStage}
                   style={{
                     background: paneMode === 'working' ? '#238636' : '#da3633',
                     color: '#fff',
@@ -221,7 +193,7 @@ function App() {
                 </button>
                 {paneMode === 'working' && (
                   <button
-                    onClick={() => void handleDiscard(selectedFile)}
+                    onClick={() => void paneFileActions.discardFile(selectedFile)}
                     style={{
                       background: '#f85149',
                       color: '#fff',
