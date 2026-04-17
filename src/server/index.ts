@@ -4,34 +4,48 @@ import { createApp, Env } from './create-app.js';
 import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createRepoWatcher } from './watch/repo-watcher.js';
+import { createWatchHub } from './watch/watch-hub.js';
 
-// Shared instance for Vite Dev server when running via `vite` CLI
-const app = new Hono<Env>();
+interface ServerRuntime {
+  app: Hono<Env>;
+  stop: () => Promise<void>;
+}
 
-// Inject a default repo root for dev mode if not provided by CLI wrapper
-app.use('*', async (c, next) => {
-  if (!c.get('repoRoot')) {
-    c.set('repoRoot', process.env.SIFT_REPO_ROOT || process.cwd());
-  }
-  await next();
-});
+function createServerRuntime(repoRoot: string): ServerRuntime {
+  const watchHub = createWatchHub();
+  const watcher = createRepoWatcher(repoRoot, () => {
+    watchHub.broadcastChanged();
+  });
 
-app.route('/', createApp());
+  const app = new Hono<Env>();
 
-export default app;
-
-// Function called by CLI
-export async function startServer(repoRoot: string): Promise<string> {
-  const cliApp = new Hono<Env>();
-
-  // Inject the dynamically resolved repo root
-  cliApp.use('*', async (c, next) => {
+  app.use('*', async (c, next) => {
     c.set('repoRoot', repoRoot);
     await next();
   });
 
-  // Mount the main app
-  cliApp.route('/', createApp());
+  app.route('/', createApp({ watchHub }));
+
+  return {
+    app,
+    stop: async () => {
+      watchHub.close();
+      await watcher.stop();
+    },
+  };
+}
+
+// Shared instance for Vite Dev server when running via `vite` CLI
+const defaultRuntime = createServerRuntime(process.env.SIFT_REPO_ROOT || process.cwd());
+
+export default defaultRuntime.app;
+
+// Function called by CLI
+export async function startServer(repoRoot: string): Promise<string> {
+  const runtime = createServerRuntime(repoRoot);
+  const cliApp = new Hono<Env>();
+  cliApp.route('/', runtime.app);
 
   // In production, try to serve built client files.
   const __filename = fileURLToPath(import.meta.url);
@@ -53,6 +67,12 @@ export async function startServer(repoRoot: string): Promise<string> {
   });
 
   const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+
+  const cleanup = () => {
+    void runtime.stop();
+  };
+  process.once('SIGINT', cleanup);
+  process.once('SIGTERM', cleanup);
 
   return new Promise((resolve) => {
     serve(
