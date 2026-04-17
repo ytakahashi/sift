@@ -25,10 +25,14 @@ const extensionToLanguage: Record<string, string> = {
   patch: 'diff',
 };
 
-export function getLanguageFromPath(filePath: string): string | undefined {
+export function getLanguageFromPath(filePath?: string): string | undefined {
+  if (!filePath) {
+    return undefined;
+  }
   const parts = filePath.split('.');
-  if (parts.length < 2) return undefined;
+  if (parts.length < 2) {
+    return undefined;
+  }
   const ext = parts.pop()?.toLowerCase();
-  if (!ext) return undefined;
-  return extensionToLanguage[ext] || ext;
+  return ext ? extensionToLanguage[ext] : undefined;
 }

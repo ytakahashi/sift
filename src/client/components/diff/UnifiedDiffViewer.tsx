@@ -3,7 +3,6 @@ import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
 import { NoteEditor } from '../notes/NoteEditor';
 import { SyntaxHighlightedLine } from './SyntaxHighlightedLine';
-import { getLanguageFromPath } from '../../utils/language';
 
 export function UnifiedDiffViewer({
   file,
@@ -16,8 +15,6 @@ export function UnifiedDiffViewer({
 }: BaseDiffViewerProps) {
   const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
   const [activeEditorLine, setActiveEditorLine] = useState<number | null>(null);
-
-  const language = useMemo(() => getLanguageFromPath(file.path), [file.path]);
 
   if (file.kind !== 'text') {
     return (
@@ -143,7 +140,11 @@ export function UnifiedDiffViewer({
                       {row.type === 'add' && '+'}
                       {row.type === 'delete' && '-'}
                       {row.type === 'context' && ' '}
-                      <SyntaxHighlightedLine content={row.content} language={language} />
+                      {row.type === 'hunk-header' ? (
+                        row.content
+                      ) : (
+                        <SyntaxHighlightedLine content={row.content} filePath={file.path} />
+                      )}
                     </span>
                   </td>
                 </tr>

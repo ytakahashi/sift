@@ -16,8 +16,7 @@ import 'prismjs/components/prism-rust';
 import 'prismjs/components/prism-yaml';
 import 'prismjs/components/prism-markdown';
 import 'prismjs/components/prism-diff';
-
-// Utility moved to src/client/utils/language.ts
+import { getLanguageFromPath } from './language';
 
 function renderToken(token: string | Prism.Token, key: string | number): React.ReactNode {
   if (typeof token === 'string') {
@@ -49,7 +48,7 @@ function renderToken(token: string | Prism.Token, key: string | number): React.R
 
 interface Props {
   content: string;
-  language?: string;
+  filePath?: string;
 }
 
 /**
@@ -61,8 +60,9 @@ interface Props {
  * that span across multiple diff rows may not be highlighted correctly and will
  * fallback to plain text.
  */
-export const SyntaxHighlightedLine = React.memo(({ content, language }: Props) => {
+export function SyntaxHighlightedLine({ content, filePath }: Props) {
   const tokens = useMemo(() => {
+    const language = getLanguageFromPath(filePath);
     if (!language || !Prism.languages[language]) {
       return null;
     }
@@ -71,11 +71,11 @@ export const SyntaxHighlightedLine = React.memo(({ content, language }: Props) =
     } catch {
       return null;
     }
-  }, [content, language]);
+  }, [content, filePath]);
 
   if (!tokens) {
     return <>{content}</>;
   }
 
   return <>{tokens.map((token, i) => renderToken(token, i))}</>;
-});
+}
