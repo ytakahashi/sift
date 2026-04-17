@@ -3,7 +3,11 @@ import { computeDiffContentHash } from './diff-content-hash';
 import type { DiffFile, DiffHunk } from './types';
 
 // Helper to create mock DiffFile
-function createMockDiffFile(path: string, hunks: DiffHunk[]): DiffFile {
+function createMockDiffFile(
+  path: string,
+  hunks: DiffHunk[],
+  overrides: Partial<DiffFile> = {},
+): DiffFile {
   return {
     id: path,
     bucket: 'working',
@@ -12,6 +16,7 @@ function createMockDiffFile(path: string, hunks: DiffHunk[]): DiffFile {
     kind: 'text',
     displayPath: path,
     hunks,
+    ...overrides,
   };
 }
 
@@ -147,6 +152,42 @@ describe('computeDiffContentHash', () => {
 
     // Then
     expect(hash1).not.toEqual(hash2);
+  });
+
+  it('should generate different hashes for rename-only changes', () => {
+    // Given: two files with the same path but different rename metadata
+    const before = [
+      createMockDiffFile('src/new-name.ts', [], {
+        oldPath: 'src/old-name.ts',
+        status: 'renamed',
+      }),
+    ];
+    const after = [createMockDiffFile('src/new-name.ts', [])];
+
+    // When
+    const hashBefore = computeDiffContentHash(before, []);
+    const hashAfter = computeDiffContentHash(after, []);
+
+    // Then
+    expect(hashBefore).not.toEqual(hashAfter);
+  });
+
+  it('should generate different hashes for binary file changes', () => {
+    // Given: a binary diff and an otherwise empty text diff for the same path
+    const before = [
+      createMockDiffFile('image.png', [], {
+        status: 'binary',
+        kind: 'binary',
+      }),
+    ];
+    const after = [createMockDiffFile('image.png', [])];
+
+    // When
+    const hashBefore = computeDiffContentHash(before, []);
+    const hashAfter = computeDiffContentHash(after, []);
+
+    // Then
+    expect(hashBefore).not.toEqual(hashAfter);
   });
 
   it('should handle empty file lists', () => {

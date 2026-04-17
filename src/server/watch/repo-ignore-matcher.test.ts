@@ -20,16 +20,8 @@ describe('createRepoIgnoreMatcher', () => {
         return '.git\n';
       }
 
-      if (command === 'check-ignore --quiet -- ignored/file.ts') {
-        return '';
-      }
-
-      if (command === 'check-ignore --quiet -- src/file.ts') {
-        throw Object.assign(new Error('not ignored'), { status: 1 });
-      }
-
-      if (command === 'check-ignore --quiet -- broken/file.ts') {
-        throw new Error('git failed');
+      if (command === 'ls-files --others --ignored --exclude-standard --directory -z') {
+        return ['ignored/', 'ignored-file.log', ''].join('\0');
       }
 
       throw new Error(`Unexpected command: ${command}`);
@@ -48,6 +40,7 @@ describe('createRepoIgnoreMatcher', () => {
 
     // When / Then: gitignored files are filtered out
     expect(matcher('/repo/root/ignored/file.ts')).toBe(true);
+    expect(matcher('/repo/root/ignored-file.log')).toBe(true);
   });
 
   it('keeps tracked repository files watchable', () => {
@@ -78,7 +71,7 @@ describe('createRepoIgnoreMatcher', () => {
     expect(matcher('/repo/root/.git/refs/heads/main')).toBe(false);
   });
 
-  it('caches gitignore lookups per relative path', () => {
+  it('loads gitignored paths once during matcher creation', () => {
     // Given: a matcher with one tracked file path
     const matcher = createRepoIgnoreMatcher('/repo/root', [
       '/repo/root',
@@ -92,12 +85,23 @@ describe('createRepoIgnoreMatcher', () => {
     expect(matcher('/repo/root/src/file.ts')).toBe(false);
     expect(matcher('/repo/root/src/file.ts')).toBe(false);
 
-    // Then: git check-ignore runs only once for that path
+    // Then: Git is queried once for .git location and once for ignored paths,
+    // not once per path evaluated by chokidar.
     expect(execFileSyncMock).toHaveBeenCalledTimes(2);
   });
 
-  it('keeps watching when git check-ignore fails unexpectedly', () => {
-    // Given: a matcher where git cannot answer for one path
+  it('keeps watching when ignored path listing fails unexpectedly', () => {
+    // Given: a matcher where Git cannot list ignored paths
+    execFileSyncMock.mockImplementation((_file: string, args: string[]) => {
+      const command = args.join(' ');
+      if (command === 'rev-parse --git-path .') {
+        return '.git\n';
+      }
+      if (command === 'ls-files --others --ignored --exclude-standard --directory -z') {
+        throw new Error('git failed');
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
     const matcher = createRepoIgnoreMatcher('/repo/root', [
       '/repo/root',
       '/repo/root/.git/index',
@@ -107,6 +111,6 @@ describe('createRepoIgnoreMatcher', () => {
     ]);
 
     // When / Then: the path falls back to "not ignored" instead of throwing
-    expect(matcher('/repo/root/broken/file.ts')).toBe(false);
+    expect(matcher('/repo/root/ignored/file.ts')).toBe(false);
   });
 });

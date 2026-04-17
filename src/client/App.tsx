@@ -12,7 +12,8 @@ import { NotesListModal } from './components/notes/NotesListModal';
 import { usePaneResize } from './hooks/usePaneResize';
 import { useNotesPanel } from './hooks/useNotesPanel';
 import { useSession } from './hooks/useSession';
-import { computeDiffContentHash } from '../domain/diff/diff-content-hash';
+import { useRefreshController } from './hooks/useRefreshController';
+import { useAutoRefresh } from './hooks/useAutoRefresh';
 
 function App() {
   const {
@@ -24,18 +25,12 @@ function App() {
   } = useDiffData();
   const { repository } = useSession();
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
-  const refreshAll = useCallback(async () => {
-    const hashBefore = computeDiffContentHash(serverWorkingFiles, serverStagedFiles);
-    const result = await refresh();
-
-    // If result is null (e.g., fetch error), we keep the notes and do not clear them.
-    if (result) {
-      const hashAfter = computeDiffContentHash(result.workingFiles, result.stagedFiles);
-      if (hashBefore !== hashAfter) {
-        clearNotes();
-      }
-    }
-  }, [refresh, clearNotes, serverWorkingFiles, serverStagedFiles]);
+  const { refreshAll } = useRefreshController({
+    workingFiles: serverWorkingFiles,
+    stagedFiles: serverStagedFiles,
+    refresh,
+    clearNotes,
+  });
 
   const {
     stageFile,
@@ -46,6 +41,7 @@ function App() {
     acting,
     error: actionError,
   } = useWorkspaceActions(refreshAll);
+  useAutoRefresh(refreshAll, { enabled: !loading, paused: acting });
 
   const {
     files: workingFiles,

@@ -6,18 +6,38 @@ function isWithinPath(candidatePath: string, basePath: string): boolean {
   return candidatePath === basePath || candidatePath.startsWith(`${basePath}${path.sep}`);
 }
 
-function isIgnoredByGit(repoRoot: string, relativePath: string): boolean {
+interface IgnoredPath {
+  absolutePath: string;
+  directory: boolean;
+}
+
+function resolvePath(repoRoot: string, targetPath: string): string {
+  return path.isAbsolute(targetPath) ? targetPath : path.join(repoRoot, targetPath);
+}
+
+function listIgnoredPaths(repoRoot: string): IgnoredPath[] {
   try {
-    execFileSync('git', ['check-ignore', '--quiet', '--', relativePath], {
-      cwd: repoRoot,
-      stdio: 'ignore',
-    });
-    return true;
+    const output = execFileSync(
+      'git',
+      ['ls-files', '--others', '--ignored', '--exclude-standard', '--directory', '-z'],
+      {
+        cwd: repoRoot,
+        encoding: 'utf8',
+      },
+    );
+
+    return output
+      .split('\0')
+      .filter(Boolean)
+      .map((ignoredPath) => ({
+        absolutePath: resolvePath(repoRoot, ignoredPath.replace(/[\\/]$/, '')),
+        directory: /[\\/]$/.test(ignoredPath),
+      }));
   } catch {
-    // Ignore matcher failures should not crash the watcher. If Git cannot
-    // answer for a path, fall back to "not ignored" so change detection keeps
-    // working, even if that means watching more paths than necessary.
-    return false;
+    // Ignore matcher setup should not crash the watcher. If Git cannot provide
+    // ignored paths, fall back to watching more paths rather than missing
+    // repository changes.
+    return [];
   }
 }
 
@@ -31,16 +51,16 @@ function resolveGitDirectory(repoRoot: string): string {
 }
 
 export function createRepoIgnoreMatcher(repoRoot: string, watchPaths: string[]): MatchFunction {
-  const ignoredCache = new Map<string, boolean>();
   const allowedGitPaths = watchPaths.filter((watchPath) => watchPath !== repoRoot);
   const gitDirectory = resolveGitDirectory(repoRoot);
+  const ignoredPaths = listIgnoredPaths(repoRoot);
 
   return (watchPath: string): boolean => {
     if (watchPath === repoRoot) {
       return false;
     }
 
-    const absolutePath = path.isAbsolute(watchPath) ? watchPath : path.resolve(repoRoot, watchPath);
+    const absolutePath = resolvePath(repoRoot, watchPath);
 
     if (allowedGitPaths.some((allowedPath) => isWithinPath(absolutePath, allowedPath))) {
       return false;
@@ -54,14 +74,12 @@ export function createRepoIgnoreMatcher(repoRoot: string, watchPaths: string[]):
       return false;
     }
 
-    const relativePath = path.relative(repoRoot, absolutePath);
-    const cached = ignoredCache.get(relativePath);
-    if (cached !== undefined) {
-      return cached;
-    }
+    return ignoredPaths.some((ignoredPath) => {
+      if (ignoredPath.directory) {
+        return isWithinPath(absolutePath, ignoredPath.absolutePath);
+      }
 
-    const ignored = isIgnoredByGit(repoRoot, relativePath);
-    ignoredCache.set(relativePath, ignored);
-    return ignored;
+      return absolutePath === ignoredPath.absolutePath;
+    });
   };
 }
