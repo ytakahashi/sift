@@ -2,18 +2,20 @@ import { useCallback, useEffect, useState } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
 import type { FileActionResult } from './pane-action';
 
+export type PaneMode = 'working' | 'staged';
+
 export interface UseFileSelectionResult {
   selectedFile: DiffFile | null;
-  paneMode: 'working' | 'staged';
+  paneMode: PaneMode;
   /** Selects a file and activates its pane (e.g. on single click). */
-  select: (file: DiffFile, pane: 'working' | 'staged') => void;
+  select: (file: DiffFile, pane: PaneMode) => void;
   /**
    * Applies the result returned by a pane hook action (stage / unstage).
    *
    * `nextSelectedFile` may be null when the pane becomes empty after the
    * action, in which case the selection is cleared.
    */
-  applyActionResult: (result: FileActionResult, pane: 'working' | 'staged') => void;
+  applyActionResult: (result: FileActionResult, pane: PaneMode) => void;
   /**
    * Handles cross-pane keyboard navigation.
    *
@@ -22,7 +24,7 @@ export interface UseFileSelectionResult {
    * ArrowUp past the first staged file jumps to the last working file. The
    * opposite directions have no adjacent pane to jump to and are ignored.
    */
-  handleBoundaryNavigate: (pane: 'working' | 'staged', direction: 'previous' | 'next') => void;
+  handleBoundaryNavigate: (pane: PaneMode, direction: 'previous' | 'next') => void;
 }
 
 export function useFileSelection(
@@ -30,7 +32,7 @@ export function useFileSelection(
   stagedFiles: DiffFile[],
 ): UseFileSelectionResult {
   const [selectedFile, setSelectedFile] = useState<DiffFile | null>(null);
-  const [paneMode, setPaneMode] = useState<'working' | 'staged'>('working');
+  const [paneMode, setPaneMode] = useState<PaneMode>('working');
 
   // Keep the selected-file reference in sync with the current file lists.
   // After a server refresh the same logical file may be a new object, so we
@@ -59,18 +61,18 @@ export function useFileSelection(
   }, [paneMode, selectedFile, workingFiles, stagedFiles]);
   /* eslint-enable react-hooks/set-state-in-effect */
 
-  const select = useCallback((file: DiffFile, pane: 'working' | 'staged') => {
+  const select = useCallback((file: DiffFile, pane: PaneMode) => {
     setSelectedFile(file);
     setPaneMode(pane);
   }, []);
 
-  const applyActionResult = useCallback((result: FileActionResult, pane: 'working' | 'staged') => {
+  const applyActionResult = useCallback((result: FileActionResult, pane: PaneMode) => {
     setSelectedFile(result.nextSelectedFile);
     setPaneMode(pane);
   }, []);
 
   const handleBoundaryNavigate = useCallback(
-    (pane: 'working' | 'staged', direction: 'previous' | 'next') => {
+    (pane: PaneMode, direction: 'previous' | 'next') => {
       if (pane === 'staged' && direction === 'previous' && workingFiles.length > 0) {
         setPaneMode('working');
         setSelectedFile(workingFiles[workingFiles.length - 1]);
