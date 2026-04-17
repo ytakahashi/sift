@@ -40,7 +40,10 @@ pnpm run dev
 ```
 
 By default, `sift` will detect the root of your current Git repository and spin
-up a web server. Check `http://localhost:3000` in your browser.
+up a web server. It starts at `http://localhost:49321`; if that port is already
+in use, Sift automatically uses the next available port. If you set the `PORT`
+environment variable, Sift treats it as a fixed port and exits if it is not
+available.
 
 **Options**:
 

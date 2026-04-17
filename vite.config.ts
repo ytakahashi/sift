@@ -15,7 +15,7 @@ export default defineConfig({
     })
   ],
   server: {
-    port: 3000
+    port: 49321
   },
   build: {
     outDir: 'dist/client',
