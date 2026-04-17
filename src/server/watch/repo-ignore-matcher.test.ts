@@ -113,4 +113,30 @@ describe('createRepoIgnoreMatcher', () => {
     // When / Then: the path falls back to "not ignored" instead of throwing
     expect(matcher('/repo/root/ignored/file.ts')).toBe(false);
   });
+
+  it('falls back to the common .git directory when git directory resolution fails', () => {
+    // Given: a matcher where Git cannot resolve its metadata directory
+    execFileSyncMock.mockImplementation((_file: string, args: string[]) => {
+      const command = args.join(' ');
+      if (command === 'rev-parse --git-path .') {
+        throw new Error('git failed');
+      }
+      if (command === 'ls-files --others --ignored --exclude-standard --directory -z') {
+        return '';
+      }
+      throw new Error(`Unexpected command: ${command}`);
+    });
+    const matcher = createRepoIgnoreMatcher('/repo/root', [
+      '/repo/root',
+      '/repo/root/.git/index',
+      '/repo/root/.git/HEAD',
+      '/repo/root/.git/refs',
+      '/repo/root/.git/packed-refs',
+    ]);
+
+    // When / Then: explicitly watched Git metadata stays watchable, while
+    // unrelated .git internals use the fallback directory and are ignored.
+    expect(matcher('/repo/root/.git/index')).toBe(false);
+    expect(matcher('/repo/root/.git/logs/HEAD')).toBe(true);
+  });
 });

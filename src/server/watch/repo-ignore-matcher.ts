@@ -42,15 +42,35 @@ function listIgnoredPaths(repoRoot: string): IgnoredPath[] {
 }
 
 function resolveGitDirectory(repoRoot: string): string {
-  const resolvedPath = execFileSync('git', ['rev-parse', '--git-path', '.'], {
-    cwd: repoRoot,
-    encoding: 'utf8',
-  }).trim();
+  try {
+    const resolvedPath = execFileSync('git', ['rev-parse', '--git-path', '.'], {
+      cwd: repoRoot,
+      encoding: 'utf8',
+    }).trim();
 
-  return path.isAbsolute(resolvedPath) ? resolvedPath : path.join(repoRoot, resolvedPath);
+    return path.isAbsolute(resolvedPath) ? resolvedPath : path.join(repoRoot, resolvedPath);
+  } catch {
+    // Keep matcher setup best-effort like ignored path loading. The common
+    // layout fallback still prevents watching most internal Git churn.
+    return path.join(repoRoot, '.git');
+  }
 }
 
 export function createRepoIgnoreMatcher(repoRoot: string, watchPaths: string[]): MatchFunction {
+  // Chokidar calls this for every candidate path under the watched roots.
+  // The matcher ignores paths that cannot affect the displayed diff, while
+  // keeping explicit metadata watch paths active:
+  //
+  // - `/repo/.git/objects/12/abcd...` => ignored; object database churn should
+  //   not schedule refreshes directly.
+  // - `/repo/.git/index` => not ignored when it is listed in watchPaths; this is
+  //   the primary signal for stage/unstage.
+  // - `/repo/node_modules/pkg/index.js` => ignored when Git reports
+  //   `node_modules/` as an ignored directory.
+  // - `/repo/src/file.ts` => not ignored unless Git reports that exact path or
+  //   one of its parent directories as ignored.
+  // - `/external/file.ts` => not ignored here; chokidar should only pass these
+  //   when the path was explicitly watched.
   const allowedGitPaths = watchPaths.filter((watchPath) => watchPath !== repoRoot);
   const gitDirectory = resolveGitDirectory(repoRoot);
   const ignoredPaths = listIgnoredPaths(repoRoot);
