@@ -6,10 +6,20 @@ export interface DiffDataRefreshResult {
   stagedFiles: DiffFile[];
 }
 
-// React StrictMode mounts effects twice in development. Share an in-flight
-// `/api/diff` request across hook instances so startup does not run duplicate
-// expensive diff generation on the server.
-let inFlightDiffRequest: Promise<DiffDataRefreshResult> | null = null;
+export interface UseDiffDataResult {
+  /** Files with unstaged working-tree changes returned by the latest accepted `/api/diff` response. */
+  workingFiles: DiffFile[];
+  /** Files with staged index changes returned by the latest accepted `/api/diff` response. */
+  stagedFiles: DiffFile[];
+  /** True while the hook is waiting for the latest requested `/api/diff` response. */
+  loading: boolean;
+  /** True after the first accepted `/api/diff` response or error has completed. */
+  initialized: boolean;
+  /** Message from the latest accepted `/api/diff` failure, or null after a successful request. */
+  error: string | null;
+  /** Fetches `/api/diff` again and applies the response only if no newer request superseded it. */
+  refresh: () => Promise<DiffDataRefreshResult | null>;
+}
 
 async function fetchDiffPayload(): Promise<DiffDataRefreshResult> {
   const res = await fetch('/api/diff');
@@ -24,18 +34,11 @@ async function fetchDiffPayload(): Promise<DiffDataRefreshResult> {
   };
 }
 
-function fetchDiffPayloadOnce(): Promise<DiffDataRefreshResult> {
-  inFlightDiffRequest ??= fetchDiffPayload().finally(() => {
-    inFlightDiffRequest = null;
-  });
-
-  return inFlightDiffRequest;
-}
-
-export function useDiffData() {
+export function useDiffData(): UseDiffDataResult {
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [loading, setLoading] = useState(true);
+  const [initialized, setInitialized] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Only the latest caller may commit state. This prevents a slower earlier
   // refresh from overwriting newer diff data when manual refresh, action refresh,
@@ -49,7 +52,7 @@ export function useDiffData() {
     setError(null);
 
     try {
-      const result = await fetchDiffPayloadOnce();
+      const result = await fetchDiffPayload();
 
       if (requestId !== latestRequestId.current) {
         return null;
@@ -66,6 +69,7 @@ export function useDiffData() {
     } finally {
       if (requestId === latestRequestId.current) {
         setLoading(false);
+        setInitialized(true);
       }
     }
   }, []);
@@ -74,5 +78,5 @@ export function useDiffData() {
     fetchDiffs();
   }, [fetchDiffs]);
 
-  return { workingFiles, stagedFiles, loading, error, refresh: fetchDiffs };
+  return { workingFiles, stagedFiles, loading, initialized, error, refresh: fetchDiffs };
 }

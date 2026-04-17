@@ -63,12 +63,14 @@ describe('useDiffData', () => {
     });
     expect(result.current.workingFiles).toEqual([workingFile]);
     expect(result.current.stagedFiles).toEqual([stagedFile]);
+    expect(result.current.initialized).toBe(true);
     expect(result.current.error).toBeNull();
   });
 
-  it('coalesces concurrent refresh requests', async () => {
-    // Given: the initial request resolves, then a manual refresh is started twice while in flight
-    const refresh = createDeferred<Response>();
+  it('keeps the latest overlapping refresh result', async () => {
+    // Given: the initial request resolves, then two refreshes overlap
+    const olderRefresh = createDeferred<Response>();
+    const newerRefresh = createDeferred<Response>();
     const fetchMock = vi.fn().mockResolvedValueOnce(
       createResponse({
         workingFiles: [createFile('initial')],
@@ -82,26 +84,34 @@ describe('useDiffData', () => {
       expect(result.current.loading).toBe(false);
     });
 
-    fetchMock.mockReturnValue(refresh.promise);
+    fetchMock.mockReturnValueOnce(olderRefresh.promise).mockReturnValueOnce(newerRefresh.promise);
 
     // When: two refresh calls happen before the first one resolves
     const firstPromise = result.current.refresh();
     const secondPromise = result.current.refresh();
 
-    refresh.resolve(
+    newerRefresh.resolve(
       createResponse({
         workingFiles: [createFile('latest')],
         stagedFiles: [],
       }),
     );
-    const [firstResult, secondResult] = await act(async () => {
-      return await Promise.all([firstPromise, secondPromise]);
+    const secondResult = await act(async () => {
+      return await secondPromise;
+    });
+    olderRefresh.resolve(
+      createResponse({
+        workingFiles: [createFile('stale')],
+        stagedFiles: [],
+      }),
+    );
+    const firstResult = await act(async () => {
+      return await firstPromise;
     });
 
-    // Then: only one network request is made for the concurrent refreshes.
-    // The older caller is still treated as stale for state ownership, but it
-    // joined the same network request rather than issuing another one.
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Then: each refresh gets its own request, and the stale response cannot
+    // overwrite the newer repository state.
+    expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(firstResult).toBeNull();
     expect(secondResult!.workingFiles.map((file) => file.id)).toEqual(['latest']);
     expect(result.current.workingFiles.map((file) => file.id)).toEqual(['latest']);

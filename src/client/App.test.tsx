@@ -52,6 +52,7 @@ describe('App file list interactions', () => {
     workingFiles: DiffFile[];
     stagedFiles: DiffFile[];
     loading: boolean;
+    initialized: boolean;
     error: string | null;
     refresh: typeof refresh;
   };
@@ -66,6 +67,7 @@ describe('App file list interactions', () => {
       ],
       stagedFiles: [createFile('s', 'staged')],
       loading: false,
+      initialized: true,
       error: null,
       refresh,
     };
@@ -285,6 +287,7 @@ describe('App Notes Interactions', () => {
       workingFiles: [],
       stagedFiles: [],
       loading: false,
+      initialized: true,
       error: null,
       refresh,
     });

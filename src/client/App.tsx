@@ -20,6 +20,7 @@ function App() {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
     loading,
+    initialized,
     error: diffError,
     refresh,
   } = useDiffData();
@@ -41,7 +42,7 @@ function App() {
     acting,
     error: actionError,
   } = useWorkspaceActions(refreshAll);
-  useAutoRefresh(refreshAll, { enabled: !loading, paused: acting });
+  useAutoRefresh(refreshAll, { enabled: initialized, paused: acting });
 
   const {
     files: workingFiles,
