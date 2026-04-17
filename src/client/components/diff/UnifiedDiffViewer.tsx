@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
 import { NoteEditor } from '../notes/NoteEditor';
+import { SyntaxHighlightedLine } from './SyntaxHighlightedLine';
 
 export function UnifiedDiffViewer({
   file,
@@ -139,7 +140,11 @@ export function UnifiedDiffViewer({
                       {row.type === 'add' && '+'}
                       {row.type === 'delete' && '-'}
                       {row.type === 'context' && ' '}
-                      {row.content}
+                      {row.type === 'hunk-header' ? (
+                        row.content
+                      ) : (
+                        <SyntaxHighlightedLine content={row.content} filePath={file.path} />
+                      )}
                     </span>
                   </td>
                 </tr>
