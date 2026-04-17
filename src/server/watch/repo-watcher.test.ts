@@ -40,6 +40,21 @@ function createExecFileMock() {
       return;
     }
 
+    if (command === 'diff --raw --no-ext-diff --color=never') {
+      callback(null, { stdout: asyncWorkingRawOutput, stderr: '' });
+      return;
+    }
+
+    if (command === 'diff --raw --no-ext-diff --color=never --cached') {
+      callback(null, { stdout: asyncStagedRawOutput, stderr: '' });
+      return;
+    }
+
+    if (command === 'ls-files --others --exclude-standard -z') {
+      callback(null, { stdout: asyncUntrackedOutput, stderr: '' });
+      return;
+    }
+
     callback(new Error(`Unexpected command: ${command}`), { stdout: '', stderr: '' });
   };
 }
@@ -47,6 +62,9 @@ function createExecFileMock() {
 let allHandler: WatchHandler | null = null;
 let asyncStatusOutput = '';
 let asyncHeadOutput = '';
+let asyncWorkingRawOutput = '';
+let asyncStagedRawOutput = '';
+let asyncUntrackedOutput = '';
 let statusGate: Promise<void> | null = null;
 let releaseStatusGate: (() => void) | null = null;
 
@@ -58,6 +76,9 @@ describe('createRepoWatcher', () => {
     allHandler = null;
     asyncStatusOutput = 'status-initial\n';
     asyncHeadOutput = 'HEAD-initial\n';
+    asyncWorkingRawOutput = 'working-raw-initial\n';
+    asyncStagedRawOutput = 'staged-raw-initial\n';
+    asyncUntrackedOutput = '';
     statusGate = null;
     releaseStatusGate = null;
 
@@ -70,6 +91,18 @@ describe('createRepoWatcher', () => {
 
       if (command === 'rev-parse HEAD') {
         return 'HEAD-initial\n';
+      }
+
+      if (command === 'diff --raw --no-ext-diff --color=never') {
+        return 'working-raw-initial\n';
+      }
+
+      if (command === 'diff --raw --no-ext-diff --color=never --cached') {
+        return 'staged-raw-initial\n';
+      }
+
+      if (command === 'ls-files --others --exclude-standard -z') {
+        return '';
       }
 
       if (command === 'rev-parse --git-path index') {
@@ -162,9 +195,24 @@ describe('createRepoWatcher', () => {
     allHandler?.();
     await vi.advanceTimersByTimeAsync(200);
 
-    // Then: status/head are each queried once for the burst
-    expect(execFileMock).toHaveBeenCalledTimes(2);
+    // Then: the fingerprint commands are queried once for the burst
+    expect(execFileMock).toHaveBeenCalledTimes(5);
     expect(onChanged).not.toHaveBeenCalled();
+  });
+
+  it('detects staged and working diff movement when status output is unchanged', async () => {
+    // Given: a watcher whose file-level status does not change
+    const onChanged = vi.fn();
+    createRepoWatcher('/repo/root', onChanged);
+
+    // When: raw diff content moves between working and staged buckets
+    asyncWorkingRawOutput = 'working-raw-updated\n';
+    asyncStagedRawOutput = 'staged-raw-updated\n';
+    allHandler?.();
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Then: a repository change is reported even though status stayed the same
+    expect(onChanged).toHaveBeenCalledTimes(1);
   });
 
   it('stops the underlying chokidar watcher', async () => {

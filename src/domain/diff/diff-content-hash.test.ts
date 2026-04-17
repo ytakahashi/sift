@@ -190,6 +190,38 @@ describe('computeDiffContentHash', () => {
     expect(hashBefore).not.toEqual(hashAfter);
   });
 
+  it('should keep the same hash when an untracked text file is staged as added', () => {
+    // Given: staging an untracked text file changes status but not content
+    const hunk = {
+      id: 'hunk-new-file',
+      header: '@@ -0,0 +1,1 @@',
+      oldStart: 0,
+      oldLines: 0,
+      newStart: 1,
+      newLines: 1,
+      lines: [{ id: 'line-new', type: 'add' as const, newLineNumber: 1, content: 'hello' }],
+    };
+    const before = [
+      createMockDiffFile('new.txt', [hunk], {
+        status: 'untracked',
+      }),
+    ];
+    const afterWorking: DiffFile[] = [];
+    const afterStaged = [
+      createMockDiffFile('new.txt', [hunk], {
+        bucket: 'staged',
+        status: 'added',
+      }),
+    ];
+
+    // When
+    const hashBefore = computeDiffContentHash(before, []);
+    const hashAfter = computeDiffContentHash(afterWorking, afterStaged);
+
+    // Then
+    expect(hashBefore).toEqual(hashAfter);
+  });
+
   it('should handle empty file lists', () => {
     // Given
     const working: DiffFile[] = [];

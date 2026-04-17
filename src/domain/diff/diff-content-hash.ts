@@ -6,7 +6,6 @@ export function computeDiffContentHash(workingFiles: DiffFile[], stagedFiles: Di
     {
       kinds: Set<string>;
       oldPaths: Set<string>;
-      statuses: Set<string>;
       lines: string[];
     }
   >();
@@ -20,11 +19,9 @@ export function computeDiffContentHash(workingFiles: DiffFile[], stagedFiles: Di
     const existing = byPath.get(file.path) ?? {
       kinds: new Set<string>(),
       oldPaths: new Set<string>(),
-      statuses: new Set<string>(),
       lines: [],
     };
     existing.kinds.add(file.kind);
-    existing.statuses.add(file.status);
     if (file.oldPath) {
       existing.oldPaths.add(file.oldPath);
     }
@@ -40,7 +37,6 @@ export function computeDiffContentHash(workingFiles: DiffFile[], stagedFiles: Di
       return [
         path,
         [...metadata.oldPaths].sort().join('\0'),
-        [...metadata.statuses].sort().join('\0'),
         [...metadata.kinds].sort().join('\0'),
         sortedLines.join('\0'),
       ].join('\0');

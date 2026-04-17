@@ -59,7 +59,6 @@ export function useAutoRefresh(
     };
 
     source.addEventListener('changed', handleChange);
-    source.onmessage = handleChange;
 
     return () => {
       source.close();
