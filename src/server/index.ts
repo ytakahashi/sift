@@ -1,5 +1,6 @@
-import { serve } from '@hono/node-server';
+import { createAdaptorServer } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
+import type { ServerType } from '@hono/node-server';
 import { createApp, Env } from './create-app.js';
 import { Hono } from 'hono';
 import path from 'node:path';
@@ -10,6 +11,67 @@ import { createWatchHub } from './watch/watch-hub.js';
 interface ServerRuntime {
   app: Hono<Env>;
   stop: () => Promise<void>;
+}
+
+const DEFAULT_PORT = 49321;
+const MAX_PORT_SEARCH_ATTEMPTS = 100;
+
+type ListenError = Error & { code?: string };
+
+function isPortInUseError(error: unknown): boolean {
+  if (!(error instanceof Error)) {
+    return false;
+  }
+
+  const { code } = error as ListenError;
+  return code === 'EADDRINUSE';
+}
+
+function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; server: ServerType }> {
+  return new Promise((resolve, reject) => {
+    const server = createAdaptorServer({ fetch: app.fetch });
+
+    const handleError = (error: Error) => {
+      server.close();
+      reject(error);
+    };
+
+    server.once('error', handleError);
+    server.listen(port, () => {
+      server.off('error', handleError);
+      const address = server.address();
+
+      if (!address || typeof address === 'string') {
+        server.close();
+        reject(new Error('Server started without a TCP port'));
+        return;
+      }
+
+      resolve({ port: address.port, server });
+    });
+  });
+}
+
+async function listenOnAvailablePort(
+  app: Hono<Env>,
+  preferredPort: number,
+): Promise<{ port: number; server: ServerType }> {
+  for (let offset = 0; offset < MAX_PORT_SEARCH_ATTEMPTS; offset += 1) {
+    const port = preferredPort + offset;
+    try {
+      return await listenOnPort(app, port);
+    } catch (error: unknown) {
+      if (!isPortInUseError(error)) {
+        throw error;
+      }
+    }
+  }
+
+  throw new Error(
+    `No available port found between ${preferredPort} and ${
+      preferredPort + MAX_PORT_SEARCH_ATTEMPTS - 1
+    }`,
+  );
 }
 
 function createServerRuntime(repoRoot: string): ServerRuntime {
@@ -66,23 +128,20 @@ export async function startServer(repoRoot: string): Promise<string> {
     }
   });
 
-  const port = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
+  const portEnv = process.env.PORT;
+  const port = portEnv ? parseInt(portEnv, 10) : DEFAULT_PORT;
+  const listen = portEnv ? listenOnPort(cliApp, port) : listenOnAvailablePort(cliApp, port);
+  const { port: actualPort, server } = await listen.catch(async (error: unknown) => {
+    await runtime.stop();
+    throw error;
+  });
 
   const cleanup = () => {
+    server.close();
     void runtime.stop();
   };
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
 
-  return new Promise((resolve) => {
-    serve(
-      {
-        fetch: cliApp.fetch,
-        port,
-      },
-      (info) => {
-        resolve(`http://localhost:${info.port}`);
-      },
-    );
-  });
+  return `http://localhost:${actualPort}`;
 }
