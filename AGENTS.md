@@ -17,7 +17,7 @@ The application consists of:
 src/
 ├── cli/          # CLI entry point (commander, repo resolution, browser opener)
 ├── server/       # Hono HTTP server (routes, services, utils)
-├── client/       # React frontend (components, hooks, styles)
+├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
 └── domain/       # Pure business logic shared across server & client
     ├── diff/     # Diff parsing, view-model building, provider interface
     ├── git/      # Git client wrapper, patch generation
@@ -85,7 +85,13 @@ defined commands.
 - Do **not** import across layer boundaries except as documented above (e.g.,
   `client/` must not import from `server/`).
 - Within `client/`, each sub-directory has additional import restrictions:
-  - `hooks/` may only import from within `hooks/` and from `domain/`.
+  - `application/` defines client-side ports and application-level contracts. It
+    may import from `domain/`, but must not import from `hooks/`, `components/`,
+    or `infrastructure/`.
+  - `infrastructure/` implements `application/` ports and may use browser APIs
+    such as `fetch`. It must not import from `hooks/` or `components/`.
+  - `hooks/` may only import from within `hooks/`, from `application/`, and from
+    `domain/`.
   - `components/<name>/` may only import from within the same component
     directory and from `domain/`.
 

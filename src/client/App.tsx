@@ -13,6 +13,9 @@ import { useSession } from './hooks/useSession';
 import { useRefreshController } from './hooks/useRefreshController';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
 import { usePaneFileActions } from './hooks/usePaneFileActions';
+import { httpDiffReader } from './infrastructure/http/diffClient';
+import { httpSessionReader } from './infrastructure/http/sessionClient';
+import { httpWorkspaceActions } from './infrastructure/http/workspaceActionsClient';
 
 function App() {
   const {
@@ -22,8 +25,8 @@ function App() {
     initialized,
     error: diffError,
     refresh,
-  } = useDiffData();
-  const { repository } = useSession();
+  } = useDiffData(httpDiffReader);
+  const { repository } = useSession(httpSessionReader);
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const { refreshAll } = useRefreshController({
     workingFiles: serverWorkingFiles,
@@ -40,7 +43,7 @@ function App() {
     unstageHunk,
     acting,
     error: actionError,
-  } = useWorkspaceActions(refreshAll);
+  } = useWorkspaceActions(httpWorkspaceActions, refreshAll);
   useAutoRefresh(refreshAll, { enabled: initialized, paused: acting });
 
   const {

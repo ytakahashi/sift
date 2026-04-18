@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
+import type { DiffReader } from '../application/ports';
 
 export interface DiffDataRefreshResult {
   workingFiles: DiffFile[];
@@ -21,20 +22,7 @@ export interface UseDiffDataResult {
   refresh: () => Promise<DiffDataRefreshResult | null>;
 }
 
-async function fetchDiffPayload(): Promise<DiffDataRefreshResult> {
-  const res = await fetch('/api/diff');
-  if (!res.ok) {
-    throw new Error(`Failed to fetch diff: ${res.statusText}`);
-  }
-
-  const data = await res.json();
-  return {
-    workingFiles: data.workingFiles || [],
-    stagedFiles: data.stagedFiles || [],
-  };
-}
-
-export function useDiffData(): UseDiffDataResult {
+export function useDiffData(diffReader: DiffReader): UseDiffDataResult {
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +40,7 @@ export function useDiffData(): UseDiffDataResult {
     setError(null);
 
     try {
-      const result = await fetchDiffPayload();
+      const result = await diffReader.fetchDiff();
 
       if (requestId !== latestRequestId.current) {
         return null;
@@ -72,7 +60,7 @@ export function useDiffData(): UseDiffDataResult {
         setInitialized(true);
       }
     }
-  }, []);
+  }, [diffReader]);
 
   useEffect(() => {
     fetchDiffs();

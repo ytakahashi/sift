@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../domain/diff/types';
+import type { DiffData, DiffReader } from '../application/ports';
 import { useDiffData } from './useDiffData';
 
 function createFile(id: string): DiffFile {
@@ -13,14 +14,6 @@ function createFile(id: string): DiffFile {
     displayPath: `${id}.ts`,
     hunks: [],
   };
-}
-
-function createResponse(body: unknown, ok = true, statusText = 'OK'): Response {
-  return {
-    ok,
-    statusText,
-    json: async () => body,
-  } as Response;
 }
 
 function createDeferred<T>() {
@@ -36,26 +29,19 @@ describe('useDiffData', () => {
     vi.clearAllMocks();
   });
 
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('fetches diff data on mount', async () => {
-    // Given: /api/diff returns working and staged files
+    // Given: the diff reader returns working and staged files
     const workingFile = createFile('working');
     const stagedFile = { ...createFile('staged'), bucket: 'staged' as const };
-    vi.stubGlobal(
-      'fetch',
-      vi.fn().mockResolvedValue(
-        createResponse({
-          workingFiles: [workingFile],
-          stagedFiles: [stagedFile],
-        }),
-      ),
-    );
+    const diffReader: DiffReader = {
+      fetchDiff: vi.fn().mockResolvedValue({
+        workingFiles: [workingFile],
+        stagedFiles: [stagedFile],
+      }),
+    };
 
     // When: the hook is rendered
-    const { result } = renderHook(() => useDiffData());
+    const { result } = renderHook(() => useDiffData(diffReader));
 
     // Then: the fetched files are stored
     await waitFor(() => {
@@ -69,49 +55,43 @@ describe('useDiffData', () => {
 
   it('keeps the latest overlapping refresh result', async () => {
     // Given: the initial request resolves, then two refreshes overlap
-    const olderRefresh = createDeferred<Response>();
-    const newerRefresh = createDeferred<Response>();
-    const fetchMock = vi.fn().mockResolvedValueOnce(
-      createResponse({
-        workingFiles: [createFile('initial')],
-        stagedFiles: [],
-      }),
-    );
-    vi.stubGlobal('fetch', fetchMock);
+    const olderRefresh = createDeferred<DiffData>();
+    const newerRefresh = createDeferred<DiffData>();
+    const fetchDiff = vi.fn().mockResolvedValueOnce({
+      workingFiles: [createFile('initial')],
+      stagedFiles: [],
+    });
+    const diffReader: DiffReader = { fetchDiff };
 
-    const { result } = renderHook(() => useDiffData());
+    const { result } = renderHook(() => useDiffData(diffReader));
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });
 
-    fetchMock.mockReturnValueOnce(olderRefresh.promise).mockReturnValueOnce(newerRefresh.promise);
+    fetchDiff.mockReturnValueOnce(olderRefresh.promise).mockReturnValueOnce(newerRefresh.promise);
 
     // When: two refresh calls happen before the first one resolves
     const firstPromise = result.current.refresh();
     const secondPromise = result.current.refresh();
 
-    newerRefresh.resolve(
-      createResponse({
-        workingFiles: [createFile('latest')],
-        stagedFiles: [],
-      }),
-    );
+    newerRefresh.resolve({
+      workingFiles: [createFile('latest')],
+      stagedFiles: [],
+    });
     const secondResult = await act(async () => {
       return await secondPromise;
     });
-    olderRefresh.resolve(
-      createResponse({
-        workingFiles: [createFile('stale')],
-        stagedFiles: [],
-      }),
-    );
+    olderRefresh.resolve({
+      workingFiles: [createFile('stale')],
+      stagedFiles: [],
+    });
     const firstResult = await act(async () => {
       return await firstPromise;
     });
 
     // Then: each refresh gets its own request, and the stale response cannot
     // overwrite the newer repository state.
-    expect(fetchMock).toHaveBeenCalledTimes(3);
+    expect(fetchDiff).toHaveBeenCalledTimes(3);
     expect(firstResult).toBeNull();
     expect(secondResult!.workingFiles.map((file) => file.id)).toEqual(['latest']);
     expect(result.current.workingFiles.map((file) => file.id)).toEqual(['latest']);
