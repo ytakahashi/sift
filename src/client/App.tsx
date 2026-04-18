@@ -225,6 +225,7 @@ function App() {
                 onAddNote={addNote}
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}
+                resolveFilePath={notesPanel.resolveFilePath}
               />
             )}
           </div>

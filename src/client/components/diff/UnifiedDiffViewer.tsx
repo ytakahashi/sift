@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
 import { NoteEditor } from '../notes/NoteEditor';
+import { NoteCard } from '../notes/NoteCard';
 import { SyntaxHighlightedLine } from './SyntaxHighlightedLine';
 
 export function UnifiedDiffViewer({
@@ -11,7 +12,9 @@ export function UnifiedDiffViewer({
   onUnstageHunk,
   notes = [],
   onAddNote,
+  onUpdateNote,
   onDeleteNote,
+  resolveFilePath,
 }: BaseDiffViewerProps) {
   const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
   const [activeEditorLine, setActiveEditorLine] = useState<number | null>(null);
@@ -175,39 +178,12 @@ export function UnifiedDiffViewer({
                   <tr key={note.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
                     <td colSpan={4} style={{ padding: '0.2rem 1rem 0.5rem 6.5rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
-                        <div
-                          style={{
-                            padding: '0.5rem',
-                            backgroundColor: '#161b22',
-                            border: '1px solid #3fb950',
-                            borderRadius: '4px',
-                          }}
-                        >
-                          <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>
-                            {note.body}
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: '0.5rem',
-                              marginTop: '0.3rem',
-                              fontSize: '0.75rem',
-                            }}
-                          >
-                            <button
-                              onClick={() => onDeleteNote?.(note.id)}
-                              style={{
-                                background: 'transparent',
-                                color: '#f85149',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
-                              }}
-                            >
-                              Delete
-                            </button>
-                          </div>
-                        </div>
+                        <NoteCard
+                          note={note}
+                          resolveFilePath={resolveFilePath}
+                          onUpdate={onUpdateNote}
+                          onDelete={onDeleteNote}
+                        />
                       </div>
                     </td>
                   </tr>

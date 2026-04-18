@@ -229,3 +229,12 @@ body {
 .token.variable {
   color: #ffa657;
 }
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
