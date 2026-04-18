@@ -1,5 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { formatNotesForClipboard } from './format';
+import { formatNoteForClipboard, formatNotesForClipboard } from './format';
+
 import type { Note } from './types';
 
 describe('formatNotesForClipboard', () => {
@@ -55,5 +56,29 @@ describe('formatNotesForClipboard', () => {
 
     // Then
     expect(result).toBe('');
+  });
+});
+
+describe('formatNoteForClipboard', () => {
+  it('formats a single note into a clipboard string', () => {
+    // Given
+    const note: Note = {
+      id: 'n1',
+      target: {
+        fileId: 'file-1',
+        hunkId: 'h1',
+        startNewLineNumber: 10,
+        endNewLineNumber: 10,
+      },
+      body: 'My note',
+      createdAt: 1000,
+    };
+    const resolveFilePath = (_fileId: string) => 'path/to/file.ts';
+
+    // When
+    const result = formatNoteForClipboard(note, resolveFilePath);
+
+    // Then
+    expect(result).toBe('> path/to/file.ts#L10\nMy note');
   });
 });

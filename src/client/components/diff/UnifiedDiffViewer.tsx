@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
 import { NoteEditor } from '../notes/NoteEditor';
 import { SyntaxHighlightedLine } from './SyntaxHighlightedLine';
+import { formatNoteForClipboard } from '../../../domain/notes/format';
 
 export function UnifiedDiffViewer({
   file,
@@ -11,10 +12,24 @@ export function UnifiedDiffViewer({
   onUnstageHunk,
   notes = [],
   onAddNote,
+  onUpdateNote,
   onDeleteNote,
+  resolveFilePath,
 }: BaseDiffViewerProps) {
   const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
   const [activeEditorLine, setActiveEditorLine] = useState<number | null>(null);
+  const [activeEditingNoteId, setActiveEditingNoteId] = useState<string | null>(null);
+  const [copiedNoteId, setCopiedNoteId] = useState<string | null>(null);
+
+  // Auto-clear the "Copied!" feedback after 2 seconds
+  useEffect(() => {
+    if (copiedNoteId !== null) {
+      const timer = setTimeout(() => {
+        setCopiedNoteId(null);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [copiedNoteId]);
 
   if (file.kind !== 'text') {
     return (
@@ -183,30 +198,98 @@ export function UnifiedDiffViewer({
                             borderRadius: '4px',
                           }}
                         >
-                          <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>
-                            {note.body}
-                          </div>
-                          <div
-                            style={{
-                              display: 'flex',
-                              gap: '0.5rem',
-                              marginTop: '0.3rem',
-                              fontSize: '0.75rem',
-                            }}
-                          >
-                            <button
-                              onClick={() => onDeleteNote?.(note.id)}
-                              style={{
-                                background: 'transparent',
-                                color: '#f85149',
-                                border: 'none',
-                                cursor: 'pointer',
-                                padding: 0,
+                          {activeEditingNoteId === note.id ? (
+                            /* Edit mode: replace body display with NoteEditor */
+                            <NoteEditor
+                              initialValue={note.body}
+                              onSave={(val) => {
+                                if (val.trim()) {
+                                  onUpdateNote?.(note.id, val);
+                                }
+                                setActiveEditingNoteId(null);
                               }}
-                            >
-                              Delete
-                            </button>
-                          </div>
+                              onCancel={() => setActiveEditingNoteId(null)}
+                            />
+                          ) : (
+                            /* View mode: show body and action buttons */
+                            <>
+                              <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>
+                                {note.body}
+                              </div>
+                              <div
+                                style={{
+                                  display: 'flex',
+                                  gap: '0.5rem',
+                                  marginTop: '0.3rem',
+                                  fontSize: '0.75rem',
+                                  alignItems: 'center',
+                                }}
+                              >
+                                <button
+                                  onClick={() => setActiveEditingNoteId(note.id)}
+                                  style={{
+                                    background: 'transparent',
+                                    color: '#79c0ff',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                  }}
+                                >
+                                  Edit
+                                </button>
+                                <div style={{ position: 'relative' }}>
+                                  {copiedNoteId === note.id && (
+                                    <span
+                                      style={{
+                                        position: 'absolute',
+                                        bottom: 'calc(100% + 4px)',
+                                        left: '50%',
+                                        transform: 'translateX(-50%)',
+                                        backgroundColor: '#373434ff',
+                                        color: '#ffffff',
+                                        padding: '0.2rem 0.4rem',
+                                        borderRadius: '4px',
+                                        whiteSpace: 'nowrap',
+                                        animation: 'fadeIn 0.2s ease-in-out',
+                                      }}
+                                    >
+                                      Copied!
+                                    </span>
+                                  )}
+                                  <button
+                                    onClick={() => {
+                                      if (!resolveFilePath) return;
+                                      const text = formatNoteForClipboard(note, resolveFilePath);
+                                      void navigator.clipboard.writeText(text).then(() => {
+                                        setCopiedNoteId(note.id);
+                                      });
+                                    }}
+                                    style={{
+                                      background: 'transparent',
+                                      color: '#8b949e',
+                                      border: 'none',
+                                      cursor: 'pointer',
+                                      padding: 0,
+                                    }}
+                                  >
+                                    Copy
+                                  </button>
+                                </div>
+                                <button
+                                  onClick={() => onDeleteNote?.(note.id)}
+                                  style={{
+                                    background: 'transparent',
+                                    color: '#f85149',
+                                    border: 'none',
+                                    cursor: 'pointer',
+                                    padding: 0,
+                                  }}
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </>
+                          )}
                         </div>
                       </div>
                     </td>
