@@ -1,11 +1,12 @@
 import { useEffect, useRef } from 'react';
+import type { RepositoryChangeSource } from '../application/ports';
 
 export interface UseAutoRefreshOptions {
   /**
    * Delays opening the long-lived SSE connection until the initial diff load
-   * has completed. Without this gate, startup can issue `/api/diff` and
-   * `/api/watch` at the same time, making the initial UI appear stuck on
-   * Loading in larger repositories.
+   * has completed. Without this gate, startup can issue the initial diff read
+   * and watch subscription at the same time, making the initial UI appear stuck
+   * on Loading in larger repositories.
    */
   enabled?: boolean;
   /**
@@ -17,6 +18,7 @@ export interface UseAutoRefreshOptions {
 }
 
 export function useAutoRefresh(
+  changeSource: RepositoryChangeSource,
   onRefresh: () => Promise<void> | void,
   { enabled = true, paused = false }: UseAutoRefreshOptions = {},
 ): void {
@@ -24,7 +26,7 @@ export function useAutoRefresh(
   const pausedRef = useRef(paused);
   const pendingRefreshRef = useRef(false);
 
-  // Keep the SSE subscription stable while still calling the latest callback
+  // Keep the change subscription stable while still calling the latest callback
   // from App after rerenders.
   useEffect(() => {
     onRefreshRef.current = onRefresh;
@@ -44,24 +46,17 @@ export function useAutoRefresh(
       return;
     }
 
-    if (typeof EventSource === 'undefined') {
-      return;
-    }
-
-    const source = new EventSource('/api/watch');
-    const handleChange = () => {
+    const subscription = changeSource.subscribe(() => {
       if (pausedRef.current) {
         pendingRefreshRef.current = true;
         return;
       }
 
       void onRefreshRef.current();
-    };
-
-    source.addEventListener('changed', handleChange);
+    });
 
     return () => {
-      source.close();
+      subscription.unsubscribe();
     };
-  }, [enabled]);
+  }, [changeSource, enabled]);
 }

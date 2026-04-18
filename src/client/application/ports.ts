@@ -21,3 +21,11 @@ export interface WorkspaceActions {
   stageHunk(path: string, hunkId: string): Promise<void>;
   unstageHunk(path: string, hunkId: string): Promise<void>;
 }
+
+export interface RepositoryChangeSubscription {
+  unsubscribe(): void;
+}
+
+export interface RepositoryChangeSource {
+  subscribe(onChange: () => void): RepositoryChangeSubscription;
+}

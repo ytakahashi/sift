@@ -1,79 +1,71 @@
 import { act, renderHook } from '@testing-library/react';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RepositoryChangeSource, RepositoryChangeSubscription } from '../application/ports';
 import { useAutoRefresh } from './useAutoRefresh';
 
-type EventHandler = () => void;
+type ChangeHandler = () => void;
 
-class MockEventSource {
-  static instances: MockEventSource[] = [];
+class FakeRepositoryChangeSource implements RepositoryChangeSource {
+  readonly unsubscribe = vi.fn();
+  private handlers: ChangeHandler[] = [];
 
-  onmessage: EventHandler | null = null;
-  readonly close = vi.fn();
-  private readonly handlers = new Map<string, EventHandler[]>();
-
-  constructor(readonly url: string) {
-    MockEventSource.instances.push(this);
+  subscribe(onChange: ChangeHandler): RepositoryChangeSubscription {
+    this.handlers.push(onChange);
+    return { unsubscribe: this.unsubscribe };
   }
 
-  addEventListener(event: string, handler: EventHandler): void {
-    const handlers = this.handlers.get(event) ?? [];
-    handlers.push(handler);
-    this.handlers.set(event, handlers);
-  }
-
-  emit(event: string): void {
-    for (const handler of this.handlers.get(event) ?? []) {
+  emitChange(): void {
+    for (const handler of this.handlers) {
       handler();
     }
+  }
+
+  subscriptionCount(): number {
+    return this.handlers.length;
   }
 }
 
 describe('useAutoRefresh', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    MockEventSource.instances = [];
-    vi.stubGlobal('EventSource', MockEventSource);
-  });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
   });
 
   it('subscribes once and uses the latest refresh callback', () => {
     // Given: the hook is rendered with one callback and then rerendered with another
+    const changeSource = new FakeRepositoryChangeSource();
     const firstRefresh = vi.fn();
     const secondRefresh = vi.fn();
     const { rerender } = renderHook(
-      ({ onRefresh }: { onRefresh: () => void }) => useAutoRefresh(onRefresh),
+      ({ onRefresh }: { onRefresh: () => void }) => useAutoRefresh(changeSource, onRefresh),
       { initialProps: { onRefresh: firstRefresh } },
     );
 
     rerender({ onRefresh: secondRefresh });
 
-    // When: the server sends a changed event
+    // When: the repository change source emits a change
     act(() => {
-      MockEventSource.instances[0].emit('changed');
+      changeSource.emitChange();
     });
 
-    // Then: the EventSource connection is stable and latest callback is used
-    expect(MockEventSource.instances).toHaveLength(1);
-    expect(MockEventSource.instances[0].url).toBe('/api/watch');
+    // Then: the subscription is stable and latest callback is used
+    expect(changeSource.subscriptionCount()).toBe(1);
     expect(firstRefresh).not.toHaveBeenCalled();
     expect(secondRefresh).toHaveBeenCalledTimes(1);
   });
 
   it('coalesces events while paused and refreshes once when resumed', () => {
     // Given: auto refresh is paused while an action is running
+    const changeSource = new FakeRepositoryChangeSource();
     const refresh = vi.fn();
     const { rerender } = renderHook(
-      ({ paused }: { paused: boolean }) => useAutoRefresh(refresh, { paused }),
+      ({ paused }: { paused: boolean }) => useAutoRefresh(changeSource, refresh, { paused }),
       { initialProps: { paused: true } },
     );
 
     // When: multiple change events arrive while paused
     act(() => {
-      MockEventSource.instances[0].emit('changed');
-      MockEventSource.instances[0].emit('changed');
+      changeSource.emitChange();
+      changeSource.emitChange();
     });
 
     // Then: refresh is not run while paused
@@ -88,20 +80,32 @@ describe('useAutoRefresh', () => {
 
   it('does not connect until enabled', () => {
     // Given: auto refresh is disabled during initial diff loading
+    const changeSource = new FakeRepositoryChangeSource();
     const refresh = vi.fn();
     const { rerender } = renderHook(
-      ({ enabled }: { enabled: boolean }) => useAutoRefresh(refresh, { enabled }),
+      ({ enabled }: { enabled: boolean }) => useAutoRefresh(changeSource, refresh, { enabled }),
       { initialProps: { enabled: false } },
     );
 
-    // Then: no EventSource connection is opened yet
-    expect(MockEventSource.instances).toHaveLength(0);
+    // Then: no change subscription is opened yet
+    expect(changeSource.subscriptionCount()).toBe(0);
 
     // When: initial loading completes
     rerender({ enabled: true });
 
-    // Then: the watch connection is opened
-    expect(MockEventSource.instances).toHaveLength(1);
-    expect(MockEventSource.instances[0].url).toBe('/api/watch');
+    // Then: the change subscription is opened
+    expect(changeSource.subscriptionCount()).toBe(1);
+  });
+
+  it('unsubscribes when the hook unmounts', () => {
+    // Given: auto refresh is enabled
+    const changeSource = new FakeRepositoryChangeSource();
+    const { unmount } = renderHook(() => useAutoRefresh(changeSource, vi.fn()));
+
+    // When: the hook unmounts
+    unmount();
+
+    // Then: the active change subscription is closed
+    expect(changeSource.unsubscribe).toHaveBeenCalledTimes(1);
   });
 });

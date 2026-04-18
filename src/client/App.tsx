@@ -16,6 +16,7 @@ import { usePaneFileActions } from './hooks/usePaneFileActions';
 import { httpDiffReader } from './infrastructure/http/diffClient';
 import { httpSessionReader } from './infrastructure/http/sessionClient';
 import { httpWorkspaceActions } from './infrastructure/http/workspaceActionsClient';
+import { sseRepositoryChangeSource } from './infrastructure/event/repositoryChangeSource';
 
 function App() {
   const {
@@ -44,7 +45,7 @@ function App() {
     acting,
     error: actionError,
   } = useWorkspaceActions(httpWorkspaceActions, refreshAll);
-  useAutoRefresh(refreshAll, { enabled: initialized, paused: acting });
+  useAutoRefresh(sseRepositoryChangeSource, refreshAll, { enabled: initialized, paused: acting });
 
   const {
     files: workingFiles,

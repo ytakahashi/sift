@@ -89,7 +89,10 @@ defined commands.
     may import from `domain/`, but must not import from `hooks/`, `components/`,
     or `infrastructure/`.
   - `infrastructure/` implements `application/` ports and may use browser APIs
-    such as `fetch`. It must not import from `hooks/` or `components/`.
+    such as `fetch` and `EventSource`. `infrastructure/http/` contains
+    request-response clients; `infrastructure/event/` contains event
+    subscription sources. Infrastructure must not import from `hooks/` or
+    `components/`.
   - `hooks/` may only import from within `hooks/`, from `application/`, and from
     `domain/`.
   - `components/<name>/` may only import from within the same component
