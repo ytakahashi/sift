@@ -2,7 +2,8 @@ import { cleanup, render, screen, fireEvent, act } from '@testing-library/react'
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../domain/diff/types';
-import App from './App';
+import AppComponent from './App';
+import type { AppDependencies } from './composition/dependencies';
 import { useDiffData } from './hooks/useDiffData';
 import { useNotes } from './hooks/useNotes';
 import { useSession } from './hooks/useSession';
@@ -40,6 +41,39 @@ function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
     displayPath: `${id}.ts`,
     hunks: [],
   };
+}
+
+const testDependencies: AppDependencies = {
+  diffReader: {
+    fetchDiff: vi.fn(async () => ({ workingFiles: [], stagedFiles: [] })),
+  },
+  sessionReader: {
+    fetchSession: vi.fn(async () => ({
+      mode: 'repository',
+      repository: {
+        name: 'sift',
+        root: '/Users/dev/projects/sift',
+      },
+      capabilities: {
+        splitView: false,
+        stdinMode: false,
+      },
+    })),
+  },
+  workspaceActions: {
+    stageFile: vi.fn(async () => {}),
+    unstageFile: vi.fn(async () => {}),
+    discardWorkingFile: vi.fn(async () => {}),
+    stageHunk: vi.fn(async () => {}),
+    unstageHunk: vi.fn(async () => {}),
+  },
+  repositoryChangeSource: {
+    subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
+  },
+};
+
+function App() {
+  return <AppComponent dependencies={testDependencies} />;
 }
 
 describe('App file list interactions', () => {

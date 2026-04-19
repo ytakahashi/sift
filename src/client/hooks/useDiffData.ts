@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DiffFile } from '../../domain/diff/types';
+import type { DiffReader } from '../application/ports';
 
 export interface DiffDataRefreshResult {
   workingFiles: DiffFile[];
@@ -7,34 +8,21 @@ export interface DiffDataRefreshResult {
 }
 
 export interface UseDiffDataResult {
-  /** Files with unstaged working-tree changes returned by the latest accepted `/api/diff` response. */
+  /** Files with unstaged working-tree changes returned by the latest accepted diff read. */
   workingFiles: DiffFile[];
-  /** Files with staged index changes returned by the latest accepted `/api/diff` response. */
+  /** Files with staged index changes returned by the latest accepted diff read. */
   stagedFiles: DiffFile[];
-  /** True while the hook is waiting for the latest requested `/api/diff` response. */
+  /** True while the hook is waiting for the latest requested diff read. */
   loading: boolean;
-  /** True after the first accepted `/api/diff` response or error has completed. */
+  /** True after the first accepted diff read or error has completed. */
   initialized: boolean;
-  /** Message from the latest accepted `/api/diff` failure, or null after a successful request. */
+  /** Message from the latest accepted diff read failure, or null after a successful read. */
   error: string | null;
-  /** Fetches `/api/diff` again and applies the response only if no newer request superseded it. */
+  /** Reads diff data again and applies the result only if no newer request superseded it. */
   refresh: () => Promise<DiffDataRefreshResult | null>;
 }
 
-async function fetchDiffPayload(): Promise<DiffDataRefreshResult> {
-  const res = await fetch('/api/diff');
-  if (!res.ok) {
-    throw new Error(`Failed to fetch diff: ${res.statusText}`);
-  }
-
-  const data = await res.json();
-  return {
-    workingFiles: data.workingFiles || [],
-    stagedFiles: data.stagedFiles || [],
-  };
-}
-
-export function useDiffData(): UseDiffDataResult {
+export function useDiffData(diffReader: DiffReader): UseDiffDataResult {
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -52,7 +40,7 @@ export function useDiffData(): UseDiffDataResult {
     setError(null);
 
     try {
-      const result = await fetchDiffPayload();
+      const result = await diffReader.fetchDiff();
 
       if (requestId !== latestRequestId.current) {
         return null;
@@ -72,7 +60,7 @@ export function useDiffData(): UseDiffDataResult {
         setInitialized(true);
       }
     }
-  }, []);
+  }, [diffReader]);
 
   useEffect(() => {
     fetchDiffs();
