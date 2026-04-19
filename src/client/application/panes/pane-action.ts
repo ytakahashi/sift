@@ -1,4 +1,4 @@
-import type { DiffFile } from '../../domain/diff/types';
+import type { DiffFile } from '../../../domain/diff/types';
 
 /**
  * The result returned by a pane hook action (e.g. stage, unstage).

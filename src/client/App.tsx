@@ -1,18 +1,18 @@
-import { useDiffData } from './hooks/useDiffData';
-import { useNotes } from './hooks/useNotes';
+import { useDiffData } from './hooks/diff/useDiffData';
+import { useNotes } from './hooks/notes/useNotes';
 import { FileList } from './components/file-list/FileList';
 import { UnifiedDiffViewer } from './components/diff/UnifiedDiffViewer';
-import { useWorkspaceActions } from './hooks/useWorkspaceActions';
-import { useWorkingPane } from './hooks/useWorkingPane';
-import { useStagedPane } from './hooks/useStagedPane';
-import { useFileSelection } from './hooks/useFileSelection';
+import { useWorkspaceActions } from './hooks/workspace-actions/useWorkspaceActions';
+import { useWorkingPane } from './hooks/panes/useWorkingPane';
+import { useStagedPane } from './hooks/panes/useStagedPane';
+import { useFileSelection } from './hooks/panes/useFileSelection';
 import { NotesListModal } from './components/notes/NotesListModal';
-import { usePaneResize } from './hooks/usePaneResize';
-import { useNotesPanel } from './hooks/useNotesPanel';
-import { useSession } from './hooks/useSession';
-import { useRefreshController } from './hooks/useRefreshController';
-import { useAutoRefresh } from './hooks/useAutoRefresh';
-import { usePaneFileActions } from './hooks/usePaneFileActions';
+import { usePaneResize } from './hooks/layout/usePaneResize';
+import { useNotesPanel } from './hooks/notes/useNotesPanel';
+import { useSession } from './hooks/session/useSession';
+import { useRefreshController } from './hooks/sync/useRefreshController';
+import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
+import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
 import type { AppDependencies } from './composition/dependencies';
 
 interface AppProps {

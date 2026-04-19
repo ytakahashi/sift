@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { RepositoryInfo } from '../../domain/session/types';
-import type { SessionReader } from '../application/ports';
+import type { RepositoryInfo } from '../../../domain/session/types';
+import type { SessionReader } from '../../application/ports';
 
 type UseSessionResult = {
   repository: RepositoryInfo | null;

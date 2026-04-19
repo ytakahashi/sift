@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DiffFile } from '../../domain/diff/types';
-import type { FileActionResult } from './pane-action';
+import type { DiffFile } from '../../../domain/diff/types';
+import type { FileActionResult } from '../../application/panes/pane-action';
 
 export type PaneMode = 'working' | 'staged';
 

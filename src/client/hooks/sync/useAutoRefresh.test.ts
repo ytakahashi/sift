@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RepositoryChangeSource, RepositoryChangeSubscription } from '../application/ports';
+import type { RepositoryChangeSource, RepositoryChangeSubscription } from '../../application/ports';
 import { useAutoRefresh } from './useAutoRefresh';
 
 type ChangeHandler = () => void;

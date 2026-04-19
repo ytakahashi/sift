@@ -1,7 +1,7 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { NotePathResolvableFile } from '../../domain/notes/resolve-note-file-path';
-import type { Note } from '../../domain/notes/types';
+import type { NotePathResolvableFile } from '../../../domain/notes/resolve-note-file-path';
+import type { Note } from '../../../domain/notes/types';
 import { useNotesPanel } from './useNotesPanel';
 
 function createFile(id: string, displayPath = `${id}.ts`): NotePathResolvableFile {

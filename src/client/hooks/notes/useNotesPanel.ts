@@ -2,9 +2,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   resolveNoteFilePath,
   type NotePathResolvableFile,
-} from '../../domain/notes/resolve-note-file-path';
-import { selectNotesForFile } from '../../domain/notes/select-notes-for-file';
-import type { Note } from '../../domain/notes/types';
+} from '../../../domain/notes/resolve-note-file-path';
+import { selectNotesForFile } from '../../../domain/notes/select-notes-for-file';
+import type { Note } from '../../../domain/notes/types';
 
 export interface UseNotesPanelOptions {
   notes: Note[];

@@ -7,7 +7,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from 'react';
-import { clampSidebarWidth, clampWorkingPanelHeight } from '../layout/pane-size';
+import { clampSidebarWidth, clampWorkingPanelHeight } from '../../presentation/layout/pane-size';
 
 type DragTarget = 'sidebar-width' | 'working-height';
 

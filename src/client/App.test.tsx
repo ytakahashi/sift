@@ -4,24 +4,24 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../domain/diff/types';
 import AppComponent from './App';
 import type { AppDependencies } from './composition/dependencies';
-import { useDiffData } from './hooks/useDiffData';
-import { useNotes } from './hooks/useNotes';
-import { useSession } from './hooks/useSession';
-import { useWorkspaceActions } from './hooks/useWorkspaceActions';
+import { useDiffData } from './hooks/diff/useDiffData';
+import { useNotes } from './hooks/notes/useNotes';
+import { useSession } from './hooks/session/useSession';
+import { useWorkspaceActions } from './hooks/workspace-actions/useWorkspaceActions';
 
-vi.mock('./hooks/useDiffData', () => ({
+vi.mock('./hooks/diff/useDiffData', () => ({
   useDiffData: vi.fn(),
 }));
 
-vi.mock('./hooks/useNotes', () => ({
+vi.mock('./hooks/notes/useNotes', () => ({
   useNotes: vi.fn(),
 }));
 
-vi.mock('./hooks/useSession', () => ({
+vi.mock('./hooks/session/useSession', () => ({
   useSession: vi.fn(),
 }));
 
-vi.mock('./hooks/useWorkspaceActions', () => ({
+vi.mock('./hooks/workspace-actions/useWorkspaceActions', () => ({
   useWorkspaceActions: vi.fn(),
 }));
 

@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { DiffFile, DiffHunk } from '../../domain/diff/types';
+import type { DiffFile, DiffHunk } from '../../../domain/diff/types';
 import { useRefreshController } from './useRefreshController';
 
 function createHunk(content: string): DiffHunk {

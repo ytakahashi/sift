@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { WorkspaceActions } from '../application/ports';
+import type { WorkspaceActions } from '../../application/ports';
 
 // onRefresh is awaited when provided so that the file lists are up to date
 // before acting is cleared and the UI is re-enabled.

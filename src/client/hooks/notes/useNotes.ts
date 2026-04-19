@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import type { Note, NoteTarget } from '../../domain/notes/types';
+import type { Note, NoteTarget } from '../../../domain/notes/types';
 
 export function useNotes() {
   const [notes, setNotes] = useState<Note[]>([]);
