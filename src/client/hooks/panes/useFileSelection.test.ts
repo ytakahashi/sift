@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { DiffFile } from '../../domain/diff/types';
+import type { DiffFile } from '../../../domain/diff/types';
 import { useFileSelection } from './useFileSelection';
 
 function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {

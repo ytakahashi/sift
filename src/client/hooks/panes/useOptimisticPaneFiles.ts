@@ -1,7 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { DiffFile } from '../../domain/diff/types';
-import { type FileActionResult, runOptimisticPaneAction } from './pane-action';
-import { getFallbackSelectionIndex, getSelectionByIndex, removeFileFromPane } from './pane-files';
+import type { DiffFile } from '../../../domain/diff/types';
+import {
+  type FileActionResult,
+  runOptimisticPaneAction,
+} from '../../application/panes/pane-action';
+import {
+  getFallbackSelectionIndex,
+  getSelectionByIndex,
+  removeFileFromPane,
+} from '../../application/panes/pane-files';
 
 interface UseOptimisticPaneFilesResult {
   files: DiffFile[];

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { DiffFile } from '../../domain/diff/types';
-import type { DiffReader } from '../application/ports';
+import type { DiffFile } from '../../../domain/diff/types';
+import type { DiffReader } from '../../application/ports';
 
 export interface DiffDataRefreshResult {
   workingFiles: DiffFile[];

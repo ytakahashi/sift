@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { DiffFile } from '../../domain/diff/types';
+import type { DiffFile } from '../../../domain/diff/types';
 import { getFallbackSelectionIndex, getSelectionByIndex, removeFileFromPane } from './pane-files';
 
 function createFile(id: string, bucket: 'working' | 'staged' = 'working'): DiffFile {

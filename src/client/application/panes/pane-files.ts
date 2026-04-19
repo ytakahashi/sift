@@ -1,4 +1,4 @@
-import type { DiffFile } from '../../domain/diff/types';
+import type { DiffFile } from '../../../domain/diff/types';
 
 /**
  * Computes the fallback selection index after an item at `currentIndex` is

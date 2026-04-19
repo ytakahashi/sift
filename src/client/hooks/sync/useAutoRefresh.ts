@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import type { RepositoryChangeSource } from '../application/ports';
+import type { RepositoryChangeSource } from '../../application/ports';
 
 export interface UseAutoRefreshOptions {
   /**

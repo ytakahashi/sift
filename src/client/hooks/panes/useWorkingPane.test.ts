@@ -1,6 +1,6 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
-import type { DiffFile } from '../../domain/diff/types';
+import type { DiffFile } from '../../../domain/diff/types';
 import { useWorkingPane } from './useWorkingPane';
 
 function createFile(id: string): DiffFile {
