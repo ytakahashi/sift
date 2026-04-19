@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { Env } from '../create-app.js';
-import { RepositoryDiffProvider } from '../../domain/diff/providers/repository-diff-provider.js';
+import { RepositoryDiffProvider } from '../infrastructure/diff/repository-diff-provider';
 
 export const diffRoutes = new Hono<Env>();
 

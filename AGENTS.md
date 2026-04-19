@@ -16,12 +16,12 @@ The application consists of:
 ```
 src/
 ├── cli/          # CLI entry point (commander, repo resolution, browser opener)
-├── server/       # Hono HTTP server (routes, services, watchers, utils)
+├── server/       # Hono HTTP server (routes, services, infrastructure, utils)
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
 └── domain/       # Pure business logic and models shared across server & client
 ```
 
-- **`domain/`** contains pure logic **with no framework dependencies**.
+- **`domain/`** contains pure logic with no framework/Node.js/browser/infrastructure dependencies.
 - **`server/`** depends on `domain/` and Node.js APIs. It must not import from `client/`.
 - **`client/`** depends on `domain/` and React. It must not import from `server/` or `cli/`.
 - **`cli/`** is the entry point. It wires together `server/` and launches the HTTP server.
@@ -96,6 +96,15 @@ Prettier and ESLint are configured. See `.prettierrc` and `eslint.config.js` for
   - A component directory may import from itself, `application/`, `presentation/`, and `domain/`.
   - It must not import from `infrastructure/`, `composition/`, or non-colocated `hooks/`.
   - Hooks used only by a component may be colocated inside that component directory.
+
+### Server
+
+#### Responsibilities
+
+- `server/infrastructure/` contains Node.js adapters such as Git CLI access, filesystem access, and
+  repository-backed providers.
+- `server/services/` orchestrates server use cases.
+- `server/routes/` handles HTTP routing and response shaping.
 
 ## Implementation Checklist
 

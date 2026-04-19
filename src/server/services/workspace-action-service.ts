@@ -1,7 +1,8 @@
-import { GitClient } from '../../domain/git/git-client';
-import { applyPatch, createPatchForHunk } from '../../domain/git/git-patch';
+import { createPatchForHunk } from '../../domain/git/git-patch';
+import { RepositoryDiffProvider } from '../infrastructure/diff/repository-diff-provider';
+import { GitClient } from '../infrastructure/git/git-client';
+import { applyPatch } from '../infrastructure/git/git-patch-applier';
 import { resolveSafePath } from '../utils/safe-path';
-import { RepositoryDiffProvider } from '../../domain/diff/providers/repository-diff-provider';
 
 export class WorkspaceActionService {
   private git: GitClient;

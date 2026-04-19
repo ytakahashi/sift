@@ -1,9 +1,9 @@
-import type { DiffProvider } from './diff-provider';
-import type { DiffFile, FileBucket, DiffHunk, DiffLine } from '../types';
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import { GitClient } from '../../git/git-client';
-import { parseDiff } from '../diff-parser';
+import type { DiffProvider } from '../../../domain/diff/providers/diff-provider';
+import { parseDiff } from '../../../domain/diff/diff-parser';
+import type { DiffFile, FileBucket, DiffHunk, DiffLine } from '../../../domain/diff/types';
+import { GitClient } from '../git/git-client';
 
 export class RepositoryDiffProvider implements DiffProvider {
   private gitClient: GitClient;
@@ -44,15 +44,17 @@ export class RepositoryDiffProvider implements DiffProvider {
         for (const file of untrackedFiles) {
           const hunks: DiffHunk[] = [];
           try {
-            const absolutePath = path.resolve(this.gitClient['repoRoot'], file);
-            const content = await fs.readFile(absolutePath, 'utf8');
-            const lines = content.split('\n');
-            const diffLines: DiffLine[] = lines.map((line, idx) => ({
-              id: `line-${file}-untracked-${idx}`,
-              type: 'add',
-              newLineNumber: idx + 1,
-              content: line,
-            }));
+            const absolutePath = path.resolve(this.gitClient.repoRoot, file);
+            const content: string = await fs.readFile(absolutePath, 'utf8');
+            const lines: string[] = content.split('\n');
+            const diffLines: DiffLine[] = lines.map(
+              (line: string, idx: number): DiffLine => ({
+                id: `line-${file}-untracked-${idx}`,
+                type: 'add',
+                newLineNumber: idx + 1,
+                content: line,
+              }),
+            );
             hunks.push({
               id: `hunk-${file}-untracked`,
               header: `@@ -0,0 +1,${lines.length} @@`,

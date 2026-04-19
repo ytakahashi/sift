@@ -4,7 +4,7 @@ import { promisify } from 'node:util';
 const execFileAsync = promisify(execFile);
 
 export class GitClient {
-  constructor(private readonly repoRoot: string) {}
+  constructor(readonly repoRoot: string) {}
 
   async runGitCommand(args: string[]): Promise<string> {
     try {
