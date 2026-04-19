@@ -13,12 +13,13 @@ import { useSession } from './hooks/useSession';
 import { useRefreshController } from './hooks/useRefreshController';
 import { useAutoRefresh } from './hooks/useAutoRefresh';
 import { usePaneFileActions } from './hooks/usePaneFileActions';
-import { httpDiffReader } from './infrastructure/http/diffClient';
-import { httpSessionReader } from './infrastructure/http/sessionClient';
-import { httpWorkspaceActions } from './infrastructure/http/workspaceActionsClient';
-import { sseRepositoryChangeSource } from './infrastructure/event/repositoryChangeSource';
+import type { AppDependencies } from './composition/dependencies';
 
-function App() {
+interface AppProps {
+  dependencies: AppDependencies;
+}
+
+function App({ dependencies }: AppProps) {
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -26,8 +27,8 @@ function App() {
     initialized,
     error: diffError,
     refresh,
-  } = useDiffData(httpDiffReader);
-  const { repository } = useSession(httpSessionReader);
+  } = useDiffData(dependencies.diffReader);
+  const { repository } = useSession(dependencies.sessionReader);
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const { refreshAll } = useRefreshController({
     workingFiles: serverWorkingFiles,
@@ -44,8 +45,11 @@ function App() {
     unstageHunk,
     acting,
     error: actionError,
-  } = useWorkspaceActions(httpWorkspaceActions, refreshAll);
-  useAutoRefresh(sseRepositoryChangeSource, refreshAll, { enabled: initialized, paused: acting });
+  } = useWorkspaceActions(dependencies.workspaceActions, refreshAll);
+  useAutoRefresh(dependencies.repositoryChangeSource, refreshAll, {
+    enabled: initialized,
+    paused: acting,
+  });
 
   const {
     files: workingFiles,

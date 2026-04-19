@@ -66,6 +66,8 @@ This project uses **pnpm** as its package manager. See `package.json` for define
 - `App.tsx` is responsible for **wiring hooks together and rendering JSX only**.
 - Business logic must not be added directly to `App.tsx`; extract it to a hook or a pure function
   instead.
+- `App.tsx` must not import from `infrastructure/`. Runtime dependencies are passed in through props
+  from `main.tsx` or `composition/`.
 
 ### Imports
 
@@ -77,8 +79,11 @@ This project uses **pnpm** as its package manager. See `package.json` for define
 - Within `client/`, each sub-directory has additional import restrictions:
   - `application/` defines client-side ports and application-level contracts. It may import from
     `domain/`, but must not import from `hooks/`, `components/`, or `infrastructure/`.
+  - `composition/` wires infrastructure implementations to application ports for the client entry
+    point. It may import from `application/` and `infrastructure/`, but must not import from
+    `hooks/` or `components/`.
   - `infrastructure/` implements `application/` ports and may use browser APIs such as `fetch` and
-    `EventSource`. Infrastructure must not import from `hooks/` or `components/`.
+    `EventSource`. It must not import from `hooks/` or `components/`.
   - `hooks/` may only import from within `hooks/`, from `application/`, and from `domain/`.
   - `components/<name>/` may only import from within the same component directory and from
     `domain/`.
