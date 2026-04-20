@@ -6,7 +6,8 @@ import type { Env } from '../create-app.js';
 export const sessionRoutes = new Hono<Env>();
 
 sessionRoutes.get('/', (c) => {
-  const repoRoot = c.get('repoRoot');
+  const repository = c.get('repository');
+  const repoRoot = repository.path;
   // basename("/") returns an empty string, so keep repoRoot itself as a safe fallback.
   const repositoryName = path.basename(repoRoot) || repoRoot;
 

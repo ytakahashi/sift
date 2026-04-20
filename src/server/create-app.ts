@@ -5,10 +5,12 @@ import { diffRoutes } from './routes/diff';
 import { actionRoutes } from './routes/actions';
 import { createWatchRoutes } from './routes/watch';
 import type { WatchHub } from './watch/watch-hub';
+import type { ServerRepository } from './repositories/default-repository';
 
 // Define context variables accessible in routes
 export type Env = {
   Variables: {
+    repository: ServerRepository;
     repoRoot: string;
   };
 };
