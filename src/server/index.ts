@@ -86,7 +86,6 @@ function createServerRuntime(repoRoot: string): ServerRuntime {
 
   app.use('*', async (c, next) => {
     c.set('repository', repository);
-    c.set('repoRoot', repository.path);
     await next();
   });
 

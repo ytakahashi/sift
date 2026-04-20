@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { actionRoutes } from './actions';
+import { createDefaultRepository } from '../repositories/default-repository';
 
 const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
   discardWorkingFileMock: vi.fn(),
@@ -24,8 +25,9 @@ describe('actionRoutes discard-working-file', () => {
 
   function createAppWithRepoRoot(repoRoot: string): Hono<Env> {
     const app = new Hono<Env>();
+    const repository = createDefaultRepository(repoRoot);
     app.use('*', async (c, next) => {
-      c.set('repoRoot', repoRoot);
+      c.set('repository', repository);
       await next();
     });
     app.route('/api/actions', actionRoutes);

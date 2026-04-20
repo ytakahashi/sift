@@ -11,7 +11,6 @@ import type { ServerRepository } from './repositories/default-repository';
 export type Env = {
   Variables: {
     repository: ServerRepository;
-    repoRoot: string;
   };
 };
 

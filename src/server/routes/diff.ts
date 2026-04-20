@@ -5,9 +5,9 @@ import { RepositoryDiffProvider } from '../infrastructure/diff/repository-diff-p
 export const diffRoutes = new Hono<Env>();
 
 diffRoutes.get('/', async (c) => {
-  const repoRoot = c.get('repoRoot');
+  const repositoryPath = c.get('repository').path;
 
-  const provider = new RepositoryDiffProvider(repoRoot);
+  const provider = new RepositoryDiffProvider(repositoryPath);
 
   try {
     const [workingFiles, stagedFiles] = await Promise.all([
@@ -19,7 +19,7 @@ diffRoutes.get('/', async (c) => {
       workingFiles,
       stagedFiles,
       metadata: {
-        repoRoot,
+        repoRoot: repositoryPath,
         revision: 'HEAD',
       },
     });

@@ -1,12 +1,16 @@
-import { Hono } from 'hono';
+import { Hono, type Context } from 'hono';
 import type { Env } from '../create-app';
 import { WorkspaceActionService } from '../services/workspace-action-service';
 
 export const actionRoutes = new Hono<Env>();
 
+function createWorkspaceActionService(c: Context<Env>): WorkspaceActionService {
+  return new WorkspaceActionService(c.get('repository').path);
+}
+
 actionRoutes.post('/stage-file', async (c) => {
   const body = await c.req.json();
-  const service = new WorkspaceActionService(c.get('repoRoot'));
+  const service = createWorkspaceActionService(c);
   try {
     await service.stageFile(body.path);
     return c.json({ success: true });
@@ -18,7 +22,7 @@ actionRoutes.post('/stage-file', async (c) => {
 
 actionRoutes.post('/unstage-file', async (c) => {
   const body = await c.req.json();
-  const service = new WorkspaceActionService(c.get('repoRoot'));
+  const service = createWorkspaceActionService(c);
   try {
     await service.unstageFile(body.path);
     return c.json({ success: true });
@@ -30,7 +34,7 @@ actionRoutes.post('/unstage-file', async (c) => {
 
 actionRoutes.post('/stage-hunk', async (c) => {
   const body = await c.req.json();
-  const service = new WorkspaceActionService(c.get('repoRoot'));
+  const service = createWorkspaceActionService(c);
   try {
     await service.stageHunk(body.path, body.hunkId);
     return c.json({ success: true });
@@ -42,7 +46,7 @@ actionRoutes.post('/stage-hunk', async (c) => {
 
 actionRoutes.post('/unstage-hunk', async (c) => {
   const body = await c.req.json();
-  const service = new WorkspaceActionService(c.get('repoRoot'));
+  const service = createWorkspaceActionService(c);
   try {
     await service.unstageHunk(body.path, body.hunkId);
     return c.json({ success: true });
@@ -54,7 +58,7 @@ actionRoutes.post('/unstage-hunk', async (c) => {
 
 actionRoutes.post('/discard-working-file', async (c) => {
   const body = await c.req.json();
-  const service = new WorkspaceActionService(c.get('repoRoot'));
+  const service = createWorkspaceActionService(c);
   try {
     await service.discardWorkingFile(body.path);
     return c.json({ success: true });

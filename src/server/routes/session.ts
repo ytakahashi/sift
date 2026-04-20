@@ -7,15 +7,15 @@ export const sessionRoutes = new Hono<Env>();
 
 sessionRoutes.get('/', (c) => {
   const repository = c.get('repository');
-  const repoRoot = repository.path;
-  // basename("/") returns an empty string, so keep repoRoot itself as a safe fallback.
-  const repositoryName = path.basename(repoRoot) || repoRoot;
+  const repositoryPath = repository.path;
+  // basename("/") returns an empty string, so keep repositoryPath itself as a safe fallback.
+  const repositoryName = path.basename(repositoryPath) || repositoryPath;
 
   const response: SessionInfo = {
     mode: 'repository',
     repository: {
       name: repositoryName,
-      root: repoRoot,
+      root: repositoryPath,
     },
     capabilities: {
       splitView: false, // Flag indicating if split view is currently supported
