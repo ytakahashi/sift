@@ -1,9 +1,6 @@
-export const DEFAULT_REPO_ID = 'default';
+import type { ServerRepository } from './server-repository';
 
-export interface ServerRepository {
-  id: string;
-  path: string;
-}
+export const DEFAULT_REPO_ID = 'default';
 
 export function createDefaultRepository(repoRoot: string): ServerRepository {
   return {
