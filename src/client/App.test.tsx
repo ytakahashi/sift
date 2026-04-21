@@ -6,7 +6,6 @@ import AppComponent from './App';
 import type { AppDependencies } from './composition/dependencies';
 import { useDiffData } from './hooks/diff/useDiffData';
 import { useNotes } from './hooks/notes/useNotes';
-import { useSession } from './hooks/session/useSession';
 import { useWorkspaceActions } from './hooks/workspace-actions/useWorkspaceActions';
 
 vi.mock('./hooks/diff/useDiffData', () => ({
@@ -15,10 +14,6 @@ vi.mock('./hooks/diff/useDiffData', () => ({
 
 vi.mock('./hooks/notes/useNotes', () => ({
   useNotes: vi.fn(),
-}));
-
-vi.mock('./hooks/session/useSession', () => ({
-  useSession: vi.fn(),
 }));
 
 vi.mock('./hooks/workspace-actions/useWorkspaceActions', () => ({
@@ -61,18 +56,11 @@ const testDependencies: AppDependencies = {
         },
       ],
     })),
-  },
-  sessionReader: {
-    fetchSession: vi.fn(async () => ({
-      mode: 'repository',
-      repository: {
-        name: 'sift',
-        root: '/Users/dev/projects/sift',
-      },
-      capabilities: {
-        splitView: false,
-        stdinMode: false,
-      },
+    fetchRepository: vi.fn(async (repoId) => ({
+      id: repoId,
+      isValid: true,
+      name: repoId,
+      path: `/Users/dev/projects/${repoId}`,
     })),
   },
   workspaceActions: {
@@ -123,15 +111,6 @@ describe('App file list interactions', () => {
     };
 
     vi.mocked(useDiffData).mockImplementation(() => diffState);
-    vi.mocked(useSession).mockReturnValue({
-      repository: {
-        name: 'sift',
-        root: '/Users/dev/projects/sift',
-      },
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
-    });
     vi.mocked(useNotes).mockReturnValue({
       notes: [],
       addNote: vi.fn(),
@@ -333,41 +312,60 @@ describe('App file list interactions', () => {
     expect(horizontalSplitter).toBeDefined();
   });
 
-  it('renders repository name in the header with absolute path tooltip', () => {
-    // Given: session data includes repository information
-    vi.mocked(useSession).mockReturnValue({
-      repository: {
-        name: 'demo-repo',
-        root: '/absolute/path/to/demo-repo',
+  it('renders selected repository name in the header with absolute path tooltip', async () => {
+    // Given: repository list data includes a selectable repository
+    const user = userEvent.setup();
+    window.history.pushState(null, '', '/');
+    vi.mocked(testDependencies.repositoryReader.fetchRepositories).mockResolvedValueOnce({
+      config: {
+        status: 'found',
       },
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
+      repositories: [
+        {
+          id: 'demo-repo',
+          isValid: true,
+          name: 'demo-repo',
+          path: '/absolute/path/to/demo-repo',
+        },
+      ],
+    });
+    vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
+      id: 'demo-repo',
+      isValid: true,
+      name: 'demo-repo',
+      path: '/absolute/path/to/demo-repo',
     });
 
     // When: the app is rendered
     render(<App />);
+    await user.click(await screen.findByRole('button', { name: /demo-repo/ }));
 
     // Then: repository name is shown and title exposes absolute path
-    const repositoryName = screen.getByText('demo-repo');
+    const repositoryName = await screen.findByText('demo-repo');
     expect(repositoryName).toBeDefined();
     expect(repositoryName.getAttribute('title')).toBe('/absolute/path/to/demo-repo');
+    expect(testDependencies.repositoryReader.fetchRepositories).toHaveBeenCalledTimes(1);
+    expect(testDependencies.repositoryReader.fetchRepository).toHaveBeenCalledWith('demo-repo');
   });
 
-  it('does not render repository name when session has no repository', () => {
-    // Given: session data has no repository information
-    vi.mocked(useSession).mockReturnValue({
-      repository: null,
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
+  it('fetches and renders repository metadata on direct route loads', async () => {
+    // Given: direct route loads can resolve repository metadata from the single-repository API
+    window.history.pushState(null, '', '/repos/demo-repo');
+    vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
+      id: 'demo-repo',
+      isValid: true,
+      name: 'demo-repo',
+      path: '/absolute/path/to/demo-repo',
     });
 
     // When: the app is rendered
     render(<App />);
 
-    // Then: repository name element is omitted
-    expect(screen.queryByText('demo-repo')).toBeNull();
+    // Then: repository name is resolved without re-fetching the full repository list
+    const repositoryName = await screen.findByText('demo-repo');
+    expect(repositoryName.getAttribute('title')).toBe('/absolute/path/to/demo-repo');
+    expect(testDependencies.repositoryReader.fetchRepositories).not.toHaveBeenCalled();
+    expect(testDependencies.repositoryReader.fetchRepository).toHaveBeenCalledWith('demo-repo');
   });
 });
 
@@ -393,15 +391,6 @@ describe('App Notes Interactions', () => {
       initialized: true,
       error: null,
       refresh,
-    });
-    vi.mocked(useSession).mockReturnValue({
-      repository: {
-        name: 'sift',
-        root: '/Users/dev/projects/sift',
-      },
-      loading: false,
-      error: null,
-      refresh: vi.fn(),
     });
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile: vi.fn(),

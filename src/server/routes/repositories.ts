@@ -8,6 +8,10 @@ import {
 import { createRepositoryRegistry } from '../repositories/repository-registry';
 import type { ServerRepository } from '../repositories/server-repository';
 import {
+  resolveScopedRepository,
+  ScopedRepositoryResolutionError,
+} from '../repositories/scoped-resolution';
+import {
   validateRepositoryPath,
   type RepositoryValidator,
 } from '../repositories/repository-validator';
@@ -105,6 +109,25 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = 
       };
 
       return c.json(response, 400);
+    }
+  });
+
+  repositoryRoutes.get('/:repoId', async (c) => {
+    try {
+      const configResult = await readConfig();
+      const repository = resolveScopedRepository(
+        configResult,
+        c.req.param('repoId'),
+        c.get('repository'),
+      );
+
+      return c.json(await toRepositoryListItem(repository, validateRepository));
+    } catch (error: unknown) {
+      if (error instanceof ScopedRepositoryResolutionError) {
+        return c.json({ error: error.message }, 400);
+      }
+
+      return c.json({ error: getErrorMessage(error) }, 500);
     }
   });
 

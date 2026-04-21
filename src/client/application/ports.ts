@@ -1,6 +1,9 @@
 import type { DiffFile } from '../../domain/diff/types';
-import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
-import type { SessionInfo } from '../../domain/session/types';
+import type {
+  RepositoryId,
+  RepositoryList,
+  RepositoryListItem,
+} from '../../domain/repository/repository';
 
 export interface DiffData {
   workingFiles: DiffFile[];
@@ -11,12 +14,9 @@ export interface DiffReader {
   fetchDiff(repoId: RepositoryId): Promise<DiffData>;
 }
 
-export interface SessionReader {
-  fetchSession(): Promise<SessionInfo>;
-}
-
 export interface RepositoryReader {
   fetchRepositories(): Promise<RepositoryList>;
+  fetchRepository(repoId: RepositoryId): Promise<RepositoryListItem>;
 }
 
 export interface WorkspaceActions {

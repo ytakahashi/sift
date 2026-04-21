@@ -1,4 +1,8 @@
-import type { RepositoryList } from '../../../domain/repository/repository';
+import type {
+  RepositoryId,
+  RepositoryList,
+  RepositoryListItem,
+} from '../../../domain/repository/repository';
 import type { RepositoryReader } from '../../application/ports';
 
 export const httpRepositoryReader: RepositoryReader = {
@@ -9,5 +13,13 @@ export const httpRepositoryReader: RepositoryReader = {
     }
 
     return (await res.json()) as RepositoryList;
+  },
+  async fetchRepository(repoId: RepositoryId): Promise<RepositoryListItem> {
+    const res = await fetch(`/api/repositories/${encodeURIComponent(repoId)}`);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch repository: ${res.statusText}`);
+    }
+
+    return (await res.json()) as RepositoryListItem;
   },
 };

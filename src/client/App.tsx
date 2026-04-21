@@ -10,9 +10,9 @@ import { useStagedPane } from './hooks/panes/useStagedPane';
 import { useFileSelection } from './hooks/panes/useFileSelection';
 import { NotesListModal } from './components/notes/NotesListModal';
 import { useRepositories } from './hooks/repositories/useRepositories';
+import { useRepository } from './hooks/repositories/useRepository';
 import { usePaneResize } from './hooks/layout/usePaneResize';
 import { useNotesPanel } from './hooks/notes/useNotesPanel';
-import { useSession } from './hooks/session/useSession';
 import { useRefreshController } from './hooks/sync/useRefreshController';
 import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
@@ -59,7 +59,10 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
     error: diffError,
     refresh,
   } = useDiffData(dependencies.diffReader, repoId);
-  const { repository } = useSession(dependencies.sessionReader);
+  const { repository, error: repositoryError } = useRepository(
+    dependencies.repositoryReader,
+    repoId,
+  );
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const { refreshAll } = useRefreshController({
     workingFiles: serverWorkingFiles,
@@ -121,14 +124,14 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
           <img src="/favicon.svg" alt="Sift Logo" style={{ width: '22px', height: '22px' }} />
           <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Sift</h1>
           {repository && (
-            <span className="app-repository-name" title={repository.root}>
+            <span className="app-repository-name" title={repository.path}>
               {repository.name}
             </span>
           )}
         </div>
         <div className="app-header-actions">
-          {(diffError || actionError) && (
-            <span style={{ color: '#f85149' }}>{diffError || actionError}</span>
+          {(repositoryError || diffError || actionError) && (
+            <span style={{ color: '#f85149' }}>{repositoryError || diffError || actionError}</span>
           )}
           <button
             onClick={refreshAll}

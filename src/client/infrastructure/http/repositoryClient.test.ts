@@ -25,4 +25,26 @@ describe('httpRepositoryReader', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/repositories');
     expect(repositories).toEqual(response);
   });
+
+  it('fetches one configured repository by id', async () => {
+    // Given
+    const response = {
+      id: 'my-app',
+      isValid: true,
+      name: 'my-app',
+      path: '/repo/my-app',
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue(response),
+      ok: true,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When
+    const repository = await httpRepositoryReader.fetchRepository('my-app');
+
+    // Then
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/my-app');
+    expect(repository).toEqual(response);
+  });
 });

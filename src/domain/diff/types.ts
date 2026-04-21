@@ -1,13 +1,3 @@
-export type AppMode = 'repository' | 'stdin' | 'commit-range';
-
-export type DiffContext = {
-  id: string;
-  mode: AppMode;
-  repoRoot?: string;
-  baseRef?: string;
-  targetRef?: string;
-};
-
 export type FileBucket = 'working' | 'staged' | 'single';
 
 export interface DiffFile {
