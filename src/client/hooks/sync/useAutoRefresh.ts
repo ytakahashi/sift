@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import type { RepositoryId } from '../../../domain/repository/repository';
 import type { RepositoryChangeSource } from '../../application/ports';
 
 export interface UseAutoRefreshOptions {
@@ -19,6 +20,7 @@ export interface UseAutoRefreshOptions {
 
 export function useAutoRefresh(
   changeSource: RepositoryChangeSource,
+  repoId: RepositoryId,
   onRefresh: () => Promise<void> | void,
   { enabled = true, paused = false }: UseAutoRefreshOptions = {},
 ): void {
@@ -46,7 +48,7 @@ export function useAutoRefresh(
       return;
     }
 
-    const subscription = changeSource.subscribe(() => {
+    const subscription = changeSource.subscribe(repoId, () => {
       if (pausedRef.current) {
         pendingRefreshRef.current = true;
         return;
@@ -58,5 +60,5 @@ export function useAutoRefresh(
     return () => {
       subscription.unsubscribe();
     };
-  }, [changeSource, enabled]);
+  }, [changeSource, enabled, repoId]);
 }

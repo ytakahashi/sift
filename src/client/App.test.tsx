@@ -1,4 +1,4 @@
-import { cleanup, render, screen, fireEvent, act } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../domain/diff/types';
@@ -149,6 +149,26 @@ describe('App file list interactions', () => {
     // Then: the diff viewer shows the file but no stage action is triggered
     expect(stageFile).not.toHaveBeenCalled();
     expect(screen.getByTestId('diff-viewer').textContent).toBe('b.ts');
+  });
+
+  it('passes the temporary default repository id through repository-scoped hooks', async () => {
+    // Given: Step 7 keeps the visible UI on the current repository while the
+    // client API layer learns to send a repoId.
+    render(<App />);
+
+    // When / Then
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'default');
+    expect(useWorkspaceActions).toHaveBeenCalledWith(
+      testDependencies.workspaceActions,
+      'default',
+      expect.any(Function),
+    );
+    await waitFor(() => {
+      expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith(
+        'default',
+        expect.any(Function),
+      );
+    });
   });
 
   it('stages on double click from the working list', async () => {

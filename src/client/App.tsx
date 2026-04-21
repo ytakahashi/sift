@@ -1,3 +1,4 @@
+import { DEFAULT_REPO_ID } from '../domain/repository/repository';
 import { useDiffData } from './hooks/diff/useDiffData';
 import { useNotes } from './hooks/notes/useNotes';
 import { FileList } from './components/file-list/FileList';
@@ -20,6 +21,7 @@ interface AppProps {
 }
 
 function App({ dependencies }: AppProps) {
+  const repoId = DEFAULT_REPO_ID;
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -27,7 +29,7 @@ function App({ dependencies }: AppProps) {
     initialized,
     error: diffError,
     refresh,
-  } = useDiffData(dependencies.diffReader);
+  } = useDiffData(dependencies.diffReader, repoId);
   const { repository } = useSession(dependencies.sessionReader);
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const { refreshAll } = useRefreshController({
@@ -45,8 +47,8 @@ function App({ dependencies }: AppProps) {
     unstageHunk,
     acting,
     error: actionError,
-  } = useWorkspaceActions(dependencies.workspaceActions, refreshAll);
-  useAutoRefresh(dependencies.repositoryChangeSource, refreshAll, {
+  } = useWorkspaceActions(dependencies.workspaceActions, repoId, refreshAll);
+  useAutoRefresh(dependencies.repositoryChangeSource, repoId, refreshAll, {
     enabled: initialized,
     paused: acting,
   });

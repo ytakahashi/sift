@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { DEFAULT_REPO_ID } from '../../domain/repository/repository';
 import {
   getErrorMessage,
   resolveScopedRepository,
@@ -72,6 +73,25 @@ describe('resolveScopedRepository', () => {
     expect(() => resolveScopedRepository(configResult, 'missing')).toThrow(
       'Repository id "missing" is not configured.',
     );
+  });
+
+  it('returns the default repository bridge when config is missing and repoId is default', () => {
+    const defaultRepository = { id: 'default', path: '/current/repo' };
+    const result = resolveScopedRepository(
+      { configPath: '...', status: 'missing' },
+      DEFAULT_REPO_ID,
+      defaultRepository,
+    );
+    expect(result).toEqual(defaultRepository);
+  });
+
+  it('still fails when config is missing and repoId is not default', () => {
+    expect(() =>
+      resolveScopedRepository({ configPath: '...', status: 'missing' }, 'sift', {
+        id: 'default',
+        path: '/repo',
+      }),
+    ).toThrow(ScopedRepositoryResolutionError);
   });
 });
 

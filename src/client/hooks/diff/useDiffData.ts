@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
+import type { RepositoryId } from '../../../domain/repository/repository';
 import type { DiffReader } from '../../application/ports';
 
 export interface DiffDataRefreshResult {
@@ -22,7 +23,7 @@ export interface UseDiffDataResult {
   refresh: () => Promise<DiffDataRefreshResult | null>;
 }
 
-export function useDiffData(diffReader: DiffReader): UseDiffDataResult {
+export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDiffDataResult {
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -40,7 +41,7 @@ export function useDiffData(diffReader: DiffReader): UseDiffDataResult {
     setError(null);
 
     try {
-      const result = await diffReader.fetchDiff();
+      const result = await diffReader.fetchDiff(repoId);
 
       if (requestId !== latestRequestId.current) {
         return null;
@@ -60,7 +61,7 @@ export function useDiffData(diffReader: DiffReader): UseDiffDataResult {
         setInitialized(true);
       }
     }
-  }, [diffReader]);
+  }, [diffReader, repoId]);
 
   useEffect(() => {
     fetchDiffs();

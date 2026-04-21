@@ -1,7 +1,12 @@
+import type { RepositoryId } from '../../../domain/repository/repository';
 import type { WorkspaceActions } from '../../application/ports';
 
-async function post(endpoint: string, body: Record<string, unknown>): Promise<void> {
-  const res = await fetch(`/api/actions/${endpoint}`, {
+async function post(
+  repoId: RepositoryId,
+  endpoint: string,
+  body: Record<string, unknown>,
+): Promise<void> {
+  const res = await fetch(`/api/repositories/${encodeURIComponent(repoId)}/actions/${endpoint}`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
@@ -13,9 +18,12 @@ async function post(endpoint: string, body: Record<string, unknown>): Promise<vo
 }
 
 export const httpWorkspaceActions: WorkspaceActions = {
-  stageFile: (path: string) => post('stage-file', { path }),
-  unstageFile: (path: string) => post('unstage-file', { path }),
-  discardWorkingFile: (path: string) => post('discard-working-file', { path }),
-  stageHunk: (path: string, hunkId: string) => post('stage-hunk', { path, hunkId }),
-  unstageHunk: (path: string, hunkId: string) => post('unstage-hunk', { path, hunkId }),
+  stageFile: (repoId: RepositoryId, path: string) => post(repoId, 'stage-file', { path }),
+  unstageFile: (repoId: RepositoryId, path: string) => post(repoId, 'unstage-file', { path }),
+  discardWorkingFile: (repoId: RepositoryId, path: string) =>
+    post(repoId, 'discard-working-file', { path }),
+  stageHunk: (repoId: RepositoryId, path: string, hunkId: string) =>
+    post(repoId, 'stage-hunk', { path, hunkId }),
+  unstageHunk: (repoId: RepositoryId, path: string, hunkId: string) =>
+    post(repoId, 'unstage-hunk', { path, hunkId }),
 };

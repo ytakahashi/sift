@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
+import type { RepositoryId } from '../../../domain/repository/repository';
 import type { WorkspaceActions } from '../../application/ports';
 
 // onRefresh is awaited when provided so that the file lists are up to date
 // before acting is cleared and the UI is re-enabled.
 export function useWorkspaceActions(
   workspaceActions: WorkspaceActions,
+  repoId: RepositoryId,
   onRefresh?: () => Promise<void> | void,
 ) {
   const [acting, setActing] = useState(false);
@@ -33,25 +35,26 @@ export function useWorkspaceActions(
   );
 
   const stageFile = useCallback(
-    (path: string) => performAction(() => workspaceActions.stageFile(path)),
-    [performAction, workspaceActions],
+    (path: string) => performAction(() => workspaceActions.stageFile(repoId, path)),
+    [performAction, repoId, workspaceActions],
   );
   const unstageFile = useCallback(
-    (path: string) => performAction(() => workspaceActions.unstageFile(path)),
-    [performAction, workspaceActions],
+    (path: string) => performAction(() => workspaceActions.unstageFile(repoId, path)),
+    [performAction, repoId, workspaceActions],
   );
   const discardWorkingFile = useCallback(
-    (path: string) => performAction(() => workspaceActions.discardWorkingFile(path)),
-    [performAction, workspaceActions],
+    (path: string) => performAction(() => workspaceActions.discardWorkingFile(repoId, path)),
+    [performAction, repoId, workspaceActions],
   );
   const stageHunk = useCallback(
-    (path: string, hunkId: string) => performAction(() => workspaceActions.stageHunk(path, hunkId)),
-    [performAction, workspaceActions],
+    (path: string, hunkId: string) =>
+      performAction(() => workspaceActions.stageHunk(repoId, path, hunkId)),
+    [performAction, repoId, workspaceActions],
   );
   const unstageHunk = useCallback(
     (path: string, hunkId: string) =>
-      performAction(() => workspaceActions.unstageHunk(path, hunkId)),
-    [performAction, workspaceActions],
+      performAction(() => workspaceActions.unstageHunk(repoId, path, hunkId)),
+    [performAction, repoId, workspaceActions],
   );
 
   return {

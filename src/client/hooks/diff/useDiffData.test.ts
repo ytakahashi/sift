@@ -41,7 +41,7 @@ describe('useDiffData', () => {
     };
 
     // When: the hook is rendered
-    const { result } = renderHook(() => useDiffData(diffReader));
+    const { result } = renderHook(() => useDiffData(diffReader, 'sift'));
 
     // Then: the fetched files are stored
     await waitFor(() => {
@@ -51,6 +51,7 @@ describe('useDiffData', () => {
     expect(result.current.stagedFiles).toEqual([stagedFile]);
     expect(result.current.initialized).toBe(true);
     expect(result.current.error).toBeNull();
+    expect(diffReader.fetchDiff).toHaveBeenCalledWith('sift');
   });
 
   it('keeps the latest overlapping refresh result', async () => {
@@ -63,7 +64,7 @@ describe('useDiffData', () => {
     });
     const diffReader: DiffReader = { fetchDiff };
 
-    const { result } = renderHook(() => useDiffData(diffReader));
+    const { result } = renderHook(() => useDiffData(diffReader, 'sift'));
     await waitFor(() => {
       expect(result.current.loading).toBe(false);
     });

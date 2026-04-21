@@ -110,7 +110,7 @@ describe('diffRoutes', () => {
     expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
   });
 
-  it('returns an error when config is missing for scoped diff', async () => {
+  it('uses the default repository bridge when config is missing for scoped default diff', async () => {
     // Given
     const app = createAppWithRepository('/current/repo', async () => ({
       configPath: '/missing/config.json',
@@ -119,6 +119,23 @@ describe('diffRoutes', () => {
 
     // When
     const response = await app.request('/api/repositories/default/diff');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(providerConstructorMock).toHaveBeenCalledWith('/current/repo');
+    expect(data.metadata.repoRoot).toBe('/current/repo');
+  });
+
+  it('returns an error when config is missing for a non-default scoped diff', async () => {
+    // Given
+    const app = createAppWithRepository('/current/repo', async () => ({
+      configPath: '/missing/config.json',
+      status: 'missing',
+    }));
+
+    // When
+    const response = await app.request('/api/repositories/sift/diff');
     const data = await response.json();
 
     // Then
