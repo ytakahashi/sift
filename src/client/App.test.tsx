@@ -47,6 +47,21 @@ const testDependencies: AppDependencies = {
   diffReader: {
     fetchDiff: vi.fn(async () => ({ workingFiles: [], stagedFiles: [] })),
   },
+  repositoryReader: {
+    fetchRepositories: vi.fn(async () => ({
+      config: {
+        status: 'found',
+      },
+      repositories: [
+        {
+          id: 'my-app',
+          isValid: true,
+          name: 'my-app',
+          path: '/Users/dev/projects/my-app',
+        },
+      ],
+    })),
+  },
   sessionReader: {
     fetchSession: vi.fn(async () => ({
       mode: 'repository',
@@ -93,7 +108,7 @@ describe('App file list interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.pushState(null, '', '/');
+    window.history.pushState(null, '', '/repos/default');
     diffState = {
       workingFiles: [
         createFile('a', 'working'),
@@ -154,8 +169,8 @@ describe('App file list interactions', () => {
   });
 
   it('passes the temporary default repository id through repository-scoped hooks', async () => {
-    // Given: root navigation is normalized to the temporary default repository
-    // route until the repository selection screen owns `/`.
+    // Given: /repos/default keeps the migration bridge available until the
+    // default repository fallback is removed.
     render(<App />);
 
     // When / Then
@@ -171,6 +186,21 @@ describe('App file list interactions', () => {
         expect.any(Function),
       );
     });
+  });
+
+  it('renders the repository selection screen at root and navigates to the selected repository', async () => {
+    // Given
+    const user = userEvent.setup();
+    window.history.pushState(null, '', '/');
+
+    // When
+    render(<App />);
+    await screen.findByRole('button', { name: /my-app/ });
+    await user.click(screen.getByRole('button', { name: /my-app/ }));
+
+    // Then
+    expect(window.location.pathname).toBe('/repos/my-app');
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
   });
 
   it('passes the repository route id through repository-scoped hooks', async () => {
@@ -348,6 +378,7 @@ describe('App Notes Interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.pushState(null, '', '/repos/default');
     Object.defineProperty(navigator, 'clipboard', {
       value: {
         writeText: vi.fn().mockResolvedValue(undefined),
@@ -385,6 +416,7 @@ describe('App Notes Interactions', () => {
 
   afterEach(() => {
     cleanup();
+    window.history.pushState(null, '', '/');
     if (originalClipboard) {
       Object.defineProperty(navigator, 'clipboard', {
         value: originalClipboard,

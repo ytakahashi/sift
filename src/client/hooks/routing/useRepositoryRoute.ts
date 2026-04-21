@@ -1,13 +1,14 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import {
+  type AppRoute,
   buildRepositoryPath,
-  parseRepositoryRoute,
+  parseAppRoute,
 } from '../../presentation/routing/repository-route';
 
 export interface UseRepositoryRouteResult {
   navigate: (repoId: RepositoryId) => void;
-  repoId: RepositoryId;
+  route: AppRoute;
 }
 
 function getCurrentPathname(): string {
@@ -18,15 +19,13 @@ function getCurrentPathname(): string {
   return window.location.pathname;
 }
 
-function normalizeRepositoryPathname(pathname: string, defaultRepoId: RepositoryId): string {
-  return parseRepositoryRoute(pathname) ? pathname : buildRepositoryPath(defaultRepoId);
+function normalizePathname(pathname: string): string {
+  return parseAppRoute(pathname) ? pathname : '/';
 }
 
-export function useRepositoryRoute(defaultRepoId: RepositoryId): UseRepositoryRouteResult {
-  const [pathname, setPathname] = useState(() =>
-    normalizeRepositoryPathname(getCurrentPathname(), defaultRepoId),
-  );
-  const route = parseRepositoryRoute(pathname);
+export function useRepositoryRoute(): UseRepositoryRouteResult {
+  const [pathname, setPathname] = useState(() => normalizePathname(getCurrentPathname()));
+  const route = parseAppRoute(pathname) ?? { type: 'selection' };
 
   const navigate = useCallback((repoId: RepositoryId): void => {
     const nextPathname = buildRepositoryPath(repoId);
@@ -40,13 +39,13 @@ export function useRepositoryRoute(defaultRepoId: RepositoryId): UseRepositoryRo
   }, []);
 
   useEffect(() => {
-    const normalizedPathname = normalizeRepositoryPathname(window.location.pathname, defaultRepoId);
+    const normalizedPathname = normalizePathname(window.location.pathname);
     if (normalizedPathname !== window.location.pathname) {
       window.history.replaceState(null, '', normalizedPathname);
     }
 
     const handlePopState = (): void => {
-      const nextPathname = normalizeRepositoryPathname(window.location.pathname, defaultRepoId);
+      const nextPathname = normalizePathname(window.location.pathname);
       if (nextPathname !== window.location.pathname) {
         window.history.replaceState(null, '', nextPathname);
       }
@@ -58,10 +57,10 @@ export function useRepositoryRoute(defaultRepoId: RepositoryId): UseRepositoryRo
     return () => {
       window.removeEventListener('popstate', handlePopState);
     };
-  }, [defaultRepoId]);
+  }, []);
 
   return {
     navigate,
-    repoId: route?.repoId ?? defaultRepoId,
+    route,
   };
 }
