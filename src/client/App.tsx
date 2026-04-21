@@ -14,6 +14,7 @@ import { useSession } from './hooks/session/useSession';
 import { useRefreshController } from './hooks/sync/useRefreshController';
 import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
+import { useRepositoryRoute } from './hooks/routing/useRepositoryRoute';
 import type { AppDependencies } from './composition/dependencies';
 
 interface AppProps {
@@ -21,7 +22,7 @@ interface AppProps {
 }
 
 function App({ dependencies }: AppProps) {
-  const repoId = DEFAULT_REPO_ID;
+  const { repoId } = useRepositoryRoute(DEFAULT_REPO_ID);
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,

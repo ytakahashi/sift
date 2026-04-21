@@ -93,6 +93,7 @@ describe('App file list interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.pushState(null, '', '/');
     diffState = {
       workingFiles: [
         createFile('a', 'working'),
@@ -136,6 +137,7 @@ describe('App file list interactions', () => {
 
   afterEach(() => {
     cleanup();
+    window.history.pushState(null, '', '/');
   });
 
   it('opens the diff on single click without activating', async () => {
@@ -152,8 +154,8 @@ describe('App file list interactions', () => {
   });
 
   it('passes the temporary default repository id through repository-scoped hooks', async () => {
-    // Given: Step 7 keeps the visible UI on the current repository while the
-    // client API layer learns to send a repoId.
+    // Given: root navigation is normalized to the temporary default repository
+    // route until the repository selection screen owns `/`.
     render(<App />);
 
     // When / Then
@@ -169,6 +171,22 @@ describe('App file list interactions', () => {
         expect.any(Function),
       );
     });
+  });
+
+  it('passes the repository route id through repository-scoped hooks', async () => {
+    // Given
+    window.history.pushState(null, '', '/repos/my-app');
+
+    // When
+    render(<App />);
+
+    // Then
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
+    expect(useWorkspaceActions).toHaveBeenCalledWith(
+      testDependencies.workspaceActions,
+      'my-app',
+      expect.any(Function),
+    );
   });
 
   it('stages on double click from the working list', async () => {
