@@ -1,6 +1,7 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { sessionRoutes } from './routes/session';
+import { healthRoutes } from './routes/health';
 import { diffRoutes } from './routes/diff';
 import { actionRoutes } from './routes/actions';
 import { createRepositoryRoutes } from './routes/repositories';
@@ -27,6 +28,7 @@ export function createApp(options: CreateAppOptions = {}): Hono<Env> {
   app.use('*', logger());
 
   // Mount API routes
+  app.route('/api/health', healthRoutes);
   app.route('/api/session', sessionRoutes);
   app.route('/api/repositories', createRepositoryRoutes());
   app.route('/api', diffRoutes);
