@@ -212,6 +212,37 @@ describe('repositoryRoutes', () => {
     });
   });
 
+  it('marks one configured repository invalid when its path cannot be used', async () => {
+    // Given
+    const app = createAppWithRepository(
+      '/current/repo',
+      async () => ({
+        config: {
+          repositories: [{ id: 'invalid-repo', path: '/Users/example/invalid-repo' }],
+        },
+        status: 'found',
+      }),
+      async () => ({
+        error: 'Repository path is not a Git repository.',
+        isValid: false,
+      }),
+    );
+
+    // When
+    const response = await app.request('/api/repositories/invalid-repo');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(data).toEqual({
+      error: 'Repository path is not a Git repository.',
+      id: 'invalid-repo',
+      isValid: false,
+      name: 'invalid-repo',
+      path: '/Users/example/invalid-repo',
+    });
+  });
+
   it('returns a validation error when configured repositories cannot build a registry', async () => {
     // Given
     const app = createAppWithRepository('/current/repo', async () => ({

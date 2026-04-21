@@ -59,6 +59,8 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
     error: diffError,
     refresh,
   } = useDiffData(dependencies.diffReader, repoId);
+  // Repository metadata is only used to label the header. While it loads, the
+  // rest of the repository viewer can render without a placeholder.
   const { repository, error: repositoryError } = useRepository(
     dependencies.repositoryReader,
     repoId,
@@ -130,6 +132,8 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
           )}
         </div>
         <div className="app-header-actions">
+          {/* These errors come from different workflows. Splitting them into
+          contextual surfaces later would make the UI easier to act on. */}
           {(repositoryError || diffError || actionError) && (
             <span style={{ color: '#f85149' }}>{repositoryError || diffError || actionError}</span>
           )}
