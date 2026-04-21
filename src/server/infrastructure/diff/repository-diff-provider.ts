@@ -12,16 +12,6 @@ export class RepositoryDiffProvider implements DiffProvider {
     this.gitClient = new GitClient(repoRoot);
   }
 
-  async validate(): Promise<boolean> {
-    try {
-      // Just run a simple git command to ensure it's a valid repo
-      await this.gitClient.runGitCommand(['rev-parse', '--is-inside-work-tree']);
-      return true;
-    } catch {
-      return false;
-    }
-  }
-
   async getFiles(bucket: FileBucket): Promise<DiffFile[]> {
     if (bucket === 'single') {
       return []; // Unsupported by repository provider for now

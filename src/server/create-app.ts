@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
 import { healthRoutes } from './routes/health';
-import { diffRoutes } from './routes/diff';
-import { actionRoutes } from './routes/actions';
+import { createDiffRoutes } from './routes/diff';
+import { createActionRoutes } from './routes/actions';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
@@ -29,8 +29,8 @@ export function createApp(options: CreateAppOptions = {}): Hono<Env> {
   // Mount API routes
   app.route('/api/health', healthRoutes);
   app.route('/api/repositories', createRepositoryRoutes());
-  app.route('/api', diffRoutes);
-  app.route('/api', actionRoutes);
+  app.route('/api', createDiffRoutes());
+  app.route('/api', createActionRoutes());
   if (options.watchHub) {
     app.route(
       '/api',
