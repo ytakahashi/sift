@@ -7,6 +7,7 @@ describe('useRepositories', () => {
   it('loads repository list on mount', async () => {
     // Given
     const repositoryReader: RepositoryReader = {
+      fetchRepository: vi.fn(),
       fetchRepositories: vi.fn().mockResolvedValue({
         config: { status: 'found' },
         repositories: [{ id: 'sift', isValid: true, name: 'sift', path: '/repo/sift' }],
@@ -27,6 +28,7 @@ describe('useRepositories', () => {
   it('stores fetch errors', async () => {
     // Given
     const repositoryReader: RepositoryReader = {
+      fetchRepository: vi.fn(),
       fetchRepositories: vi.fn().mockRejectedValue(new Error('network failed')),
     };
 
