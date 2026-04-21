@@ -1,6 +1,7 @@
+import { DEFAULT_REPO_ID } from '../../domain/repository/repository';
 import type { ServerRepository } from './server-repository';
 
-export const DEFAULT_REPO_ID = 'default';
+export { DEFAULT_REPO_ID };
 
 export function createDefaultRepository(repoRoot: string): ServerRepository {
   return {

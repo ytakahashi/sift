@@ -1,4 +1,4 @@
-import { cleanup, render, screen, fireEvent, act } from '@testing-library/react';
+import { cleanup, render, screen, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../domain/diff/types';
@@ -47,6 +47,21 @@ const testDependencies: AppDependencies = {
   diffReader: {
     fetchDiff: vi.fn(async () => ({ workingFiles: [], stagedFiles: [] })),
   },
+  repositoryReader: {
+    fetchRepositories: vi.fn(async () => ({
+      config: {
+        status: 'found',
+      },
+      repositories: [
+        {
+          id: 'my-app',
+          isValid: true,
+          name: 'my-app',
+          path: '/Users/dev/projects/my-app',
+        },
+      ],
+    })),
+  },
   sessionReader: {
     fetchSession: vi.fn(async () => ({
       mode: 'repository',
@@ -93,6 +108,7 @@ describe('App file list interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.pushState(null, '', '/repos/default');
     diffState = {
       workingFiles: [
         createFile('a', 'working'),
@@ -136,6 +152,7 @@ describe('App file list interactions', () => {
 
   afterEach(() => {
     cleanup();
+    window.history.pushState(null, '', '/');
   });
 
   it('opens the diff on single click without activating', async () => {
@@ -149,6 +166,57 @@ describe('App file list interactions', () => {
     // Then: the diff viewer shows the file but no stage action is triggered
     expect(stageFile).not.toHaveBeenCalled();
     expect(screen.getByTestId('diff-viewer').textContent).toBe('b.ts');
+  });
+
+  it('passes the temporary default repository id through repository-scoped hooks', async () => {
+    // Given: /repos/default keeps the migration bridge available until the
+    // default repository fallback is removed.
+    render(<App />);
+
+    // When / Then
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'default');
+    expect(useWorkspaceActions).toHaveBeenCalledWith(
+      testDependencies.workspaceActions,
+      'default',
+      expect.any(Function),
+    );
+    await waitFor(() => {
+      expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith(
+        'default',
+        expect.any(Function),
+      );
+    });
+  });
+
+  it('renders the repository selection screen at root and navigates to the selected repository', async () => {
+    // Given
+    const user = userEvent.setup();
+    window.history.pushState(null, '', '/');
+
+    // When
+    render(<App />);
+    await screen.findByRole('button', { name: /my-app/ });
+    await user.click(screen.getByRole('button', { name: /my-app/ }));
+
+    // Then
+    expect(window.location.pathname).toBe('/repos/my-app');
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
+  });
+
+  it('passes the repository route id through repository-scoped hooks', async () => {
+    // Given
+    window.history.pushState(null, '', '/repos/my-app');
+
+    // When
+    render(<App />);
+
+    // Then
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
+    expect(useWorkspaceActions).toHaveBeenCalledWith(
+      testDependencies.workspaceActions,
+      'my-app',
+      expect.any(Function),
+    );
   });
 
   it('stages on double click from the working list', async () => {
@@ -310,6 +378,7 @@ describe('App Notes Interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    window.history.pushState(null, '', '/repos/default');
     Object.defineProperty(navigator, 'clipboard', {
       value: {
         writeText: vi.fn().mockResolvedValue(undefined),
@@ -347,6 +416,7 @@ describe('App Notes Interactions', () => {
 
   afterEach(() => {
     cleanup();
+    window.history.pushState(null, '', '/');
     if (originalClipboard) {
       Object.defineProperty(navigator, 'clipboard', {
         value: originalClipboard,

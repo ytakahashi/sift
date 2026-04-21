@@ -1,4 +1,5 @@
 import type { DiffFile } from '../../domain/diff/types';
+import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
 import type { SessionInfo } from '../../domain/session/types';
 
 export interface DiffData {
@@ -7,19 +8,23 @@ export interface DiffData {
 }
 
 export interface DiffReader {
-  fetchDiff(): Promise<DiffData>;
+  fetchDiff(repoId: RepositoryId): Promise<DiffData>;
 }
 
 export interface SessionReader {
   fetchSession(): Promise<SessionInfo>;
 }
 
+export interface RepositoryReader {
+  fetchRepositories(): Promise<RepositoryList>;
+}
+
 export interface WorkspaceActions {
-  stageFile(path: string): Promise<void>;
-  unstageFile(path: string): Promise<void>;
-  discardWorkingFile(path: string): Promise<void>;
-  stageHunk(path: string, hunkId: string): Promise<void>;
-  unstageHunk(path: string, hunkId: string): Promise<void>;
+  stageFile(repoId: RepositoryId, path: string): Promise<void>;
+  unstageFile(repoId: RepositoryId, path: string): Promise<void>;
+  discardWorkingFile(repoId: RepositoryId, path: string): Promise<void>;
+  stageHunk(repoId: RepositoryId, path: string, hunkId: string): Promise<void>;
+  unstageHunk(repoId: RepositoryId, path: string, hunkId: string): Promise<void>;
 }
 
 export interface RepositoryChangeSubscription {
@@ -27,5 +32,5 @@ export interface RepositoryChangeSubscription {
 }
 
 export interface RepositoryChangeSource {
-  subscribe(onChange: () => void): RepositoryChangeSubscription;
+  subscribe(repoId: RepositoryId, onChange: () => void): RepositoryChangeSubscription;
 }

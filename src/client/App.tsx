@@ -1,25 +1,56 @@
+import type { RepositoryId } from '../domain/repository/repository';
 import { useDiffData } from './hooks/diff/useDiffData';
 import { useNotes } from './hooks/notes/useNotes';
 import { FileList } from './components/file-list/FileList';
 import { UnifiedDiffViewer } from './components/diff/UnifiedDiffViewer';
+import { RepositorySelection } from './components/repository-selection/RepositorySelection';
 import { useWorkspaceActions } from './hooks/workspace-actions/useWorkspaceActions';
 import { useWorkingPane } from './hooks/panes/useWorkingPane';
 import { useStagedPane } from './hooks/panes/useStagedPane';
 import { useFileSelection } from './hooks/panes/useFileSelection';
 import { NotesListModal } from './components/notes/NotesListModal';
+import { useRepositories } from './hooks/repositories/useRepositories';
 import { usePaneResize } from './hooks/layout/usePaneResize';
 import { useNotesPanel } from './hooks/notes/useNotesPanel';
 import { useSession } from './hooks/session/useSession';
 import { useRefreshController } from './hooks/sync/useRefreshController';
 import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
+import { useRepositoryRoute } from './hooks/routing/useRepositoryRoute';
 import type { AppDependencies } from './composition/dependencies';
 
 interface AppProps {
   dependencies: AppDependencies;
 }
 
-function App({ dependencies }: AppProps) {
+interface RepositorySelectionScreenProps {
+  dependencies: AppDependencies;
+  onSelectRepository: (repoId: RepositoryId) => void;
+}
+
+function RepositorySelectionScreen({
+  dependencies,
+  onSelectRepository,
+}: RepositorySelectionScreenProps) {
+  const { repositories, loading, error, refresh } = useRepositories(dependencies.repositoryReader);
+
+  return (
+    <RepositorySelection
+      error={error}
+      loading={loading}
+      onRefresh={() => void refresh()}
+      onSelectRepository={onSelectRepository}
+      repositories={repositories}
+    />
+  );
+}
+
+interface RepositoryViewerProps {
+  dependencies: AppDependencies;
+  repoId: RepositoryId;
+}
+
+function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -27,7 +58,7 @@ function App({ dependencies }: AppProps) {
     initialized,
     error: diffError,
     refresh,
-  } = useDiffData(dependencies.diffReader);
+  } = useDiffData(dependencies.diffReader, repoId);
   const { repository } = useSession(dependencies.sessionReader);
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const { refreshAll } = useRefreshController({
@@ -45,8 +76,8 @@ function App({ dependencies }: AppProps) {
     unstageHunk,
     acting,
     error: actionError,
-  } = useWorkspaceActions(dependencies.workspaceActions, refreshAll);
-  useAutoRefresh(dependencies.repositoryChangeSource, refreshAll, {
+  } = useWorkspaceActions(dependencies.workspaceActions, repoId, refreshAll);
+  useAutoRefresh(dependencies.repositoryChangeSource, repoId, refreshAll, {
     enabled: initialized,
     paused: acting,
   });
@@ -241,6 +272,16 @@ function App({ dependencies }: AppProps) {
       </main>
     </div>
   );
+}
+
+function App({ dependencies }: AppProps) {
+  const { navigate, route } = useRepositoryRoute();
+
+  if (route.type === 'selection') {
+    return <RepositorySelectionScreen dependencies={dependencies} onSelectRepository={navigate} />;
+  }
+
+  return <RepositoryViewer dependencies={dependencies} repoId={route.repoId} />;
 }
 
 export default App;

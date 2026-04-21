@@ -1,3 +1,4 @@
+import { DEFAULT_REPO_ID } from '../../domain/repository/repository';
 import type { RepositoryConfigReadResult } from './repository-config-reader';
 import { createRepositoryRegistry, RepositoryRegistryError } from './repository-registry';
 import type { ServerRepository } from './server-repository';
@@ -16,12 +17,17 @@ export function getErrorMessage(error: unknown): string {
 export function resolveScopedRepository(
   configResult: RepositoryConfigReadResult,
   repoId: string | undefined,
+  defaultRepository?: ServerRepository,
 ): ServerRepository {
   if (!repoId) {
     throw new ScopedRepositoryResolutionError('Repository id is required.');
   }
 
   if (configResult.status === 'missing') {
+    if (repoId === DEFAULT_REPO_ID && defaultRepository) {
+      return defaultRepository;
+    }
+
     throw new ScopedRepositoryResolutionError(
       `Repository config is missing: ${configResult.configPath}`,
     );

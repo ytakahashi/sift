@@ -8,8 +8,10 @@ type ChangeHandler = () => void;
 class FakeRepositoryChangeSource implements RepositoryChangeSource {
   readonly unsubscribe = vi.fn();
   private handlers: ChangeHandler[] = [];
+  private repoIds: string[] = [];
 
-  subscribe(onChange: ChangeHandler): RepositoryChangeSubscription {
+  subscribe(repoId: string, onChange: ChangeHandler): RepositoryChangeSubscription {
+    this.repoIds.push(repoId);
     this.handlers.push(onChange);
     return { unsubscribe: this.unsubscribe };
   }
@@ -22,6 +24,10 @@ class FakeRepositoryChangeSource implements RepositoryChangeSource {
 
   subscriptionCount(): number {
     return this.handlers.length;
+  }
+
+  subscribedRepoIds(): string[] {
+    return this.repoIds;
   }
 }
 
@@ -36,7 +42,7 @@ describe('useAutoRefresh', () => {
     const firstRefresh = vi.fn();
     const secondRefresh = vi.fn();
     const { rerender } = renderHook(
-      ({ onRefresh }: { onRefresh: () => void }) => useAutoRefresh(changeSource, onRefresh),
+      ({ onRefresh }: { onRefresh: () => void }) => useAutoRefresh(changeSource, 'sift', onRefresh),
       { initialProps: { onRefresh: firstRefresh } },
     );
 
@@ -49,6 +55,7 @@ describe('useAutoRefresh', () => {
 
     // Then: the subscription is stable and latest callback is used
     expect(changeSource.subscriptionCount()).toBe(1);
+    expect(changeSource.subscribedRepoIds()).toEqual(['sift']);
     expect(firstRefresh).not.toHaveBeenCalled();
     expect(secondRefresh).toHaveBeenCalledTimes(1);
   });
@@ -58,7 +65,8 @@ describe('useAutoRefresh', () => {
     const changeSource = new FakeRepositoryChangeSource();
     const refresh = vi.fn();
     const { rerender } = renderHook(
-      ({ paused }: { paused: boolean }) => useAutoRefresh(changeSource, refresh, { paused }),
+      ({ paused }: { paused: boolean }) =>
+        useAutoRefresh(changeSource, 'sift', refresh, { paused }),
       { initialProps: { paused: true } },
     );
 
@@ -83,7 +91,8 @@ describe('useAutoRefresh', () => {
     const changeSource = new FakeRepositoryChangeSource();
     const refresh = vi.fn();
     const { rerender } = renderHook(
-      ({ enabled }: { enabled: boolean }) => useAutoRefresh(changeSource, refresh, { enabled }),
+      ({ enabled }: { enabled: boolean }) =>
+        useAutoRefresh(changeSource, 'sift', refresh, { enabled }),
       { initialProps: { enabled: false } },
     );
 
@@ -100,7 +109,7 @@ describe('useAutoRefresh', () => {
   it('unsubscribes when the hook unmounts', () => {
     // Given: auto refresh is enabled
     const changeSource = new FakeRepositoryChangeSource();
-    const { unmount } = renderHook(() => useAutoRefresh(changeSource, vi.fn()));
+    const { unmount } = renderHook(() => useAutoRefresh(changeSource, 'sift', vi.fn()));
 
     // When: the hook unmounts
     unmount();

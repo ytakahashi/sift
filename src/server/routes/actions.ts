@@ -25,7 +25,11 @@ async function createScopedActionService(
   readConfig: () => Promise<RepositoryConfigReadResult>,
 ): Promise<WorkspaceActionService> {
   const configResult = await readConfig();
-  const repository = resolveScopedRepository(configResult, c.req.param('repoId'));
+  const repository = resolveScopedRepository(
+    configResult,
+    c.req.param('repoId'),
+    c.get('repository'),
+  );
   return createWorkspaceActionService(repository);
 }
 

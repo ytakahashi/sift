@@ -1,5 +1,6 @@
 import type {
   DiffReader,
+  RepositoryReader,
   RepositoryChangeSource,
   SessionReader,
   WorkspaceActions,
@@ -7,6 +8,7 @@ import type {
 
 export interface AppDependencies {
   diffReader: DiffReader;
+  repositoryReader: RepositoryReader;
   sessionReader: SessionReader;
   workspaceActions: WorkspaceActions;
   repositoryChangeSource: RepositoryChangeSource;
