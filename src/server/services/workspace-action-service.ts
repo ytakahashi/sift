@@ -8,13 +8,13 @@ export class WorkspaceActionService {
   private git: GitClient;
   private provider: RepositoryDiffProvider;
 
-  constructor(private repoRoot: string) {
-    this.git = new GitClient(repoRoot);
-    this.provider = new RepositoryDiffProvider(repoRoot);
+  constructor(private repositoryPath: string) {
+    this.git = new GitClient(repositoryPath);
+    this.provider = new RepositoryDiffProvider(repositoryPath);
   }
 
   private sanitizePath(targetPath: string): string {
-    resolveSafePath(this.repoRoot, targetPath);
+    resolveSafePath(this.repositoryPath, targetPath);
     return targetPath;
   }
 

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRepoWatcher } from './watch/repo-watcher.js';
 import { createWatchHub } from './watch/watch-hub.js';
+import { createDefaultRepository } from './repositories/default-repository';
 
 interface ServerRuntime {
   app: Hono<Env>;
@@ -75,15 +76,16 @@ async function listenOnAvailablePort(
 }
 
 function createServerRuntime(repoRoot: string): ServerRuntime {
+  const repository = createDefaultRepository(repoRoot);
   const watchHub = createWatchHub();
-  const watcher = createRepoWatcher(repoRoot, () => {
+  const watcher = createRepoWatcher(repository.path, () => {
     watchHub.broadcastChanged();
   });
 
   const app = new Hono<Env>();
 
   app.use('*', async (c, next) => {
-    c.set('repoRoot', repoRoot);
+    c.set('repository', repository);
     await next();
   });
 
