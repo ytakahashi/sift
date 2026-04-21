@@ -9,14 +9,12 @@ import { createRepoWatcher } from './watch/repo-watcher.js';
 import { createWatchHub } from './watch/watch-hub.js';
 import { createRepoWatchManager } from './watch/repo-watch-manager';
 import { createDefaultRepository } from './repositories/default-repository';
+import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
 interface ServerRuntime {
   app: Hono<Env>;
   stop: () => Promise<void>;
 }
-
-const DEFAULT_PORT = 49321;
-const MAX_PORT_SEARCH_ATTEMPTS = 100;
 
 type ListenError = Error & { code?: string };
 
@@ -52,28 +50,6 @@ function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; ser
       resolve({ port: address.port, server });
     });
   });
-}
-
-async function listenOnAvailablePort(
-  app: Hono<Env>,
-  preferredPort: number,
-): Promise<{ port: number; server: ServerType }> {
-  for (let offset = 0; offset < MAX_PORT_SEARCH_ATTEMPTS; offset += 1) {
-    const port = preferredPort + offset;
-    try {
-      return await listenOnPort(app, port);
-    } catch (error: unknown) {
-      if (!isPortInUseError(error)) {
-        throw error;
-      }
-    }
-  }
-
-  throw new Error(
-    `No available port found between ${preferredPort} and ${
-      preferredPort + MAX_PORT_SEARCH_ATTEMPTS - 1
-    }`,
-  );
 }
 
 function createServerRuntime(repoRoot: string): ServerRuntime {
@@ -135,11 +111,25 @@ export async function startServer(repoRoot: string): Promise<string> {
 
   const portEnv = process.env.PORT;
   const port = portEnv ? parseInt(portEnv, 10) : DEFAULT_PORT;
-  const listen = portEnv ? listenOnPort(cliApp, port) : listenOnAvailablePort(cliApp, port);
-  const { port: actualPort, server } = await listen.catch(async (error: unknown) => {
+  const { server } = await listenOnPort(cliApp, port).catch(async (error: unknown) => {
     await runtime.stop();
+    if (isPortInUseError(error)) {
+      const existingServerStatus = await checkExistingSiftServer(port);
+      if (existingServerStatus === 'sift') {
+        return { port, server: null };
+      }
+
+      if (existingServerStatus === 'other') {
+        throw new Error(`Port ${port} is already in use by another process.`);
+      }
+    }
+
     throw error;
   });
+
+  if (!server) {
+    return buildLocalServerUrl(port);
+  }
 
   const cleanup = () => {
     server.close();
@@ -148,5 +138,5 @@ export async function startServer(repoRoot: string): Promise<string> {
   process.once('SIGINT', cleanup);
   process.once('SIGTERM', cleanup);
 
-  return `http://localhost:${actualPort}`;
+  return buildLocalServerUrl(port);
 }
