@@ -1,5 +1,9 @@
 import { Hono } from 'hono';
 import path from 'node:path';
+import type {
+  RepositoryListItem,
+  RepositoryList as RepositoryListResponse,
+} from '../../domain/repository/repository';
 import type { Env } from '../create-app';
 import {
   readRepositoryConfig,
@@ -9,36 +13,13 @@ import { createRepositoryRegistry } from '../repositories/repository-registry';
 import type { ServerRepository } from '../repositories/server-repository';
 import {
   resolveScopedRepository,
+  getErrorMessage,
   ScopedRepositoryResolutionError,
 } from '../repositories/scoped-resolution';
 import {
   validateRepositoryPath,
   type RepositoryValidator,
 } from '../repositories/repository-validator';
-
-export interface RepositoryListItem {
-  error?: string;
-  id: string;
-  isValid: boolean;
-  name: string;
-  path: string;
-}
-
-export interface RepositoryListResponse {
-  config:
-    | {
-        status: 'found';
-      }
-    | {
-        path: string;
-        status: 'missing';
-      }
-    | {
-        error: string;
-        status: 'invalid';
-      };
-  repositories: RepositoryListItem[];
-}
 
 export interface CreateRepositoryRoutesOptions {
   readConfig?: () => Promise<RepositoryConfigReadResult>;
@@ -61,10 +42,6 @@ async function toRepositoryListItem(
     name: deriveRepositoryName(repository.path),
     path: repository.path,
   };
-}
-
-function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
 }
 
 export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = {}): Hono<Env> {

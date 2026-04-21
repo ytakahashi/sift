@@ -132,5 +132,3 @@ export function createActionRoutes(options: CreateActionRoutesOptions = {}): Hon
 
   return actionRoutes;
 }
-
-export const actionRoutes = createActionRoutes();

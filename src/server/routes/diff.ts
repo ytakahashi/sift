@@ -74,5 +74,3 @@ export function createDiffRoutes(options: CreateDiffRoutesOptions = {}): Hono<En
 
   return diffRoutes;
 }
-
-export const diffRoutes = createDiffRoutes();
