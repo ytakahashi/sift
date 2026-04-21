@@ -1,0 +1,112 @@
+import { Hono } from 'hono';
+import path from 'node:path';
+import type { Env } from '../create-app';
+import {
+  readRepositoryConfig,
+  type RepositoryConfigReadResult,
+} from '../repositories/repository-config-reader';
+import { createRepositoryRegistry } from '../repositories/repository-registry';
+import type { ServerRepository } from '../repositories/server-repository';
+import {
+  validateRepositoryPath,
+  type RepositoryValidator,
+} from '../repositories/repository-validator';
+
+export interface RepositoryListItem {
+  error?: string;
+  id: string;
+  isValid: boolean;
+  name: string;
+  path: string;
+}
+
+export interface RepositoryListResponse {
+  config:
+    | {
+        status: 'found';
+      }
+    | {
+        path: string;
+        status: 'missing';
+      }
+    | {
+        error: string;
+        status: 'invalid';
+      };
+  repositories: RepositoryListItem[];
+}
+
+export interface CreateRepositoryRoutesOptions {
+  readConfig?: () => Promise<RepositoryConfigReadResult>;
+  validateRepository?: RepositoryValidator;
+}
+
+function deriveRepositoryName(repositoryPath: string): string {
+  return path.basename(repositoryPath) || repositoryPath;
+}
+
+async function toRepositoryListItem(
+  repository: ServerRepository,
+  validateRepository: RepositoryValidator,
+): Promise<RepositoryListItem> {
+  const validation = await validateRepository(repository);
+  return {
+    error: validation.error,
+    id: repository.id,
+    isValid: validation.isValid,
+    name: deriveRepositoryName(repository.path),
+    path: repository.path,
+  };
+}
+
+function getErrorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = {}): Hono<Env> {
+  const repositoryRoutes = new Hono<Env>();
+  const readConfig = options.readConfig ?? readRepositoryConfig;
+  const validateRepository = options.validateRepository ?? validateRepositoryPath;
+
+  repositoryRoutes.get('/', async (c) => {
+    const configResult = await readConfig();
+
+    if (configResult.status === 'missing') {
+      const response: RepositoryListResponse = {
+        config: {
+          path: configResult.configPath,
+          status: 'missing',
+        },
+        repositories: [await toRepositoryListItem(c.get('repository'), validateRepository)],
+      };
+
+      return c.json(response);
+    }
+
+    try {
+      const registry = createRepositoryRegistry(configResult.config.repositories);
+      const response: RepositoryListResponse = {
+        config: {
+          status: 'found',
+        },
+        repositories: await Promise.all(
+          registry.list().map((repository) => toRepositoryListItem(repository, validateRepository)),
+        ),
+      };
+
+      return c.json(response);
+    } catch (error: unknown) {
+      const response: RepositoryListResponse = {
+        config: {
+          error: getErrorMessage(error),
+          status: 'invalid',
+        },
+        repositories: [],
+      };
+
+      return c.json(response, 400);
+    }
+  });
+
+  return repositoryRoutes;
+}

@@ -7,6 +7,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRepoWatcher } from './watch/repo-watcher.js';
 import { createWatchHub } from './watch/watch-hub.js';
+import { createRepoWatchManager } from './watch/repo-watch-manager';
 import { createDefaultRepository } from './repositories/default-repository';
 
 interface ServerRuntime {
@@ -78,6 +79,7 @@ async function listenOnAvailablePort(
 function createServerRuntime(repoRoot: string): ServerRuntime {
   const repository = createDefaultRepository(repoRoot);
   const watchHub = createWatchHub();
+  const repoWatchManager = createRepoWatchManager();
   const watcher = createRepoWatcher(repository.path, () => {
     watchHub.broadcastChanged();
   });
@@ -89,12 +91,13 @@ function createServerRuntime(repoRoot: string): ServerRuntime {
     await next();
   });
 
-  app.route('/', createApp({ watchHub }));
+  app.route('/', createApp({ repoWatchManager, watchHub }));
 
   return {
     app,
     stop: async () => {
       watchHub.close();
+      await repoWatchManager.close();
       await watcher.stop();
     },
   };
