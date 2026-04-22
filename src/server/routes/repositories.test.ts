@@ -1,12 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createDefaultRepository } from '../repositories/default-repository';
 import { createRepositoryRoutes } from './repositories';
 import type { ServerRepository } from '../repositories/server-repository';
 
-function createAppWithRepository(
-  repoRoot: string,
+function createApp(
   readConfig: Parameters<typeof createRepositoryRoutes>[0]['readConfig'],
   validateRepository: Parameters<
     typeof createRepositoryRoutes
@@ -15,13 +13,6 @@ function createAppWithRepository(
   }),
 ): Hono<Env> {
   const app = new Hono<Env>();
-  const repository = createDefaultRepository(repoRoot);
-
-  app.use('*', async (c, next) => {
-    c.set('repository', repository);
-    await next();
-  });
-
   app.route('/api/repositories', createRepositoryRoutes({ readConfig, validateRepository }));
   return app;
 }
@@ -29,7 +20,7 @@ function createAppWithRepository(
 describe('repositoryRoutes', () => {
   it('returns configured repositories', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [
           { id: 'sift', path: '/Users/example/projects/sift' },
@@ -66,9 +57,9 @@ describe('repositoryRoutes', () => {
     });
   });
 
-  it('returns the current repository fallback when config is missing', async () => {
+  it('returns an empty repository list when config is missing', async () => {
     // Given
-    const app = createAppWithRepository('/Users/example/current-repo', async () => ({
+    const app = createApp(async () => ({
       configPath: '/Users/example/.config/sift/config.json',
       status: 'missing',
     }));
@@ -84,20 +75,13 @@ describe('repositoryRoutes', () => {
         path: '/Users/example/.config/sift/config.json',
         status: 'missing',
       },
-      repositories: [
-        {
-          id: 'default',
-          isValid: true,
-          name: 'current-repo',
-          path: '/Users/example/current-repo',
-        },
-      ],
+      repositories: [],
     });
   });
 
   it('returns one configured repository by repoId', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [
           { id: 'sift', path: '/Users/example/projects/sift' },
@@ -121,30 +105,27 @@ describe('repositoryRoutes', () => {
     });
   });
 
-  it('returns the default repository by repoId when config is missing', async () => {
+  it('returns an error by repoId when config is missing', async () => {
     // Given
-    const app = createAppWithRepository('/Users/example/current-repo', async () => ({
+    const app = createApp(async () => ({
       configPath: '/Users/example/.config/sift/config.json',
       status: 'missing',
     }));
 
     // When
-    const response = await app.request('/api/repositories/default');
+    const response = await app.request('/api/repositories/sift');
     const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(400);
     expect(data).toEqual({
-      id: 'default',
-      isValid: true,
-      name: 'current-repo',
-      path: '/Users/example/current-repo',
+      error: 'Repository config is missing: /Users/example/.config/sift/config.json',
     });
   });
 
   it('returns an error for an unconfigured repository id', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [{ id: 'sift', path: '/repo/sift' }],
       },
@@ -162,8 +143,7 @@ describe('repositoryRoutes', () => {
 
   it('marks repositories invalid when their paths cannot be used', async () => {
     // Given
-    const app = createAppWithRepository(
-      '/current/repo',
+    const app = createApp(
       async () => ({
         config: {
           repositories: [
@@ -214,8 +194,7 @@ describe('repositoryRoutes', () => {
 
   it('marks one configured repository invalid when its path cannot be used', async () => {
     // Given
-    const app = createAppWithRepository(
-      '/current/repo',
+    const app = createApp(
       async () => ({
         config: {
           repositories: [{ id: 'invalid-repo', path: '/Users/example/invalid-repo' }],
@@ -245,7 +224,7 @@ describe('repositoryRoutes', () => {
 
   it('returns a validation error when configured repositories cannot build a registry', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [
           { id: 'sift', path: '/repo/sift' },

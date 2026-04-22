@@ -25,16 +25,8 @@ async function createScopedActionService(
   readConfig: () => Promise<RepositoryConfigReadResult>,
 ): Promise<WorkspaceActionService> {
   const configResult = await readConfig();
-  const repository = resolveScopedRepository(
-    configResult,
-    c.req.param('repoId'),
-    c.get('repository'),
-  );
+  const repository = resolveScopedRepository(configResult, c.req.param('repoId'));
   return createWorkspaceActionService(repository);
-}
-
-function createDefaultActionService(c: Context<Env>): WorkspaceActionService {
-  return createWorkspaceActionService(c.get('repository'));
 }
 
 async function handleAction(
@@ -125,7 +117,6 @@ export function createActionRoutes(options: CreateActionRoutesOptions = {}): Hon
   const actionRoutes = new Hono<Env>();
   const readConfig = options.readConfig ?? readRepositoryConfig;
 
-  registerActionRoutes(actionRoutes, '/actions', createDefaultActionService);
   registerActionRoutes(actionRoutes, '/repositories/:repoId/actions', (c) =>
     createScopedActionService(c, readConfig),
   );

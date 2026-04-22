@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createDefaultRepository } from '../repositories/default-repository';
 import { createDiffRoutes } from './diff';
 
 const { getFilesMock, providerConstructorMock } = vi.hoisted(() => ({
@@ -13,18 +12,8 @@ vi.mock('../infrastructure/diff/repository-diff-provider', () => ({
   RepositoryDiffProvider: providerConstructorMock,
 }));
 
-function createAppWithRepository(
-  repoRoot: string,
-  readConfig: Parameters<typeof createDiffRoutes>[0]['readConfig'],
-): Hono<Env> {
+function createApp(readConfig: Parameters<typeof createDiffRoutes>[0]['readConfig']): Hono<Env> {
   const app = new Hono<Env>();
-  const repository = createDefaultRepository(repoRoot);
-
-  app.use('*', async (c, next) => {
-    c.set('repository', repository);
-    await next();
-  });
-
   app.route('/api', createDiffRoutes({ readConfig }));
   return app;
 }
@@ -46,33 +35,9 @@ describe('diffRoutes', () => {
     });
   });
 
-  it('keeps the existing default diff route', async () => {
-    // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
-      configPath: '/missing/config.json',
-      status: 'missing',
-    }));
-
-    // When
-    const response = await app.request('/api/diff');
-    const data = await response.json();
-
-    // Then
-    expect(response.status).toBe(200);
-    expect(providerConstructorMock).toHaveBeenCalledWith('/current/repo');
-    expect(data).toEqual({
-      metadata: {
-        repoRoot: '/current/repo',
-        revision: 'HEAD',
-      },
-      stagedFiles: [{ id: 'staged-file', path: 'staged.ts' }],
-      workingFiles: [{ id: 'working-file', path: 'working.ts' }],
-    });
-  });
-
   it('returns diff for the repository resolved from repoId', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [
           { id: 'sift', path: '/repo/sift' },
@@ -94,7 +59,7 @@ describe('diffRoutes', () => {
 
   it('returns an error when repoId is not configured', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [{ id: 'sift', path: '/repo/sift' }],
       },
@@ -110,26 +75,9 @@ describe('diffRoutes', () => {
     expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
   });
 
-  it('uses the default repository bridge when config is missing for scoped default diff', async () => {
-    // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
-      configPath: '/missing/config.json',
-      status: 'missing',
-    }));
-
-    // When
-    const response = await app.request('/api/repositories/default/diff');
-    const data = await response.json();
-
-    // Then
-    expect(response.status).toBe(200);
-    expect(providerConstructorMock).toHaveBeenCalledWith('/current/repo');
-    expect(data.metadata.repoRoot).toBe('/current/repo');
-  });
-
   it('returns an error when config is missing for a non-default scoped diff', async () => {
     // Given
-    const app = createAppWithRepository('/current/repo', async () => ({
+    const app = createApp(async () => ({
       configPath: '/missing/config.json',
       status: 'missing',
     }));

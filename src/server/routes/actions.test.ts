@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createDefaultRepository } from '../repositories/default-repository';
 import { createActionRoutes } from './actions';
 
 const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
@@ -13,19 +12,13 @@ vi.mock('../services/workspace-action-service', () => ({
   WorkspaceActionService: serviceConstructorMock,
 }));
 
-function createAppWithRepoRoot(
-  repoRoot: string,
+function createApp(
   readConfig: Parameters<typeof createActionRoutes>[0]['readConfig'] = async () => ({
     configPath: '/missing/config.json',
     status: 'missing',
   }),
 ): Hono<Env> {
   const app = new Hono<Env>();
-  const repository = createDefaultRepository(repoRoot);
-  app.use('*', async (c, next) => {
-    c.set('repository', repository);
-    await next();
-  });
   app.route('/api', createActionRoutes({ readConfig }));
   return app;
 }
@@ -40,30 +33,10 @@ describe('actionRoutes discard-working-file', () => {
     });
   });
 
-  it('keeps the existing default discard-working-file action', async () => {
-    // Given: the service succeeds
-    discardWorkingFileMock.mockResolvedValue(undefined);
-    const app = createAppWithRepoRoot('/repo/root');
-
-    // When
-    const response = await app.request('/api/actions/discard-working-file', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ path: 'a.ts' }),
-    });
-    const data = await response.json();
-
-    // Then
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true });
-    expect(serviceConstructorMock).toHaveBeenCalledWith('/repo/root');
-    expect(discardWorkingFileMock).toHaveBeenCalledWith('a.ts');
-  });
-
   it('runs scoped discard-working-file action against the resolved repository', async () => {
     // Given
     discardWorkingFileMock.mockResolvedValue(undefined);
-    const app = createAppWithRepoRoot('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [
           { id: 'sift', path: '/repo/sift' },
@@ -90,7 +63,7 @@ describe('actionRoutes discard-working-file', () => {
 
   it('returns 400 when scoped action repoId is not configured', async () => {
     // Given
-    const app = createAppWithRepoRoot('/current/repo', async () => ({
+    const app = createApp(async () => ({
       config: {
         repositories: [{ id: 'sift', path: '/repo/sift' }],
       },
@@ -113,10 +86,15 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 500 with error message when discard fails', async () => {
     // Given: the service throws
     discardWorkingFileMock.mockRejectedValue(new Error('discard failed'));
-    const app = createAppWithRepoRoot('/repo/root');
+    const app = createApp(async () => ({
+      config: {
+        repositories: [{ id: 'sift', path: '/repo/sift' }],
+      },
+      status: 'found',
+    }));
 
     // When
-    const response = await app.request('/api/actions/discard-working-file', {
+    const response = await app.request('/api/repositories/sift/actions/discard-working-file', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: 'a.ts' }),
