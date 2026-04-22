@@ -1,14 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createRepositoryRoutes } from './repositories';
+import { createRepositoryRoutes, type CreateRepositoryRoutesOptions } from './repositories';
 import type { ServerRepository } from '../repositories/server-repository';
 
 function createApp(
-  readConfig: Parameters<typeof createRepositoryRoutes>[0]['readConfig'],
-  validateRepository: Parameters<
-    typeof createRepositoryRoutes
-  >[0]['validateRepository'] = async () => ({
+  readConfig: NonNullable<CreateRepositoryRoutesOptions['readConfig']>,
+  validateRepository: NonNullable<
+    CreateRepositoryRoutesOptions['validateRepository']
+  > = async () => ({
     isValid: true,
   }),
 ): Hono<Env> {

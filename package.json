@@ -15,6 +15,7 @@
     "build": "pnpm run build:client && pnpm run build:server",
     "start": "node dist/cli/index.js",
     "test": "vitest run",
+    "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --noEmit --project tsconfig.node.json",
     "format": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "format:fix": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "lint": "eslint .",

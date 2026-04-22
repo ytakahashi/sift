@@ -113,6 +113,7 @@ After completing any implementation task, ensure the following all pass:
 ```bash
 pnpm run format    # Prettier check passes
 pnpm run lint      # ESLint check passes
+pnpm run typecheck # TypeScript type checks pass
 pnpm run test      # All test cases pass
 pnpm run build     # Production build succeeds
 ```

@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createActionRoutes } from './actions';
+import { createActionRoutes, type CreateActionRoutesOptions } from './actions';
 
 const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
   discardWorkingFileMock: vi.fn(),
@@ -13,7 +13,7 @@ vi.mock('../services/workspace-action-service', () => ({
 }));
 
 function createApp(
-  readConfig: Parameters<typeof createActionRoutes>[0]['readConfig'] = async () => ({
+  readConfig: NonNullable<CreateActionRoutesOptions['readConfig']> = async () => ({
     configPath: '/missing/config.json',
     status: 'missing',
   }),
