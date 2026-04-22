@@ -77,7 +77,7 @@ function getDiffRawSync(repoRoot: string, staged: boolean): string {
 
 async function getDiffRaw(repoRoot: string, staged: boolean): Promise<string> {
   // Use raw diff for a cheap structural fingerprint; full patch parsing is
-  // left to `/api/diff` after a real change has been detected.
+  // left to the repository-scoped diff API after a real change has been detected.
   const args = ['diff', '--raw', '--no-ext-diff', '--color=never'];
   if (staged) {
     args.push('--cached');

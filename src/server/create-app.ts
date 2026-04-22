@@ -6,22 +6,14 @@ import { createActionRoutes } from './routes/actions';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
-import type { WatchHub } from './watch/watch-hub';
-import type { ServerRepository } from './repositories/server-repository';
 
-// Define context variables accessible in routes
-export type Env = {
-  Variables: {
-    repository: ServerRepository;
-  };
-};
+export type Env = Record<string, never>;
 
 export interface CreateAppOptions {
-  repoWatchManager?: RepoWatchManager;
-  watchHub?: WatchHub;
+  repoWatchManager: RepoWatchManager;
 }
 
-export function createApp(options: CreateAppOptions = {}): Hono<Env> {
+export function createApp(options: CreateAppOptions): Hono<Env> {
   const app = new Hono<Env>();
 
   app.use('*', logger());
@@ -31,15 +23,7 @@ export function createApp(options: CreateAppOptions = {}): Hono<Env> {
   app.route('/api/repositories', createRepositoryRoutes());
   app.route('/api', createDiffRoutes());
   app.route('/api', createActionRoutes());
-  if (options.watchHub) {
-    app.route(
-      '/api',
-      createWatchRoutes({
-        defaultWatchHub: options.watchHub,
-        repoWatchManager: options.repoWatchManager,
-      }),
-    );
-  }
+  app.route('/api', createWatchRoutes({ repoWatchManager: options.repoWatchManager }));
 
   // In production, static files can be served here via hono static middleware.
   // Vite dev server intercepts requests before they hit this if the file exists.

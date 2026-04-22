@@ -5,10 +5,7 @@ import { createApp, Env } from './create-app.js';
 import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRepoWatcher } from './watch/repo-watcher.js';
-import { createWatchHub } from './watch/watch-hub.js';
 import { createRepoWatchManager } from './watch/repo-watch-manager';
-import { createDefaultRepository } from './repositories/default-repository';
 import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
 interface ServerRuntime {
@@ -52,41 +49,28 @@ function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; ser
   });
 }
 
-function createServerRuntime(repoRoot: string): ServerRuntime {
-  const repository = createDefaultRepository(repoRoot);
-  const watchHub = createWatchHub();
+function createServerRuntime(): ServerRuntime {
   const repoWatchManager = createRepoWatchManager();
-  const watcher = createRepoWatcher(repository.path, () => {
-    watchHub.broadcastChanged();
-  });
-
   const app = new Hono<Env>();
 
-  app.use('*', async (c, next) => {
-    c.set('repository', repository);
-    await next();
-  });
-
-  app.route('/', createApp({ repoWatchManager, watchHub }));
+  app.route('/', createApp({ repoWatchManager }));
 
   return {
     app,
     stop: async () => {
-      watchHub.close();
       await repoWatchManager.close();
-      await watcher.stop();
     },
   };
 }
 
 // Shared instance for Vite Dev server when running via `vite` CLI
-const defaultRuntime = createServerRuntime(process.env.SIFT_REPO_ROOT || process.cwd());
+const defaultRuntime = createServerRuntime();
 
 export default defaultRuntime.app;
 
 // Function called by CLI
-export async function startServer(repoRoot: string): Promise<string> {
-  const runtime = createServerRuntime(repoRoot);
+export async function startServer(): Promise<string> {
+  const runtime = createServerRuntime();
   const cliApp = new Hono<Env>();
   cliApp.route('/', runtime.app);
 

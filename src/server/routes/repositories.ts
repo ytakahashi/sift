@@ -58,7 +58,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = 
           path: configResult.configPath,
           status: 'missing',
         },
-        repositories: [await toRepositoryListItem(c.get('repository'), validateRepository)],
+        repositories: [],
       };
 
       return c.json(response);
@@ -92,11 +92,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = 
   repositoryRoutes.get('/:repoId', async (c) => {
     try {
       const configResult = await readConfig();
-      const repository = resolveScopedRepository(
-        configResult,
-        c.req.param('repoId'),
-        c.get('repository'),
-      );
+      const repository = resolveScopedRepository(configResult, c.req.param('repoId'));
 
       return c.json(await toRepositoryListItem(repository, validateRepository));
     } catch (error: unknown) {

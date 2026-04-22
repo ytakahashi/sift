@@ -45,7 +45,7 @@ const testDependencies: AppDependencies = {
   repositoryReader: {
     fetchRepositories: vi.fn(async () => ({
       config: {
-        status: 'found',
+        status: 'found' as const,
       },
       repositories: [
         {
@@ -96,7 +96,7 @@ describe('App file list interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.pushState(null, '', '/repos/default');
+    window.history.pushState(null, '', '/repos/my-app');
     diffState = {
       workingFiles: [
         createFile('a', 'working'),
@@ -147,21 +147,20 @@ describe('App file list interactions', () => {
     expect(screen.getByTestId('diff-viewer').textContent).toBe('b.ts');
   });
 
-  it('passes the temporary default repository id through repository-scoped hooks', async () => {
-    // Given: /repos/default keeps the migration bridge available until the
-    // default repository fallback is removed.
+  it('passes the route repository id through repository-scoped hooks', async () => {
+    // Given: the viewer is opened for a configured repository route.
     render(<App />);
 
     // When / Then
-    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'default');
+    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
     expect(useWorkspaceActions).toHaveBeenCalledWith(
       testDependencies.workspaceActions,
-      'default',
+      'my-app',
       expect.any(Function),
     );
     await waitFor(() => {
       expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith(
-        'default',
+        'my-app',
         expect.any(Function),
       );
     });
@@ -376,7 +375,7 @@ describe('App Notes Interactions', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.pushState(null, '', '/repos/default');
+    window.history.pushState(null, '', '/repos/my-app');
     Object.defineProperty(navigator, 'clipboard', {
       value: {
         writeText: vi.fn().mockResolvedValue(undefined),
