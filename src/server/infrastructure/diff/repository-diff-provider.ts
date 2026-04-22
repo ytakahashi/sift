@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
-import type { DiffProvider } from '../../../domain/diff/providers/diff-provider';
+import type { DiffProvider } from '../../../domain/diff/diff-provider';
 import { parseDiff } from '../../../domain/diff/diff-parser';
 import type { DiffFile, FileBucket, DiffHunk, DiffLine } from '../../../domain/diff/types';
 import { GitClient } from '../git/git-client';

@@ -65,7 +65,9 @@ describe('createRepoWatchManager', () => {
   it('broadcasts through the repository-specific hub when the watcher changes', async () => {
     // Given
     const hub = createHub();
-    let onChanged: (() => void) | null = null;
+    let onChanged = (): void => {
+      throw new Error('Expected watcher listener to be registered.');
+    };
     const manager = createRepoWatchManager({
       createHub: () => hub,
       createWatcher: (_repoRoot, listener) => {
@@ -77,7 +79,7 @@ describe('createRepoWatchManager', () => {
     await manager.subscribe({ id: 'sift', path: '/repo/sift' }, createStream());
 
     // When
-    onChanged?.();
+    onChanged();
 
     // Then
     expect(hub.broadcastChanged).toHaveBeenCalledTimes(1);

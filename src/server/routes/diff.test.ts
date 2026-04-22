@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createDiffRoutes } from './diff';
+import { createDiffRoutes, type CreateDiffRoutesOptions } from './diff';
 
 const { getFilesMock, providerConstructorMock } = vi.hoisted(() => ({
   getFilesMock: vi.fn(),
@@ -12,7 +12,7 @@ vi.mock('../infrastructure/diff/repository-diff-provider', () => ({
   RepositoryDiffProvider: providerConstructorMock,
 }));
 
-function createApp(readConfig: Parameters<typeof createDiffRoutes>[0]['readConfig']): Hono<Env> {
+function createApp(readConfig: NonNullable<CreateDiffRoutesOptions['readConfig']>): Hono<Env> {
   const app = new Hono<Env>();
   app.route('/api', createDiffRoutes({ readConfig }));
   return app;
