@@ -64,6 +64,18 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = 
       return c.json(response);
     }
 
+    if (configResult.status === 'invalid') {
+      const response: RepositoryListResponse = {
+        config: {
+          error: configResult.error,
+          status: 'invalid',
+        },
+        repositories: [],
+      };
+
+      return c.json(response, 400);
+    }
+
     try {
       const registry = createRepositoryRegistry(configResult.config.repositories);
       const response: RepositoryListResponse = {

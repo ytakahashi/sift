@@ -79,6 +79,29 @@ describe('repositoryRoutes', () => {
     });
   });
 
+  it('returns an empty repository list and 400 when config is invalid', async () => {
+    // Given
+    const app = createApp(async () => ({
+      configPath: '/Users/example/.config/sift/config.json',
+      error: 'Invalid JSON config: Unexpected token',
+      status: 'invalid',
+    }));
+
+    // When
+    const response = await app.request('/api/repositories');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({
+      config: {
+        error: 'Invalid JSON config: Unexpected token',
+        status: 'invalid',
+      },
+      repositories: [],
+    });
+  });
+
   it('returns one configured repository by repoId', async () => {
     // Given
     const app = createApp(async () => ({

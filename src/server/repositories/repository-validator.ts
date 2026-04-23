@@ -1,6 +1,7 @@
 import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
+import path from 'node:path';
 import type { ServerRepository } from './server-repository';
 
 const execFileAsync = promisify(execFile);
@@ -17,6 +18,20 @@ export type RepositoryValidator = (
 export async function validateRepositoryPath(
   repository: ServerRepository,
 ): Promise<RepositoryValidationResult> {
+  if (!/^[a-z0-9-]+$/.test(repository.id)) {
+    return {
+      error: 'Repository id must contain only lowercase letters, numbers, and hyphens.',
+      isValid: false,
+    };
+  }
+
+  if (!path.isAbsolute(repository.path)) {
+    return {
+      error: 'Repository path must be an absolute path.',
+      isValid: false,
+    };
+  }
+
   try {
     const repositoryStat = await stat(repository.path);
     if (!repositoryStat.isDirectory()) {

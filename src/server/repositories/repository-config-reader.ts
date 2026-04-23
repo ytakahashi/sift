@@ -31,7 +31,16 @@ export interface MissingRepositoryConfig {
   status: 'missing';
 }
 
-export type RepositoryConfigReadResult = FoundRepositoryConfig | MissingRepositoryConfig;
+export interface InvalidRepositoryConfig {
+  configPath: string;
+  error: string;
+  status: 'invalid';
+}
+
+export type RepositoryConfigReadResult =
+  | FoundRepositoryConfig
+  | MissingRepositoryConfig
+  | InvalidRepositoryConfig;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -48,25 +57,16 @@ function parseJson(rawConfig: string): unknown {
 
 function toRepository(value: unknown, index: number): ServerRepository {
   if (!isRecord(value)) {
-    throw new RepositoryConfigParseError(`Repository entry at index ${index} must be an object.`);
+    return { id: `__invalid_${index}`, path: '' };
   }
 
   const { id, path: repositoryPath } = value;
-  if (typeof id !== 'string' || id.trim() === '') {
-    throw new RepositoryConfigParseError(
-      `Repository entry at index ${index} must have a non-empty string "id".`,
-    );
-  }
-
-  if (typeof repositoryPath !== 'string' || repositoryPath.trim() === '') {
-    throw new RepositoryConfigParseError(
-      `Repository entry "${id}" must have a non-empty string "path".`,
-    );
-  }
+  const resolvedId = typeof id === 'string' && id.trim() !== '' ? id : `__invalid_id_${index}`;
+  const resolvedPath = typeof repositoryPath === 'string' ? repositoryPath : '';
 
   return {
-    id,
-    path: repositoryPath,
+    id: resolvedId,
+    path: resolvedPath,
   };
 }
 
@@ -91,19 +91,24 @@ export function parseRepositoryConfig(rawConfig: string): RepositoryConfig {
 export async function readRepositoryConfig(
   configPath: string = DEFAULT_REPOSITORY_CONFIG_PATH,
 ): Promise<RepositoryConfigReadResult> {
+  let rawConfig: string;
   try {
-    const rawConfig = await readFile(configPath, 'utf8');
+    rawConfig = await readFile(configPath, 'utf8');
+  } catch (error: unknown) {
+    if (typeof error === 'object' && error !== null && 'code' in error && error.code === 'ENOENT') {
+      return { configPath, status: 'missing' };
+    }
+    const message = error instanceof Error ? error.message : String(error);
+    return { configPath, error: `Failed to read config file: ${message}`, status: 'invalid' };
+  }
+
+  try {
     return {
       config: parseRepositoryConfig(rawConfig),
       status: 'found',
     };
-  } catch {
-    // Treat all read failures as "missing" so callers only need one setup-state
-    // branch; splitting ENOENT, permission, and other IO failures would make
-    // repository selection flow more complex without changing the next action.
-    return {
-      configPath,
-      status: 'missing',
-    };
+  } catch (error: unknown) {
+    const message = error instanceof Error ? error.message : String(error);
+    return { configPath, error: message, status: 'invalid' };
   }
 }

@@ -137,4 +137,34 @@ describe('validateRepositoryPath', () => {
       isValid: false,
     });
   });
+
+  it('returns invalid when the repository id contains invalid characters', async () => {
+    // Given
+    mockDirectory();
+    mockGitResult('true\n');
+
+    // When
+    const result = await validateRepositoryPath({ id: 'invalid id space', path: '/repo/sift' });
+
+    // Then
+    expect(result).toEqual({
+      error: 'Repository id must contain only lowercase letters, numbers, and hyphens.',
+      isValid: false,
+    });
+  });
+
+  it('returns invalid when the repository path is not absolute', async () => {
+    // Given
+    mockDirectory();
+    mockGitResult('true\n');
+
+    // When
+    const result = await validateRepositoryPath({ id: 'sift', path: './relative-path/sift' });
+
+    // Then
+    expect(result).toEqual({
+      error: 'Repository path must be an absolute path.',
+      isValid: false,
+    });
+  });
 });

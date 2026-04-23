@@ -27,6 +27,12 @@ export function resolveScopedRepository(
     );
   }
 
+  if (configResult.status === 'invalid') {
+    throw new ScopedRepositoryResolutionError(
+      `Repository config is invalid: ${configResult.error}`,
+    );
+  }
+
   try {
     const registry = createRepositoryRegistry(configResult.config.repositories);
     return registry.resolve(repoId);
