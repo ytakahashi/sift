@@ -6,7 +6,7 @@ import { createActionRoutes } from './routes/actions';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
-import type { RepositoryConfigReadResult } from './repositories/repository-config-reader';
+import type { RepositoryConfigReadResult } from './infrastructure/config/repository-config-reader';
 
 export type Env = Record<string, never>;
 

@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { REPOSITORY_ID_PATTERN } from '../../domain/repository/repository';
-import type { ServerRepository } from './server-repository';
+import type { ServerRepository } from '../repositories/server-repository';
 
 const execFileAsync = promisify(execFile);
 

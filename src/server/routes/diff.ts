@@ -5,12 +5,12 @@ import { RepositoryDiffProvider } from '../infrastructure/diff/repository-diff-p
 import {
   readRepositoryConfig,
   type RepositoryConfigReadResult,
-} from '../repositories/repository-config-reader';
+} from '../infrastructure/config/repository-config-reader';
 import {
   getErrorMessage,
   resolveScopedRepository,
   ScopedRepositoryResolutionError,
-} from '../repositories/scoped-resolution';
+} from '../services/scoped-resolution';
 
 export interface CreateDiffRoutesOptions {
   readConfig?: () => Promise<RepositoryConfigReadResult>;

@@ -6,7 +6,7 @@ import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRepoWatchManager } from './watch/repo-watch-manager';
-import { RepositoryConfigWatcher } from './repositories/repository-config-watcher';
+import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
 interface ServerRuntime {

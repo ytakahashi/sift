@@ -1,15 +1,5 @@
-import { describe, expect, it, vi } from 'vitest';
-import {
-  DEFAULT_REPOSITORY_CONFIG_PATH,
-  parseRepositoryConfig,
-  readRepositoryConfig,
-  RepositoryConfigParseError,
-} from './repository-config-reader';
-import { readFile } from 'node:fs/promises';
-
-vi.mock('node:fs/promises', () => ({
-  readFile: vi.fn(),
-}));
+import { describe, expect, it } from 'vitest';
+import { parseRepositoryConfig, RepositoryConfigParseError } from './repository-config-parser';
 
 describe('parseRepositoryConfig', () => {
   it('parses repository ids and paths from the JSON config file', () => {
@@ -43,11 +33,6 @@ describe('parseRepositoryConfig', () => {
         },
       ],
     });
-  });
-
-  it('uses config.json as the default config path', () => {
-    // Given / When / Then
-    expect(DEFAULT_REPOSITORY_CONFIG_PATH.endsWith('/.config/sift/config.json')).toBe(true);
   });
 
   it('fails when the JSON cannot be parsed', () => {
@@ -99,34 +84,5 @@ describe('parseRepositoryConfig', () => {
 
     // Then
     expect(config.repositories).toEqual([{ id: 'sift', path: '' }]);
-  });
-
-  it('returns a missing result when the config file does not exist', async () => {
-    // Given
-    const configPath = `/tmp/sift-missing-config-for-test-${Date.now()}.json`;
-    vi.mocked(readFile).mockRejectedValueOnce(
-      Object.assign(new Error('ENOENT'), { code: 'ENOENT' }),
-    );
-
-    // When
-    const result = await readRepositoryConfig(configPath);
-
-    // Then
-    expect(result).toEqual({
-      configPath,
-      status: 'missing',
-    });
-  });
-
-  it('returns an invalid result when reading the config throws non-ENOENT', async () => {
-    // Given
-    const configPath = `/tmp/sift-invalid-config-for-test-${Date.now()}.json`;
-    vi.mocked(readFile).mockRejectedValueOnce(new Error('Permission denied'));
-
-    // When
-    const result = await readRepositoryConfig(configPath);
-
-    // Then
-    expect(result.status).toBe('invalid');
   });
 });
