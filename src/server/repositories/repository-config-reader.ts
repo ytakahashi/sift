@@ -57,11 +57,11 @@ function parseJson(rawConfig: string): unknown {
 
 function toRepository(value: unknown, index: number): ServerRepository {
   if (!isRecord(value)) {
-    return { id: `__invalid_${index}`, path: '' };
+    return { id: `invalid-repo-${index}`, path: '' };
   }
 
   const { id, path: repositoryPath } = value;
-  const resolvedId = typeof id === 'string' && id.trim() !== '' ? id : `__invalid_id_${index}`;
+  const resolvedId = typeof id === 'string' && id.trim() !== '' ? id : `invalid-id-${index}`;
   const resolvedPath = typeof repositoryPath === 'string' ? repositoryPath : '';
 
   return {

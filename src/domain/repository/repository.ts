@@ -1,5 +1,7 @@
 export type RepositoryId = string;
 
+export const REPOSITORY_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
 export interface RepositoryListItem {
   error?: string;
   id: RepositoryId;

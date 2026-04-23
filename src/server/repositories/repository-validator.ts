@@ -2,6 +2,7 @@ import { execFile } from 'node:child_process';
 import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
+import { REPOSITORY_ID_PATTERN } from '../../domain/repository/repository';
 import type { ServerRepository } from './server-repository';
 
 const execFileAsync = promisify(execFile);
@@ -18,7 +19,7 @@ export type RepositoryValidator = (
 export async function validateRepositoryPath(
   repository: ServerRepository,
 ): Promise<RepositoryValidationResult> {
-  if (!/^[a-z0-9-]+$/.test(repository.id)) {
+  if (!REPOSITORY_ID_PATTERN.test(repository.id)) {
     return {
       error: 'Repository id must contain only lowercase letters, numbers, and hyphens.',
       isValid: false,
