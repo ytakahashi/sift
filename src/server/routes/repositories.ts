@@ -8,18 +8,18 @@ import type { Env } from '../create-app';
 import {
   readRepositoryConfig,
   type RepositoryConfigReadResult,
-} from '../repositories/repository-config-reader';
+} from '../infrastructure/config/repository-config-reader';
 import { createRepositoryRegistry } from '../repositories/repository-registry';
 import type { ServerRepository } from '../repositories/server-repository';
 import {
-  resolveScopedRepository,
   getErrorMessage,
+  resolveScopedRepository,
   ScopedRepositoryResolutionError,
-} from '../repositories/scoped-resolution';
+} from '../services/scoped-resolution';
 import {
   validateRepositoryPath,
   type RepositoryValidator,
-} from '../repositories/repository-validator';
+} from '../infrastructure/repository-validator';
 
 export interface CreateRepositoryRoutesOptions {
   readConfig?: () => Promise<RepositoryConfigReadResult>;
@@ -62,6 +62,18 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions = 
       };
 
       return c.json(response);
+    }
+
+    if (configResult.status === 'invalid') {
+      const response: RepositoryListResponse = {
+        config: {
+          error: configResult.error,
+          status: 'invalid',
+        },
+        repositories: [],
+      };
+
+      return c.json(response, 400);
     }
 
     try {

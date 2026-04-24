@@ -56,6 +56,20 @@ describe('resolveScopedRepository', () => {
     );
   });
 
+  it('fails when config is invalid', () => {
+    // Given
+    const configResult = {
+      configPath: '/invalid/config.json',
+      error: 'Unexpected token',
+      status: 'invalid' as const,
+    };
+
+    // When / Then
+    expect(() => resolveScopedRepository(configResult, 'sift')).toThrow(
+      'Repository config is invalid: Unexpected token',
+    );
+  });
+
   it('wraps registry errors as scoped resolution errors', () => {
     // Given
     const configResult = {

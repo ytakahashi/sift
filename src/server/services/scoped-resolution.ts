@@ -1,6 +1,9 @@
-import type { RepositoryConfigReadResult } from './repository-config-reader';
-import { createRepositoryRegistry, RepositoryRegistryError } from './repository-registry';
-import type { ServerRepository } from './server-repository';
+import type { RepositoryConfigReadResult } from '../infrastructure/config/repository-config-reader';
+import {
+  createRepositoryRegistry,
+  RepositoryRegistryError,
+} from '../repositories/repository-registry';
+import type { ServerRepository } from '../repositories/server-repository';
 
 export class ScopedRepositoryResolutionError extends Error {
   constructor(message: string) {
@@ -24,6 +27,12 @@ export function resolveScopedRepository(
   if (configResult.status === 'missing') {
     throw new ScopedRepositoryResolutionError(
       `Repository config is missing: ${configResult.configPath}`,
+    );
+  }
+
+  if (configResult.status === 'invalid') {
+    throw new ScopedRepositoryResolutionError(
+      `Repository config is invalid: ${configResult.error}`,
     );
   }
 

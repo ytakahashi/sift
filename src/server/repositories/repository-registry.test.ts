@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createRepositoryRegistry, RepositoryRegistryError } from './repository-registry';
+import { createRepositoryRegistry } from './repository-registry';
 
 describe('createRepositoryRegistry', () => {
   it('lists configured repositories and resolves by id', () => {
@@ -27,24 +27,6 @@ describe('createRepositoryRegistry', () => {
     // When / Then
     expect(() => createRepositoryRegistry(repositories)).toThrow(
       'Repository id "sift" is duplicated.',
-    );
-  });
-
-  it('fails when repository id is not URL-safe', () => {
-    // Given
-    const repositories = [{ id: 'My App', path: '/repo/my-app' }];
-
-    // When / Then
-    expect(() => createRepositoryRegistry(repositories)).toThrow(RepositoryRegistryError);
-  });
-
-  it('fails when repository path is not absolute', () => {
-    // Given
-    const repositories = [{ id: 'sift', path: 'relative/sift' }];
-
-    // When / Then
-    expect(() => createRepositoryRegistry(repositories)).toThrow(
-      'Repository path for "sift" must be absolute.',
     );
   });
 

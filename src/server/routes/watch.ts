@@ -4,12 +4,12 @@ import type { Env } from '../create-app';
 import {
   readRepositoryConfig,
   type RepositoryConfigReadResult,
-} from '../repositories/repository-config-reader';
+} from '../infrastructure/config/repository-config-reader';
 import {
   getErrorMessage,
   resolveScopedRepository,
   ScopedRepositoryResolutionError,
-} from '../repositories/scoped-resolution';
+} from '../services/scoped-resolution';
 import type { RepoWatchManager } from '../watch/repo-watch-manager';
 
 export interface CreateWatchRoutesOptions {

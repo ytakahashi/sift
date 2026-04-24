@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRepoWatchManager } from './watch/repo-watch-manager';
+import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
 interface ServerRuntime {
@@ -51,14 +52,22 @@ function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; ser
 
 function createServerRuntime(): ServerRuntime {
   const repoWatchManager = createRepoWatchManager();
+  const configWatcher = new RepositoryConfigWatcher();
   const app = new Hono<Env>();
 
-  app.route('/', createApp({ repoWatchManager }));
+  app.route(
+    '/',
+    createApp({
+      repoWatchManager,
+      readConfig: () => configWatcher.readConfig(),
+    }),
+  );
 
   return {
     app,
     stop: async () => {
       await repoWatchManager.close();
+      await configWatcher.stop();
     },
   };
 }

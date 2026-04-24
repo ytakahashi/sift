@@ -1,4 +1,3 @@
-import path from 'node:path';
 import type { ServerRepository } from './server-repository';
 
 export class RepositoryRegistryError extends Error {
@@ -13,20 +12,6 @@ export interface RepositoryRegistry {
   resolve: (repoId: string) => ServerRepository;
 }
 
-const REPOSITORY_ID_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
-
-function validateRepository(repository: ServerRepository): void {
-  if (!REPOSITORY_ID_PATTERN.test(repository.id)) {
-    throw new RepositoryRegistryError(
-      `Repository id "${repository.id}" must use lowercase letters, numbers, and hyphens.`,
-    );
-  }
-
-  if (!path.isAbsolute(repository.path)) {
-    throw new RepositoryRegistryError(`Repository path for "${repository.id}" must be absolute.`);
-  }
-}
-
 export function createRepositoryRegistry(repositories: ServerRepository[]): RepositoryRegistry {
   const repositoriesById = new Map<string, ServerRepository>();
 
@@ -34,8 +19,6 @@ export function createRepositoryRegistry(repositories: ServerRepository[]): Repo
     if (repositoriesById.has(repository.id)) {
       throw new RepositoryRegistryError(`Repository id "${repository.id}" is duplicated.`);
     }
-
-    validateRepository(repository);
 
     repositoriesById.set(repository.id, repository);
   }
