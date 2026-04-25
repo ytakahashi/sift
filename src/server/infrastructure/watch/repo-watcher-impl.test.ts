@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRepoWatcher } from './repo-watcher';
+import { createRepoWatcher } from './repo-watcher-impl';
 
 type WatchHandler = () => void;
 
