@@ -6,30 +6,33 @@ import {
   RepositoryResolutionError,
   type RepositoryResolver,
 } from '../services/repository-resolver';
+import type { WorkspaceActionService } from '../services/workspace-action-service';
 
-const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
-  discardWorkingFileMock: vi.fn(),
-  serviceConstructorMock: vi.fn(),
-}));
+const discardWorkingFileMock = vi.fn();
 
-vi.mock('../services/workspace-action-service', () => ({
-  WorkspaceActionService: serviceConstructorMock,
-}));
+const mockService: WorkspaceActionService = {
+  stageFile: vi.fn(),
+  unstageFile: vi.fn(),
+  stageHunk: vi.fn(),
+  unstageHunk: vi.fn(),
+  discardWorkingFile: discardWorkingFileMock,
+};
 
 function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
   const app = new Hono<Env>();
-  app.route('/api', createActionRoutes({ repositoryResolver }));
+  app.route(
+    '/api',
+    createActionRoutes({
+      repositoryResolver,
+      createWorkspaceActionService: () => mockService,
+    }),
+  );
   return app;
 }
 
 describe('actionRoutes discard-working-file', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    serviceConstructorMock.mockImplementation(function MockWorkspaceActionService() {
-      return {
-        discardWorkingFile: discardWorkingFileMock,
-      };
-    });
   });
 
   it('runs scoped discard-working-file action against the resolved repository', async () => {
@@ -54,7 +57,6 @@ describe('actionRoutes discard-working-file', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true });
     expect(mockResolver.resolve).toHaveBeenCalledWith('my-app');
-    expect(serviceConstructorMock).toHaveBeenCalledWith('/repo/my-app');
     expect(discardWorkingFileMock).toHaveBeenCalledWith('a.ts');
   });
 

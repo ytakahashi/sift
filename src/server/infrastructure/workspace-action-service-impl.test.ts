@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../domain/diff/types';
-import { WorkspaceActionService } from './workspace-action-service';
+import { WorkspaceActionServiceImpl } from './workspace-action-service-impl';
 
 function createWorkingFile(path: string, status: DiffFile['status'], oldPath?: string): DiffFile {
   return {
@@ -15,8 +15,8 @@ function createWorkingFile(path: string, status: DiffFile['status'], oldPath?: s
   };
 }
 
-describe('WorkspaceActionService.discardWorkingFile', () => {
-  let service: WorkspaceActionService;
+describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
+  let service: WorkspaceActionServiceImpl;
   let gitMock: {
     cleanPath: ReturnType<typeof vi.fn>;
     restoreWorktree: ReturnType<typeof vi.fn>;
@@ -26,7 +26,7 @@ describe('WorkspaceActionService.discardWorkingFile', () => {
   };
 
   beforeEach(() => {
-    service = new WorkspaceActionService('/repo/root');
+    service = new WorkspaceActionServiceImpl('/repo/root');
     gitMock = {
       cleanPath: vi.fn().mockResolvedValue(undefined),
       restoreWorktree: vi.fn().mockResolvedValue(undefined),
