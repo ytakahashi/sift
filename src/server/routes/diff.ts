@@ -41,7 +41,7 @@ export function createDiffRoutes(options: CreateDiffRoutesOptions): Hono<Env> {
 
   diffRoutes.get('/repositories/:repoId/diff', async (c) => {
     try {
-      const repository = await resolver.resolve(c.req.param('repoId'));
+      const repository = await resolver.resolve(c.req.param('repoId') as string);
       return c.json(await buildDiffResponse(repository.path));
     } catch (error: unknown) {
       if (error instanceof RepositoryResolutionError) {

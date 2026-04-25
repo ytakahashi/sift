@@ -17,7 +17,7 @@ async function createScopedActionService(
   c: Context<Env>,
   resolver: RepositoryResolver,
 ): Promise<WorkspaceActionService> {
-  const repository = await resolver.resolve(c.req.param('repoId'));
+  const repository = await resolver.resolve(c.req.param('repoId') as string);
   return createWorkspaceActionService(repository);
 }
 

@@ -13,10 +13,10 @@ export class RepositoryResolutionError extends Error {
 
 export interface RepositoryResolver {
   /** Resolves a repoId to a RepositoryDescriptor. Throws RepositoryResolutionError if not found. */
-  resolve(repoId: string | undefined): Promise<RepositoryDescriptor>;
+  resolve(repoId: string): Promise<RepositoryDescriptor>;
 
   /** Resolves a repoId to a RepositoryListItem (includes validation). Throws RepositoryResolutionError if not found. */
-  resolveItem(repoId: string | undefined): Promise<RepositoryListItem>;
+  resolveItem(repoId: string): Promise<RepositoryListItem>;
 
   /** Returns the full repository list with validation status. */
   list(): Promise<RepositoryList>;

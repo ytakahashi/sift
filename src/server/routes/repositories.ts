@@ -21,7 +21,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
 
   repositoryRoutes.get('/:repoId', async (c) => {
     try {
-      const listItem = await resolver.resolveItem(c.req.param('repoId'));
+      const listItem = await resolver.resolveItem(c.req.param('repoId') as string);
       return c.json(listItem);
     } catch (error: unknown) {
       if (error instanceof RepositoryResolutionError) {

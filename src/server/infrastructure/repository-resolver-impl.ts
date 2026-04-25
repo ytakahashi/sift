@@ -62,7 +62,7 @@ export function createRepositoryResolver(
   readConfig: () => Promise<RepositoryConfigReadResult>,
   validateRepository: RepositoryValidator,
 ): RepositoryResolver {
-  const resolve = async (repoId: string | undefined): Promise<RepositoryDescriptor> => {
+  const resolve = async (repoId: string): Promise<RepositoryDescriptor> => {
     if (!repoId) {
       throw new RepositoryResolutionError('Repository id is required.');
     }
@@ -93,7 +93,7 @@ export function createRepositoryResolver(
 
   return {
     resolve,
-    resolveItem: async (repoId: string | undefined): Promise<RepositoryListItem> => {
+    resolveItem: async (repoId: string): Promise<RepositoryListItem> => {
       const repository = await resolve(repoId);
       return toRepositoryListItem(repository, validateRepository);
     },

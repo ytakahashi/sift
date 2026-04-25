@@ -2,8 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createActionRoutes } from './actions';
-import { createRepositoryResolver } from '../infrastructure/repository-resolver-impl';
-import type { RepositoryConfigReadResult } from '../infrastructure/config/repository-config-reader';
+import { RepositoryResolutionError, type RepositoryResolver } from '../services/repository-resolver';
 
 const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
   discardWorkingFileMock: vi.fn(),
@@ -14,14 +13,8 @@ vi.mock('../services/workspace-action-service', () => ({
   WorkspaceActionService: serviceConstructorMock,
 }));
 
-function createApp(
-  readConfig: () => Promise<RepositoryConfigReadResult> = async () => ({
-    configPath: '/missing/config.json',
-    status: 'missing',
-  }),
-): Hono<Env> {
+function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
   const app = new Hono<Env>();
-  const repositoryResolver = createRepositoryResolver(readConfig, async () => ({ isValid: true }));
   app.route('/api', createActionRoutes({ repositoryResolver }));
   return app;
 }
@@ -39,15 +32,12 @@ describe('actionRoutes discard-working-file', () => {
   it('runs scoped discard-working-file action against the resolved repository', async () => {
     // Given
     discardWorkingFileMock.mockResolvedValue(undefined);
-    const app = createApp(async () => ({
-      config: {
-        repositories: [
-          { id: 'sift', path: '/repo/sift' },
-          { id: 'my-app', path: '/repo/my-app' },
-        ],
-      },
-      status: 'found',
-    }));
+    const mockResolver = {
+      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/my-app/actions/discard-working-file', {
@@ -60,18 +50,19 @@ describe('actionRoutes discard-working-file', () => {
     // Then
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true });
+    expect(mockResolver.resolve).toHaveBeenCalledWith('my-app');
     expect(serviceConstructorMock).toHaveBeenCalledWith('/repo/my-app');
     expect(discardWorkingFileMock).toHaveBeenCalledWith('a.ts');
   });
 
   it('returns 400 when scoped action repoId is not configured', async () => {
     // Given
-    const app = createApp(async () => ({
-      config: {
-        repositories: [{ id: 'sift', path: '/repo/sift' }],
-      },
-      status: 'found',
-    }));
+    const mockResolver = {
+      resolve: vi.fn().mockRejectedValue(new RepositoryResolutionError('Repository id "missing" is not configured.')),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/missing/actions/discard-working-file', {
@@ -89,12 +80,12 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 500 with error message when discard fails', async () => {
     // Given: the service throws
     discardWorkingFileMock.mockRejectedValue(new Error('discard failed'));
-    const app = createApp(async () => ({
-      config: {
-        repositories: [{ id: 'sift', path: '/repo/sift' }],
-      },
-      status: 'found',
-    }));
+    const mockResolver = {
+      resolve: vi.fn().mockResolvedValue({ id: 'sift', path: '/repo/sift' }),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/sift/actions/discard-working-file', {
