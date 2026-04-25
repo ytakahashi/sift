@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createDiffRoutes } from './diff';
-import { RepositoryResolutionError, type RepositoryResolver } from '../services/repository-resolver';
+import {
+  RepositoryResolutionError,
+  type RepositoryResolver,
+} from '../services/repository-resolver';
 
 const { getFilesMock, providerConstructorMock } = vi.hoisted(() => ({
   getFilesMock: vi.fn(),
@@ -58,7 +61,11 @@ describe('diffRoutes', () => {
   it('returns an error when repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn().mockRejectedValue(new RepositoryResolutionError('Repository id "missing" is not configured.')),
+      resolve: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryResolutionError('Repository id "missing" is not configured.'),
+        ),
       resolveItem: vi.fn(),
       list: vi.fn(),
     };
@@ -76,7 +83,11 @@ describe('diffRoutes', () => {
   it('returns an error when config is missing for a non-default scoped diff', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn().mockRejectedValue(new RepositoryResolutionError('Repository config is missing: /missing/config.json')),
+      resolve: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryResolutionError('Repository config is missing: /missing/config.json'),
+        ),
       resolveItem: vi.fn(),
       list: vi.fn(),
     };

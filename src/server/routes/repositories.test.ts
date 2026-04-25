@@ -2,7 +2,10 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createRepositoryRoutes } from './repositories';
-import { RepositoryResolutionError, type RepositoryResolver } from '../services/repository-resolver';
+import {
+  RepositoryResolutionError,
+  type RepositoryResolver,
+} from '../services/repository-resolver';
 
 function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
   const app = new Hono<Env>();
@@ -139,7 +142,13 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn().mockRejectedValue(new RepositoryResolutionError('Repository config is missing: /Users/example/.config/sift/config.json')),
+      resolveItem: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryResolutionError(
+            'Repository config is missing: /Users/example/.config/sift/config.json',
+          ),
+        ),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -159,7 +168,11 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn().mockRejectedValue(new RepositoryResolutionError('Repository id "missing" is not configured.')),
+      resolveItem: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryResolutionError('Repository id "missing" is not configured.'),
+        ),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -182,7 +195,13 @@ describe('repositoryRoutes', () => {
         config: { status: 'found' },
         repositories: [
           { id: 'sift', isValid: true, name: 'sift', path: '/Users/example/projects/sift' },
-          { id: 'missing-repo', isValid: false, error: 'Repository path does not exist.', name: 'missing-repo', path: '/Users/example/missing-repo' },
+          {
+            id: 'missing-repo',
+            isValid: false,
+            error: 'Repository path does not exist.',
+            name: 'missing-repo',
+            path: '/Users/example/missing-repo',
+          },
         ],
       }),
     };

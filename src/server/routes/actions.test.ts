@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createActionRoutes } from './actions';
-import { RepositoryResolutionError, type RepositoryResolver } from '../services/repository-resolver';
+import {
+  RepositoryResolutionError,
+  type RepositoryResolver,
+} from '../services/repository-resolver';
 
 const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
   discardWorkingFileMock: vi.fn(),
@@ -58,7 +61,11 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 400 when scoped action repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn().mockRejectedValue(new RepositoryResolutionError('Repository id "missing" is not configured.')),
+      resolve: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryResolutionError('Repository id "missing" is not configured.'),
+        ),
       resolveItem: vi.fn(),
       list: vi.fn(),
     };
