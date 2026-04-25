@@ -1,31 +1,23 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../create-app';
-import {
-  readRepositoryConfig,
-  type RepositoryConfigReadResult,
-} from '../infrastructure/config/repository-config-reader';
-import {
-  getErrorMessage,
-  resolveScopedRepository,
-  ScopedRepositoryResolutionError,
-} from '../services/scoped-resolution';
-import type { ServerRepository } from '../repositories/server-repository';
+import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
+import { getErrorMessage } from '../error/error-utils';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 import { WorkspaceActionService } from '../services/workspace-action-service';
 
 export interface CreateActionRoutesOptions {
-  readConfig?: () => Promise<RepositoryConfigReadResult>;
+  repositoryResolver: RepositoryResolver;
 }
 
-function createWorkspaceActionService(repository: ServerRepository): WorkspaceActionService {
+function createWorkspaceActionService(repository: RepositoryDescriptor): WorkspaceActionService {
   return new WorkspaceActionService(repository.path);
 }
 
 async function createScopedActionService(
   c: Context<Env>,
-  readConfig: () => Promise<RepositoryConfigReadResult>,
+  resolver: RepositoryResolver,
 ): Promise<WorkspaceActionService> {
-  const configResult = await readConfig();
-  const repository = resolveScopedRepository(configResult, c.req.param('repoId'));
+  const repository = await resolver.resolve(c.req.param('repoId') as string);
   return createWorkspaceActionService(repository);
 }
 
@@ -41,7 +33,7 @@ async function handleAction(
     await runAction(service, body);
     return c.json({ success: true });
   } catch (error: unknown) {
-    if (error instanceof ScopedRepositoryResolutionError) {
+    if (error instanceof RepositoryResolutionError) {
       return c.json({ error: error.message }, 400);
     }
 
@@ -113,12 +105,12 @@ function registerActionRoutes(
   );
 }
 
-export function createActionRoutes(options: CreateActionRoutesOptions = {}): Hono<Env> {
+export function createActionRoutes(options: CreateActionRoutesOptions): Hono<Env> {
   const actionRoutes = new Hono<Env>();
-  const readConfig = options.readConfig ?? readRepositoryConfig;
+  const resolver = options.repositoryResolver;
 
   registerActionRoutes(actionRoutes, '/repositories/:repoId/actions', (c) =>
-    createScopedActionService(c, readConfig),
+    createScopedActionService(c, resolver),
   );
 
   return actionRoutes;

@@ -1,30 +1,22 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Env } from '../create-app';
-import {
-  readRepositoryConfig,
-  type RepositoryConfigReadResult,
-} from '../infrastructure/config/repository-config-reader';
-import {
-  getErrorMessage,
-  resolveScopedRepository,
-  ScopedRepositoryResolutionError,
-} from '../services/scoped-resolution';
+import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
+import { getErrorMessage } from '../error/error-utils';
 import type { RepoWatchManager } from '../watch/repo-watch-manager';
 
 export interface CreateWatchRoutesOptions {
-  readConfig?: () => Promise<RepositoryConfigReadResult>;
   repoWatchManager: RepoWatchManager;
+  repositoryResolver: RepositoryResolver;
 }
 
 export function createWatchRoutes(options: CreateWatchRoutesOptions): Hono<Env> {
   const watchRoutes = new Hono<Env>();
-  const readConfig = options.readConfig ?? readRepositoryConfig;
+  const resolver = options.repositoryResolver;
 
   watchRoutes.get('/repositories/:repoId/watch', async (c) => {
     try {
-      const configResult = await readConfig();
-      const repository = resolveScopedRepository(configResult, c.req.param('repoId'));
+      const repository = await resolver.resolve(c.req.param('repoId') as string);
 
       return streamSSE(c, async (stream) => {
         await options.repoWatchManager.subscribe(repository, stream);
@@ -33,7 +25,7 @@ export function createWatchRoutes(options: CreateWatchRoutesOptions): Hono<Env> 
         });
       });
     } catch (error: unknown) {
-      if (error instanceof ScopedRepositoryResolutionError) {
+      if (error instanceof RepositoryResolutionError) {
         return c.json({ error: error.message }, 400);
       }
 

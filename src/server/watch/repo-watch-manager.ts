@@ -1,4 +1,4 @@
-import type { ServerRepository } from '../repositories/server-repository';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 import { createRepoWatcher, type RepoWatcher } from './repo-watcher';
 import { createWatchHub, type WatchHub, type WatchStream } from './watch-hub';
 
@@ -10,7 +10,7 @@ interface RepoWatchEntry {
 
 export interface RepoWatchManager {
   close: () => Promise<void>;
-  subscribe: (repository: ServerRepository, stream: WatchStream) => Promise<void>;
+  subscribe: (repository: RepositoryDescriptor, stream: WatchStream) => Promise<void>;
 }
 
 export interface CreateRepoWatchManagerOptions {
@@ -30,7 +30,7 @@ export function createRepoWatchManager(
   const createWatcher = options.createWatcher ?? createRepoWatcher;
   const entries = new Map<string, RepoWatchEntry>();
 
-  const getOrCreateEntry = (repository: ServerRepository): RepoWatchEntry => {
+  const getOrCreateEntry = (repository: RepositoryDescriptor): RepoWatchEntry => {
     const existingEntry = entries.get(repository.id);
     if (existingEntry) {
       return existingEntry;
@@ -70,7 +70,7 @@ export function createRepoWatchManager(
         }),
       );
     },
-    subscribe: async (repository: ServerRepository, stream: WatchStream) => {
+    subscribe: async (repository: RepositoryDescriptor, stream: WatchStream) => {
       if (stream.aborted || stream.closed) {
         return;
       }

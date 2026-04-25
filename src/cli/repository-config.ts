@@ -5,8 +5,8 @@ import {
   parseRepositoryConfig,
   type RepositoryConfig,
   RepositoryConfigParseError,
-} from '../server/repositories/repository-config-parser';
-import type { ServerRepository } from '../server/repositories/server-repository';
+} from '../server/infrastructure/config/repository-config-parser';
+import type { RepositoryDescriptor } from '../domain/repository/repository';
 
 export interface AddedRepository {
   id: string;
@@ -47,7 +47,7 @@ export function slugifyRepositoryId(repositoryName: string): string {
 
 export function createAvailableRepositoryId(
   candidateId: string,
-  repositories: ServerRepository[],
+  repositories: RepositoryDescriptor[],
 ): string {
   const existingIds = new Set(repositories.map((repository) => repository.id));
   if (!existingIds.has(candidateId)) {

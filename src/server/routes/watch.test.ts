@@ -2,18 +2,17 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createWatchRoutes } from './watch';
+import {
+  RepositoryResolutionError,
+  type RepositoryResolver,
+} from '../services/repository-resolver';
 
-function createApp(): Hono<Env> {
+function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
   const app = new Hono<Env>();
   app.route(
     '/api',
     createWatchRoutes({
-      readConfig: async () => ({
-        config: {
-          repositories: [{ id: 'sift', path: '/repo/sift' }],
-        },
-        status: 'found',
-      }),
+      repositoryResolver,
       repoWatchManager: {
         close: vi.fn().mockResolvedValue(undefined),
         subscribe: vi.fn().mockResolvedValue(undefined),
@@ -26,7 +25,16 @@ function createApp(): Hono<Env> {
 describe('watchRoutes', () => {
   it('returns 400 when scoped watch repoId is not configured', async () => {
     // Given
-    const app = createApp();
+    const mockResolver = {
+      resolve: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryResolutionError('Repository id "missing" is not configured.'),
+        ),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/missing/watch');
