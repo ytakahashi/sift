@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { createRepoWatcher } from './repo-watcher';
+import { createRepoWatcher } from './repo-watcher-impl';
 
 type WatchHandler = () => void;
 
@@ -196,6 +196,8 @@ describe('createRepoWatcher', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     // Then: the fingerprint commands are queried once for the burst
+    // (5 async Git calls per check: status, rev-parse HEAD,
+    //  working diff --raw, staged diff --raw, ls-files --others)
     expect(execFileMock).toHaveBeenCalledTimes(5);
     expect(onChanged).not.toHaveBeenCalled();
   });

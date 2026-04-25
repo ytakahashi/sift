@@ -30,8 +30,8 @@ function listIgnoredPaths(repoRoot: string): IgnoredPath[] {
       .split('\0')
       .filter(Boolean)
       .map((ignoredPath) => ({
-        absolutePath: resolvePath(repoRoot, ignoredPath.replace(/[\\/]$/, '')),
-        directory: /[\\/]$/.test(ignoredPath),
+        absolutePath: resolvePath(repoRoot, ignoredPath.replace(/[/]$/, '')),
+        directory: /[/]$/.test(ignoredPath),
       }));
   } catch {
     // Ignore matcher setup should not crash the watcher. If Git cannot provide

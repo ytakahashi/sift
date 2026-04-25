@@ -15,6 +15,8 @@ import {
   validateRepositoryPath,
   type RepositoryValidator,
 } from './infrastructure/repository-validator';
+import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
+import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
 
 export type Env = Record<string, never>;
 
@@ -35,8 +37,20 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
   // Mount API routes
   app.route('/api/health', healthRoutes);
   app.route('/api/repositories', createRepositoryRoutes({ repositoryResolver: resolver }));
-  app.route('/api', createDiffRoutes({ repositoryResolver: resolver }));
-  app.route('/api', createActionRoutes({ repositoryResolver: resolver }));
+  app.route(
+    '/api',
+    createDiffRoutes({
+      repositoryResolver: resolver,
+      createDiffProvider: (path) => new RepositoryDiffProvider(path),
+    }),
+  );
+  app.route(
+    '/api',
+    createActionRoutes({
+      repositoryResolver: resolver,
+      createWorkspaceActionService: (path) => new WorkspaceActionServiceImpl(path),
+    }),
+  );
   app.route(
     '/api',
     createWatchRoutes({

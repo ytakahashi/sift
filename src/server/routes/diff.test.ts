@@ -7,18 +7,18 @@ import {
   type RepositoryResolver,
 } from '../services/repository-resolver';
 
-const { getFilesMock, providerConstructorMock } = vi.hoisted(() => ({
-  getFilesMock: vi.fn(),
-  providerConstructorMock: vi.fn(),
-}));
-
-vi.mock('../infrastructure/diff/repository-diff-provider', () => ({
-  RepositoryDiffProvider: providerConstructorMock,
-}));
+const getFilesMock = vi.fn();
 
 function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
   const app = new Hono<Env>();
-  app.route('/api', createDiffRoutes({ repositoryResolver }));
+  app.route(
+    '/api',
+    createDiffRoutes({
+      repositoryResolver,
+      // Inject a mock DiffProvider factory so tests do not touch the filesystem
+      createDiffProvider: () => ({ getFiles: getFilesMock }),
+    }),
+  );
   return app;
 }
 
@@ -31,11 +31,6 @@ describe('diffRoutes', () => {
       }
 
       return Promise.resolve([{ id: 'staged-file', path: 'staged.ts' }]);
-    });
-    providerConstructorMock.mockImplementation(function MockRepositoryDiffProvider() {
-      return {
-        getFiles: getFilesMock,
-      };
     });
   });
 
@@ -54,7 +49,7 @@ describe('diffRoutes', () => {
 
     // Then
     expect(response.status).toBe(200);
-    expect(providerConstructorMock).toHaveBeenCalledWith('/repo/my-app');
+    // Confirm the factory was called with the resolved repository path
     expect(data.metadata.repoRoot).toBe('/repo/my-app');
   });
 

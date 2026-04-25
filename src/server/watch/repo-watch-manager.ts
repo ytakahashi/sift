@@ -1,5 +1,5 @@
 import type { RepositoryDescriptor } from '../../domain/repository/repository';
-import { createRepoWatcher, type RepoWatcher } from './repo-watcher';
+import type { RepoWatcher } from './repo-watcher';
 import { createWatchHub, type WatchHub, type WatchStream } from './watch-hub';
 
 interface RepoWatchEntry {
@@ -15,7 +15,7 @@ export interface RepoWatchManager {
 
 export interface CreateRepoWatchManagerOptions {
   createHub?: () => WatchHub;
-  createWatcher?: (repoRoot: string, onChanged: () => void) => RepoWatcher;
+  createWatcher: (repoRoot: string, onChanged: () => void) => RepoWatcher;
 }
 
 // The multi-repository UI opens one repository at a time, but users can switch
@@ -23,11 +23,9 @@ export interface CreateRepoWatchManagerOptions {
 // after a scoped SSE subscription arrives, share that watcher across duplicate
 // tabs for the same repoId, and stop it once the last tab leaves so inactive
 // repositories do not keep filesystem watchers open.
-export function createRepoWatchManager(
-  options: CreateRepoWatchManagerOptions = {},
-): RepoWatchManager {
+export function createRepoWatchManager(options: CreateRepoWatchManagerOptions): RepoWatchManager {
   const createHub = options.createHub ?? createWatchHub;
-  const createWatcher = options.createWatcher ?? createRepoWatcher;
+  const createWatcher = options.createWatcher;
   const entries = new Map<string, RepoWatchEntry>();
 
   const getOrCreateEntry = (repository: RepositoryDescriptor): RepoWatchEntry => {

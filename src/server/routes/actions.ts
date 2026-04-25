@@ -2,23 +2,20 @@ import { Hono, type Context } from 'hono';
 import type { Env } from '../create-app';
 import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
 import { getErrorMessage } from '../error/error-utils';
-import type { RepositoryDescriptor } from '../../domain/repository/repository';
-import { WorkspaceActionService } from '../services/workspace-action-service';
+import type { WorkspaceActionService } from '../services/workspace-action-service';
 
 export interface CreateActionRoutesOptions {
   repositoryResolver: RepositoryResolver;
-}
-
-function createWorkspaceActionService(repository: RepositoryDescriptor): WorkspaceActionService {
-  return new WorkspaceActionService(repository.path);
+  createWorkspaceActionService: (repositoryPath: string) => WorkspaceActionService;
 }
 
 async function createScopedActionService(
   c: Context<Env>,
   resolver: RepositoryResolver,
+  createService: (path: string) => WorkspaceActionService,
 ): Promise<WorkspaceActionService> {
   const repository = await resolver.resolve(c.req.param('repoId') as string);
-  return createWorkspaceActionService(repository);
+  return createService(repository.path);
 }
 
 async function handleAction(
@@ -108,9 +105,10 @@ function registerActionRoutes(
 export function createActionRoutes(options: CreateActionRoutesOptions): Hono<Env> {
   const actionRoutes = new Hono<Env>();
   const resolver = options.repositoryResolver;
+  const { createWorkspaceActionService } = options;
 
   registerActionRoutes(actionRoutes, '/repositories/:repoId/actions', (c) =>
-    createScopedActionService(c, resolver),
+    createScopedActionService(c, resolver, createWorkspaceActionService),
   );
 
   return actionRoutes;

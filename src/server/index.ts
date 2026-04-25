@@ -6,6 +6,7 @@ import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRepoWatchManager } from './watch/repo-watch-manager';
+import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
 import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
@@ -51,7 +52,8 @@ function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; ser
 }
 
 function createServerRuntime(): ServerRuntime {
-  const repoWatchManager = createRepoWatchManager();
+  // createRepoWatcher is passed explicitly; repo-watch-manager no longer imports infra directly.
+  const repoWatchManager = createRepoWatchManager({ createWatcher: createRepoWatcher });
   const configWatcher = new RepositoryConfigWatcher();
   const app = new Hono<Env>();
 
