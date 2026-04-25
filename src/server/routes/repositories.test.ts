@@ -1,19 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createRepositoryRoutes, type CreateRepositoryRoutesOptions } from './repositories';
+import { createRepositoryRoutes } from './repositories';
 import type { RepositoryDescriptor } from '../../domain/repository/repository';
+import { createRepositoryResolver } from '../infrastructure/repository-resolver-impl';
+import type { RepositoryConfigReadResult } from '../infrastructure/config/repository-config-reader';
+import type { RepositoryValidator } from '../infrastructure/repository-validator';
 
 function createApp(
-  readConfig: NonNullable<CreateRepositoryRoutesOptions['readConfig']>,
-  validateRepository: NonNullable<
-    CreateRepositoryRoutesOptions['validateRepository']
-  > = async () => ({
+  readConfig: () => Promise<RepositoryConfigReadResult>,
+  validateRepository: RepositoryValidator = async () => ({
     isValid: true,
   }),
 ): Hono<Env> {
   const app = new Hono<Env>();
-  app.route('/api/repositories', createRepositoryRoutes({ readConfig, validateRepository }));
+  const repositoryResolver = createRepositoryResolver(readConfig, validateRepository);
+  app.route('/api/repositories', createRepositoryRoutes({ repositoryResolver }));
   return app;
 }
 

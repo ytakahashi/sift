@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createDiffRoutes, type CreateDiffRoutesOptions } from './diff';
+import { createDiffRoutes } from './diff';
+import { createRepositoryResolver } from '../infrastructure/repository-resolver-impl';
+import type { RepositoryConfigReadResult } from '../infrastructure/config/repository-config-reader';
 
 const { getFilesMock, providerConstructorMock } = vi.hoisted(() => ({
   getFilesMock: vi.fn(),
@@ -12,9 +14,10 @@ vi.mock('../infrastructure/diff/repository-diff-provider', () => ({
   RepositoryDiffProvider: providerConstructorMock,
 }));
 
-function createApp(readConfig: NonNullable<CreateDiffRoutesOptions['readConfig']>): Hono<Env> {
+function createApp(readConfig: () => Promise<RepositoryConfigReadResult>): Hono<Env> {
   const app = new Hono<Env>();
-  app.route('/api', createDiffRoutes({ readConfig }));
+  const repositoryResolver = createRepositoryResolver(readConfig, async () => ({ isValid: true }));
+  app.route('/api', createDiffRoutes({ repositoryResolver }));
   return app;
 }
 

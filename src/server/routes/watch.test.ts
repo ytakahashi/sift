@@ -2,18 +2,24 @@ import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createWatchRoutes } from './watch';
+import { createRepositoryResolver } from '../infrastructure/repository-resolver-impl';
 
 function createApp(): Hono<Env> {
   const app = new Hono<Env>();
+  const repositoryResolver = createRepositoryResolver(
+    async () => ({
+      config: {
+        repositories: [{ id: 'sift', path: '/repo/sift' }],
+      },
+      status: 'found',
+    }),
+    async () => ({ isValid: true }),
+  );
+
   app.route(
     '/api',
     createWatchRoutes({
-      readConfig: async () => ({
-        config: {
-          repositories: [{ id: 'sift', path: '/repo/sift' }],
-        },
-        status: 'found',
-      }),
+      repositoryResolver,
       repoWatchManager: {
         close: vi.fn().mockResolvedValue(undefined),
         subscribe: vi.fn().mockResolvedValue(undefined),

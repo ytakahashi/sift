@@ -1,7 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createActionRoutes, type CreateActionRoutesOptions } from './actions';
+import { createActionRoutes } from './actions';
+import { createRepositoryResolver } from '../infrastructure/repository-resolver-impl';
+import type { RepositoryConfigReadResult } from '../infrastructure/config/repository-config-reader';
 
 const { discardWorkingFileMock, serviceConstructorMock } = vi.hoisted(() => ({
   discardWorkingFileMock: vi.fn(),
@@ -13,13 +15,14 @@ vi.mock('../services/workspace-action-service', () => ({
 }));
 
 function createApp(
-  readConfig: NonNullable<CreateActionRoutesOptions['readConfig']> = async () => ({
+  readConfig: () => Promise<RepositoryConfigReadResult> = async () => ({
     configPath: '/missing/config.json',
     status: 'missing',
   }),
 ): Hono<Env> {
   const app = new Hono<Env>();
-  app.route('/api', createActionRoutes({ readConfig }));
+  const repositoryResolver = createRepositoryResolver(readConfig, async () => ({ isValid: true }));
+  app.route('/api', createActionRoutes({ repositoryResolver }));
   return app;
 }
 

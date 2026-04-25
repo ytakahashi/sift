@@ -2,18 +2,11 @@ import { Hono } from 'hono';
 import type { DiffFile } from '../../domain/diff/types';
 import type { Env } from '../create-app.js';
 import { RepositoryDiffProvider } from '../infrastructure/diff/repository-diff-provider';
-import {
-  readRepositoryConfig,
-  type RepositoryConfigReadResult,
-} from '../infrastructure/config/repository-config-reader';
-import {
-  resolveScopedRepository,
-  ScopedRepositoryResolutionError,
-} from '../services/scoped-resolution';
+import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
 import { getErrorMessage } from '../error/error-utils';
 
 export interface CreateDiffRoutesOptions {
-  readConfig?: () => Promise<RepositoryConfigReadResult>;
+  repositoryResolver: RepositoryResolver;
 }
 
 interface DiffResponse {
@@ -42,17 +35,16 @@ async function buildDiffResponse(repositoryPath: string): Promise<DiffResponse> 
   };
 }
 
-export function createDiffRoutes(options: CreateDiffRoutesOptions = {}): Hono<Env> {
+export function createDiffRoutes(options: CreateDiffRoutesOptions): Hono<Env> {
   const diffRoutes = new Hono<Env>();
-  const readConfig = options.readConfig ?? readRepositoryConfig;
+  const resolver = options.repositoryResolver;
 
   diffRoutes.get('/repositories/:repoId/diff', async (c) => {
     try {
-      const configResult = await readConfig();
-      const repository = resolveScopedRepository(configResult, c.req.param('repoId'));
+      const repository = await resolver.resolve(c.req.param('repoId'));
       return c.json(await buildDiffResponse(repository.path));
     } catch (error: unknown) {
-      if (error instanceof ScopedRepositoryResolutionError) {
+      if (error instanceof RepositoryResolutionError) {
         return c.json({ error: error.message }, 400);
       }
 
