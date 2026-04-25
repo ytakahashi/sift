@@ -1,10 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { homedir } from 'node:os';
 import path from 'node:path';
-import {
-  parseRepositoryConfig,
-  type RepositoryConfig,
-} from '../../repositories/repository-config-parser';
+import { parseRepositoryConfig, type RepositoryConfig } from './repository-config-parser';
 
 export const DEFAULT_REPOSITORY_CONFIG_PATH = path.join(
   homedir(),

@@ -5,18 +5,18 @@ import {
   type RepositoryConfigReadResult,
 } from '../infrastructure/config/repository-config-reader';
 import {
-  getErrorMessage,
   resolveScopedRepository,
   ScopedRepositoryResolutionError,
 } from '../services/scoped-resolution';
-import type { ServerRepository } from '../repositories/server-repository';
+import { getErrorMessage } from '../error/error-utils';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 import { WorkspaceActionService } from '../services/workspace-action-service';
 
 export interface CreateActionRoutesOptions {
   readConfig?: () => Promise<RepositoryConfigReadResult>;
 }
 
-function createWorkspaceActionService(repository: ServerRepository): WorkspaceActionService {
+function createWorkspaceActionService(repository: RepositoryDescriptor): WorkspaceActionService {
   return new WorkspaceActionService(repository.path);
 }
 

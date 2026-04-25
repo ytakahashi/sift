@@ -7,10 +7,10 @@ import {
   type RepositoryConfigReadResult,
 } from '../infrastructure/config/repository-config-reader';
 import {
-  getErrorMessage,
   resolveScopedRepository,
   ScopedRepositoryResolutionError,
 } from '../services/scoped-resolution';
+import { getErrorMessage } from '../error/error-utils';
 
 export interface CreateDiffRoutesOptions {
   readConfig?: () => Promise<RepositoryConfigReadResult>;

@@ -1,9 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import {
-  getErrorMessage,
-  resolveScopedRepository,
-  ScopedRepositoryResolutionError,
-} from './scoped-resolution';
+import { resolveScopedRepository, ScopedRepositoryResolutionError } from './scoped-resolution';
 
 describe('resolveScopedRepository', () => {
   it('resolves a configured repository', () => {
@@ -86,13 +82,5 @@ describe('resolveScopedRepository', () => {
     expect(() => resolveScopedRepository(configResult, 'missing')).toThrow(
       'Repository id "missing" is not configured.',
     );
-  });
-});
-
-describe('getErrorMessage', () => {
-  it('returns Error messages and stringifies unknown values', () => {
-    // Given / When / Then
-    expect(getErrorMessage(new Error('failed'))).toBe('failed');
-    expect(getErrorMessage('plain failure')).toBe('plain failure');
   });
 });

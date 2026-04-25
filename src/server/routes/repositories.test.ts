@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createRepositoryRoutes, type CreateRepositoryRoutesOptions } from './repositories';
-import type { ServerRepository } from '../repositories/server-repository';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 
 function createApp(
   readConfig: NonNullable<CreateRepositoryRoutesOptions['readConfig']>,
@@ -176,7 +176,7 @@ describe('repositoryRoutes', () => {
         },
         status: 'found',
       }),
-      async (repository: ServerRepository) =>
+      async (repository: RepositoryDescriptor) =>
         repository.id === 'missing-repo'
           ? {
               error: 'Repository path does not exist.',

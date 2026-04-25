@@ -25,3 +25,8 @@ export interface RepositoryList {
       };
   repositories: RepositoryListItem[];
 }
+
+export interface RepositoryDescriptor {
+  id: RepositoryId;
+  path: string;
+}

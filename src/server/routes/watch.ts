@@ -6,10 +6,10 @@ import {
   type RepositoryConfigReadResult,
 } from '../infrastructure/config/repository-config-reader';
 import {
-  getErrorMessage,
   resolveScopedRepository,
   ScopedRepositoryResolutionError,
 } from '../services/scoped-resolution';
+import { getErrorMessage } from '../error/error-utils';
 import type { RepoWatchManager } from '../watch/repo-watch-manager';
 
 export interface CreateWatchRoutesOptions {

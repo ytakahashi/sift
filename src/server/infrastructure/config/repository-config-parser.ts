@@ -1,7 +1,7 @@
-import type { ServerRepository } from './server-repository';
+import type { RepositoryDescriptor } from '../../../domain/repository/repository';
 
 export interface RepositoryConfig {
-  repositories: ServerRepository[];
+  repositories: RepositoryDescriptor[];
 }
 
 export class RepositoryConfigParseError extends Error {
@@ -29,7 +29,7 @@ function parseJson(rawConfig: string): unknown {
 }
 
 /**
- * Maps an unknown JSON entry to a ServerRepository object.
+ * Maps an unknown JSON entry to a RepositoryDescriptor object.
  *
  * This function is fault-tolerant: it avoids throwing errors for malformed individual entries
  * so that other valid repositories in the same configuration file can still be loaded.
@@ -39,7 +39,7 @@ function parseJson(rawConfig: string): unknown {
  * ensuring they can be individually validated and reported as invalid by the `RepositoryValidator` later,
  * without crashing the entire configuration loading process.
  */
-function toRepository(value: unknown, index: number): ServerRepository {
+function toRepository(value: unknown, index: number): RepositoryDescriptor {
   if (!isRecord(value)) {
     return { id: `invalid-repo-${index}`, path: '' };
   }
@@ -78,7 +78,7 @@ function toRepositoryConfig(value: unknown): RepositoryConfig {
  * Parses a raw JSON configuration string into a strongly-typed `RepositoryConfig`.
  *
  * @param rawConfig The raw JSON string read from the configuration file.
- * @returns A `RepositoryConfig` object containing an array of `ServerRepository` items.
+ * @returns A `RepositoryConfig` object containing an array of `RepositoryDescriptor` items.
  *          If individual repository entries are malformed, they will be included with placeholder
  *          `invalid-*` IDs and will be filtered/rejected later in the validation phase.
  * @throws {RepositoryConfigParseError} If the JSON is invalid or the root structure is incorrect.

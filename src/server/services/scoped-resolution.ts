@@ -3,7 +3,7 @@ import {
   createRepositoryRegistry,
   RepositoryRegistryError,
 } from '../repositories/repository-registry';
-import type { ServerRepository } from '../repositories/server-repository';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 
 export class ScopedRepositoryResolutionError extends Error {
   constructor(message: string) {
@@ -12,14 +12,10 @@ export class ScopedRepositoryResolutionError extends Error {
   }
 }
 
-export function getErrorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 export function resolveScopedRepository(
   configResult: RepositoryConfigReadResult,
   repoId: string | undefined,
-): ServerRepository {
+): RepositoryDescriptor {
   if (!repoId) {
     throw new ScopedRepositoryResolutionError('Repository id is required.');
   }

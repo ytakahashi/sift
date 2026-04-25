@@ -3,7 +3,7 @@ import { stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { REPOSITORY_ID_PATTERN } from '../../domain/repository/repository';
-import type { ServerRepository } from '../repositories/server-repository';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 
 const execFileAsync = promisify(execFile);
 
@@ -13,11 +13,11 @@ export interface RepositoryValidationResult {
 }
 
 export type RepositoryValidator = (
-  repository: ServerRepository,
+  repository: RepositoryDescriptor,
 ) => Promise<RepositoryValidationResult>;
 
 export async function validateRepositoryPath(
-  repository: ServerRepository,
+  repository: RepositoryDescriptor,
 ): Promise<RepositoryValidationResult> {
   if (!REPOSITORY_ID_PATTERN.test(repository.id)) {
     return {

@@ -10,12 +10,12 @@ import {
   type RepositoryConfigReadResult,
 } from '../infrastructure/config/repository-config-reader';
 import { createRepositoryRegistry } from '../repositories/repository-registry';
-import type { ServerRepository } from '../repositories/server-repository';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 import {
-  getErrorMessage,
   resolveScopedRepository,
   ScopedRepositoryResolutionError,
 } from '../services/scoped-resolution';
+import { getErrorMessage } from '../error/error-utils';
 import {
   validateRepositoryPath,
   type RepositoryValidator,
@@ -31,7 +31,7 @@ function deriveRepositoryName(repositoryPath: string): string {
 }
 
 async function toRepositoryListItem(
-  repository: ServerRepository,
+  repository: RepositoryDescriptor,
   validateRepository: RepositoryValidator,
 ): Promise<RepositoryListItem> {
   const validation = await validateRepository(repository);

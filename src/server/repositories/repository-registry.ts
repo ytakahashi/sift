@@ -1,4 +1,4 @@
-import type { ServerRepository } from './server-repository';
+import type { RepositoryDescriptor } from '../../domain/repository/repository';
 
 export class RepositoryRegistryError extends Error {
   constructor(message: string) {
@@ -8,12 +8,12 @@ export class RepositoryRegistryError extends Error {
 }
 
 export interface RepositoryRegistry {
-  list: () => ServerRepository[];
-  resolve: (repoId: string) => ServerRepository;
+  list: () => RepositoryDescriptor[];
+  resolve: (repoId: string) => RepositoryDescriptor;
 }
 
-export function createRepositoryRegistry(repositories: ServerRepository[]): RepositoryRegistry {
-  const repositoriesById = new Map<string, ServerRepository>();
+export function createRepositoryRegistry(repositories: RepositoryDescriptor[]): RepositoryRegistry {
+  const repositoriesById = new Map<string, RepositoryDescriptor>();
 
   for (const repository of repositories) {
     if (repositoriesById.has(repository.id)) {
@@ -25,7 +25,7 @@ export function createRepositoryRegistry(repositories: ServerRepository[]): Repo
 
   return {
     list: () => Array.from(repositoriesById.values()),
-    resolve: (repoId: string): ServerRepository => {
+    resolve: (repoId: string): RepositoryDescriptor => {
       const repository = repositoriesById.get(repoId);
       if (!repository) {
         throw new RepositoryRegistryError(`Repository id "${repoId}" is not configured.`);
