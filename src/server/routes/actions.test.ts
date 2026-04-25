@@ -1,11 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { createActionRoutes } from './actions';
-import {
-  RepositoryResolutionError,
-  type RepositoryResolver,
-} from '../services/repository-resolver';
+import { createActionRoutes, type CreateActionRoutesOptions } from './actions';
+import { RepositoryResolutionError } from '../services/repository-resolver';
 import type { WorkspaceActionService } from '../services/workspace-action-service';
 
 const discardWorkingFileMock = vi.fn();
@@ -18,15 +15,9 @@ const mockService: WorkspaceActionService = {
   discardWorkingFile: discardWorkingFileMock,
 };
 
-function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
+function createApp(options: CreateActionRoutesOptions): Hono<Env> {
   const app = new Hono<Env>();
-  app.route(
-    '/api',
-    createActionRoutes({
-      repositoryResolver,
-      createWorkspaceActionService: () => mockService,
-    }),
-  );
+  app.route('/api', createActionRoutes(options));
   return app;
 }
 
@@ -43,7 +34,8 @@ describe('actionRoutes discard-working-file', () => {
       resolveItem: vi.fn(),
       list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
+    const app = createApp({ repositoryResolver: mockResolver, createWorkspaceActionService });
 
     // When
     const response = await app.request('/api/repositories/my-app/actions/discard-working-file', {
@@ -57,6 +49,8 @@ describe('actionRoutes discard-working-file', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({ success: true });
     expect(mockResolver.resolve).toHaveBeenCalledWith('my-app');
+    // Verify the factory received the path resolved from the repository descriptor
+    expect(createWorkspaceActionService).toHaveBeenCalledWith('/repo/my-app');
     expect(discardWorkingFileMock).toHaveBeenCalledWith('a.ts');
   });
 
@@ -71,7 +65,10 @@ describe('actionRoutes discard-working-file', () => {
       resolveItem: vi.fn(),
       list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
 
     // When
     const response = await app.request('/api/repositories/missing/actions/discard-working-file', {
@@ -94,7 +91,10 @@ describe('actionRoutes discard-working-file', () => {
       resolveItem: vi.fn(),
       list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
 
     // When
     const response = await app.request('/api/repositories/sift/actions/discard-working-file', {
