@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type { RepositoryId } from '../domain/repository/repository';
 import { useDiffData } from './hooks/diff/useDiffData';
 import { useNotes } from './hooks/notes/useNotes';
@@ -31,7 +32,7 @@ interface RepositorySelectionScreenProps {
 function RepositorySelectionScreen({
   dependencies,
   onSelectRepository,
-}: RepositorySelectionScreenProps) {
+}: RepositorySelectionScreenProps): ReactElement {
   const { repositories, loading, error, refresh } = useRepositories(dependencies.repositoryReader);
 
   return (
@@ -50,7 +51,7 @@ interface RepositoryViewerProps {
   repoId: RepositoryId;
 }
 
-function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
+function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): ReactElement {
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -281,7 +282,7 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps) {
   );
 }
 
-function App({ dependencies }: AppProps) {
+function App({ dependencies }: AppProps): ReactElement {
   const { navigate, route } = useRepositoryRoute();
 
   if (route.type === 'selection') {

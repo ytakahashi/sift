@@ -15,7 +15,10 @@ class RepositoryRegistryError extends Error {
   }
 }
 
-function createRegistry(repositories: RepositoryDescriptor[]) {
+function createRegistry(repositories: RepositoryDescriptor[]): {
+  list: () => RepositoryDescriptor[];
+  resolve: (repoId: string) => RepositoryDescriptor;
+} {
   const repositoriesById = new Map<string, RepositoryDescriptor>();
 
   for (const repository of repositories) {

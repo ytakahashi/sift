@@ -31,7 +31,7 @@ describe('formatNotesForClipboard', () => {
       },
     ];
 
-    const resolveFilePath = (fileId: string) => {
+    const resolveFilePath = (fileId: string): string => {
       if (fileId === 'file-1') return 'path/to/file1.txt';
       if (fileId === 'file-2') return 'path/to/file2.txt';
       return 'unknown';
@@ -49,7 +49,7 @@ describe('formatNotesForClipboard', () => {
   it('returns empty string if notes are empty', () => {
     // Given
     const notes: Note[] = [];
-    const resolveFilePath = () => 'foo';
+    const resolveFilePath = (): string => 'foo';
 
     // When
     const result = formatNotesForClipboard(notes, resolveFilePath);
@@ -73,7 +73,7 @@ describe('formatNoteForClipboard', () => {
       body: 'My note',
       createdAt: 1000,
     };
-    const resolveFilePath = (_fileId: string) => 'path/to/file.ts';
+    const resolveFilePath = (_fileId: string): string => 'path/to/file.ts';
 
     // When
     const result = formatNoteForClipboard(note, resolveFilePath);

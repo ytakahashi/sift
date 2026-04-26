@@ -14,7 +14,7 @@ function createNote(overrides?: Partial<Note>): Note {
   };
 }
 
-const resolveFilePath = (_fileId: string) => 'path/to/file.ts';
+const resolveFilePath = (_fileId: string): string => 'path/to/file.ts';
 
 describe('NoteCard', () => {
   afterEach(() => {

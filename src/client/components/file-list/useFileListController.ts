@@ -39,7 +39,7 @@ export function useFileListController({
   onSelect,
   onActivate,
   onBoundaryNavigate,
-}: UseFileListControllerOptions) {
+}: UseFileListControllerOptions): { onKeyDown: (event: KeyboardEvent<HTMLDivElement>) => void } {
   const onKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>) => {
       const action = getFileListKeyAction(event.key);

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { resolveNoteFilePath } from './resolve-note-file-path';
 
-function createFile(id: string, displayPath = `${id}.ts`) {
+function createFile(id: string, displayPath = `${id}.ts`): { id: string; displayPath: string } {
   return {
     id,
     displayPath,

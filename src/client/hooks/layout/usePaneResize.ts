@@ -44,7 +44,7 @@ export function usePaneResize(): UsePaneResizeResult {
   }, []);
 
   useEffect(() => {
-    const handlePointerMove = (event: PointerEvent) => {
+    const handlePointerMove = (event: PointerEvent): void => {
       const currentDragTarget = dragTargetRef.current;
       if (!currentDragTarget) {
         return;
@@ -70,7 +70,7 @@ export function usePaneResize(): UsePaneResizeResult {
       setWorkingPaneHeightPx(clampWorkingPanelHeight(heightPx, sidebarRect.height));
     };
 
-    const handlePointerEnd = () => {
+    const handlePointerEnd = (): void => {
       if (!dragTargetRef.current) {
         return;
       }
@@ -89,7 +89,7 @@ export function usePaneResize(): UsePaneResizeResult {
 
   // Keep pane sizes valid if the app is resized after the user has dragged splitters.
   useEffect(() => {
-    const clampCurrentLayout = () => {
+    const clampCurrentLayout = (): void => {
       const appMain = appMainRef.current;
       if (appMain) {
         const appRect = appMain.getBoundingClientRect();

@@ -30,7 +30,7 @@ function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; ser
   return new Promise((resolve, reject) => {
     const server = createAdaptorServer({ fetch: app.fetch });
 
-    const handleError = (error: Error) => {
+    const handleError = (error: Error): void => {
       server.close();
       reject(error);
     };
@@ -126,7 +126,7 @@ export async function startServer(): Promise<string> {
     return buildLocalServerUrl(port);
   }
 
-  const cleanup = () => {
+  const cleanup = (): void => {
     server.close();
     void runtime.stop();
   };

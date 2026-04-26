@@ -96,7 +96,10 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     await service.discardWorkingFile('new-name.ts');
 
     // Then: resolveSafePath resolves both paths to absolute paths under the repo root
-    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['/repo/root/old-name.ts', '/repo/root/new-name.ts']);
+    expect(gitMock.restoreWorktree).toHaveBeenCalledWith([
+      '/repo/root/old-name.ts',
+      '/repo/root/new-name.ts',
+    ]);
   });
 
   it('fails when file is not found in the working tree', async () => {

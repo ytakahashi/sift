@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, type ReactElement } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
 import { useFileListController } from './useFileListController';
 
@@ -12,7 +12,7 @@ interface FileListProps {
   onBoundaryNavigate?: (direction: 'previous' | 'next') => void;
 }
 
-function getStatusColor(status: string) {
+function getStatusColor(status: string): string {
   switch (status) {
     case 'modified':
       return '#d2a8ff'; // purple
@@ -35,7 +35,7 @@ export function FileList({
   disabled = false,
   isActive = false,
   onBoundaryNavigate,
-}: FileListProps) {
+}: FileListProps): ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
   const { onKeyDown } = useFileListController({
     files,

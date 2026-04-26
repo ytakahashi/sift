@@ -1,7 +1,13 @@
 import { useState, useCallback } from 'react';
 import type { Note, NoteTarget } from '../../../domain/notes/types';
 
-export function useNotes() {
+export function useNotes(): {
+  notes: Note[];
+  addNote: (target: NoteTarget, body: string) => void;
+  updateNote: (id: string, body: string) => void;
+  deleteNote: (id: string) => void;
+  clearNotes: () => void;
+} {
   const [notes, setNotes] = useState<Note[]>([]);
 
   const addNote = useCallback((target: NoteTarget, body: string) => {

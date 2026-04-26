@@ -1,3 +1,4 @@
+import type { ReactElement } from 'react';
 import type {
   RepositoryId,
   RepositoryList,
@@ -34,7 +35,7 @@ function RepositoryRow({
 }: {
   onSelectRepository: (repoId: RepositoryId) => void;
   repository: RepositoryListItem;
-}) {
+}): ReactElement {
   return (
     <li className={`repository-item ${repository.isValid ? '' : 'repository-item-invalid'}`}>
       <button
@@ -60,7 +61,7 @@ export function RepositorySelection({
   onRefresh,
   onSelectRepository,
   repositories,
-}: RepositorySelectionProps) {
+}: RepositorySelectionProps): ReactElement {
   const configMessage = getConfigMessage(repositories);
   const items = repositories?.repositories ?? [];
 
