@@ -2,8 +2,8 @@ import { Hono } from 'hono';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
 import type { DiffFile } from '../../domain/diff/types';
 import type { Env } from '../create-app.js';
-import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
-import { getErrorMessage } from '../error/error-utils';
+import type { RepositoryResolver } from '../services/repository-resolver';
+import { handleRouteError } from './route-error';
 
 export interface CreateDiffRoutesOptions {
   repositoryResolver: RepositoryResolver;
@@ -49,11 +49,7 @@ export function createDiffRoutes(options: CreateDiffRoutesOptions): Hono<Env> {
       const repository = await resolver.resolve(c.req.param('repoId') as string);
       return c.json(await buildDiffResponse(repository.path, createDiffProvider));
     } catch (error: unknown) {
-      if (error instanceof RepositoryResolutionError) {
-        return c.json({ error: error.message }, 400);
-      }
-
-      return c.json({ error: getErrorMessage(error) }, 500);
+      return handleRouteError(c, error);
     }
   });
 

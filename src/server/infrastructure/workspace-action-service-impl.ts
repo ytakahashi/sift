@@ -3,7 +3,7 @@ import type { WorkspaceActionService } from '../services/workspace-action-servic
 import { RepositoryDiffProvider } from './diff/repository-diff-provider';
 import { GitClient } from './git/git-client';
 import { applyPatch } from './git/git-patch-applier';
-import { resolveSafePath } from '../utils/safe-path';
+import { resolveSafePath } from './safe-path';
 
 export class WorkspaceActionServiceImpl implements WorkspaceActionService {
   private git: GitClient;
@@ -14,24 +14,19 @@ export class WorkspaceActionServiceImpl implements WorkspaceActionService {
     this.provider = new RepositoryDiffProvider(repositoryPath);
   }
 
-  private sanitizePath(targetPath: string): string {
-    resolveSafePath(this.repositoryPath, targetPath);
-    return targetPath;
-  }
-
   async stageFile(file: string): Promise<void> {
-    const safeP = this.sanitizePath(file);
-    await this.git.runGitCommand(['add', '--', safeP]);
+    const safePath = resolveSafePath(this.repositoryPath, file);
+    await this.git.runGitCommand(['add', '--', safePath]);
   }
 
   async unstageFile(file: string): Promise<void> {
-    const safeP = this.sanitizePath(file);
+    const safePath = resolveSafePath(this.repositoryPath, file);
     try {
       await this.git.runGitCommand(['rev-parse', 'HEAD']);
-      await this.git.runGitCommand(['reset', 'HEAD', '--', safeP]);
+      await this.git.runGitCommand(['reset', 'HEAD', '--', safePath]);
     } catch {
       // Fallback for initial commit where HEAD does not exist
-      await this.git.runGitCommand(['rm', '--cached', '-f', '--', safeP]);
+      await this.git.runGitCommand(['rm', '--cached', '-f', '--', safePath]);
     }
   }
 
@@ -48,7 +43,7 @@ export class WorkspaceActionServiceImpl implements WorkspaceActionService {
     const targetFile = files.find((f) => f.path === filePath);
     if (!targetFile) throw new Error('File not found in working tree');
 
-    const safePath = this.sanitizePath(targetFile.path);
+    const safePath = resolveSafePath(this.repositoryPath, targetFile.path);
 
     if (targetFile.status === 'untracked') {
       await this.git.cleanPath(safePath);
@@ -64,7 +59,7 @@ export class WorkspaceActionServiceImpl implements WorkspaceActionService {
       if (!oldPath) {
         throw new Error('Renamed file is missing oldPath');
       }
-      const safeOldPath = this.sanitizePath(oldPath);
+      const safeOldPath = resolveSafePath(this.repositoryPath, oldPath);
       await this.git.restoreWorktree([safeOldPath, safePath]);
       return;
     }

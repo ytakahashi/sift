@@ -1,7 +1,7 @@
 import { Hono, type Context } from 'hono';
 import type { Env } from '../create-app';
-import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
-import { getErrorMessage } from '../error/error-utils';
+import type { RepositoryResolver } from '../services/repository-resolver';
+import { handleRouteError } from './route-error';
 import type { WorkspaceActionService } from '../services/workspace-action-service';
 
 export interface CreateActionRoutesOptions {
@@ -30,11 +30,7 @@ async function handleAction(
     await runAction(service, body);
     return c.json({ success: true });
   } catch (error: unknown) {
-    if (error instanceof RepositoryResolutionError) {
-      return c.json({ error: error.message }, 400);
-    }
-
-    return c.json({ error: getErrorMessage(error) }, 500);
+    return handleRouteError(c, error);
   }
 }
 

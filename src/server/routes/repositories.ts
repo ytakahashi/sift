@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
-import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
-import { getErrorMessage } from '../error/error-utils';
+import type { RepositoryResolver } from '../services/repository-resolver';
+import { handleRouteError } from './route-error';
 
 export interface CreateRepositoryRoutesOptions {
   repositoryResolver: RepositoryResolver;
@@ -24,11 +24,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
       const listItem = await resolver.resolveItem(c.req.param('repoId') as string);
       return c.json(listItem);
     } catch (error: unknown) {
-      if (error instanceof RepositoryResolutionError) {
-        return c.json({ error: error.message }, 400);
-      }
-
-      return c.json({ error: getErrorMessage(error) }, 500);
+      return handleRouteError(c, error);
     }
   });
 

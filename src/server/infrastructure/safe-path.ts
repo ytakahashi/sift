@@ -29,16 +29,3 @@ export function resolveSafePath(basePath: string, targetPath: string): string {
 
   return resolvedTarget;
 }
-
-/**
- * Validates whether the given path is safely within the repo root.
- * Returns boolean instead of throwing.
- */
-export function isSafePath(basePath: string, targetPath: string): boolean {
-  try {
-    resolveSafePath(basePath, targetPath);
-    return true;
-  } catch {
-    return false;
-  }
-}
