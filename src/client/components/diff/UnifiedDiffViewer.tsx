@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, type ReactElement } from 'react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
 import { NoteEditor } from '../notes/NoteEditor';
@@ -15,7 +15,7 @@ export function UnifiedDiffViewer({
   onUpdateNote,
   onDeleteNote,
   resolveFilePath,
-}: BaseDiffViewerProps) {
+}: BaseDiffViewerProps): ReactElement {
   const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
   const [activeEditorLine, setActiveEditorLine] = useState<number | null>(null);
 

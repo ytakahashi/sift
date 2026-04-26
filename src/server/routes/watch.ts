@@ -1,8 +1,8 @@
 import { Hono } from 'hono';
 import { streamSSE } from 'hono/streaming';
 import type { Env } from '../create-app';
-import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
-import { getErrorMessage } from '../error/error-utils';
+import type { RepositoryResolver } from '../services/repository-resolver';
+import { handleRouteError } from './route-error';
 import type { RepoWatchManager } from '../watch/repo-watch-manager';
 
 export interface CreateWatchRoutesOptions {
@@ -25,11 +25,7 @@ export function createWatchRoutes(options: CreateWatchRoutesOptions): Hono<Env> 
         });
       });
     } catch (error: unknown) {
-      if (error instanceof RepositoryResolutionError) {
-        return c.json({ error: error.message }, 400);
-      }
-
-      return c.json({ error: getErrorMessage(error) }, 500);
+      return handleRouteError(c, error);
     }
   });
 

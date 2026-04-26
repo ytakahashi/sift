@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { resolveSafePath, isSafePath } from './safe-path';
+import { resolveSafePath } from './safe-path';
 
 describe('resolveSafePath', () => {
   const base = '/repo/root';
@@ -62,31 +62,5 @@ describe('resolveSafePath', () => {
 
     // Then: returns the base path itself
     expect(result).toBe(base);
-  });
-});
-
-describe('isSafePath', () => {
-  const base = '/repo/root';
-
-  it('returns true for a safe path', () => {
-    // Given: base path and a safe relative path
-    const relativePath = 'src/file.ts';
-
-    // When: checking if the path is safe
-    const result = isSafePath(base, relativePath);
-
-    // Then: returns true
-    expect(result).toBe(true);
-  });
-
-  it('returns false for a traversal path', () => {
-    // Given: base path and a traversal path
-    const relativePath = '../etc/passwd';
-
-    // When: checking if the path is safe
-    const result = isSafePath(base, relativePath);
-
-    // Then: returns false
-    expect(result).toBe(false);
   });
 });

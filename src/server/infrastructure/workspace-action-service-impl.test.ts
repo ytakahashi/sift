@@ -45,8 +45,8 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     // When
     await service.discardWorkingFile('new.ts');
 
-    // Then
-    expect(gitMock.cleanPath).toHaveBeenCalledWith('new.ts');
+    // Then: resolveSafePath resolves the relative path to an absolute path under the repo root
+    expect(gitMock.cleanPath).toHaveBeenCalledWith('/repo/root/new.ts');
     expect(gitMock.restoreWorktree).not.toHaveBeenCalled();
   });
 
@@ -57,8 +57,8 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     // When
     await service.discardWorkingFile('a.ts');
 
-    // Then
-    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['a.ts']);
+    // Then: resolveSafePath resolves the relative path to an absolute path under the repo root
+    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['/repo/root/a.ts']);
     expect(gitMock.cleanPath).not.toHaveBeenCalled();
   });
 
@@ -69,8 +69,8 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     // When
     await service.discardWorkingFile('deleted.ts');
 
-    // Then
-    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['deleted.ts']);
+    // Then: resolveSafePath resolves the relative path to an absolute path under the repo root
+    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['/repo/root/deleted.ts']);
     expect(gitMock.cleanPath).not.toHaveBeenCalled();
   });
 
@@ -81,8 +81,8 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     // When
     await service.discardWorkingFile('image.png');
 
-    // Then
-    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['image.png']);
+    // Then: resolveSafePath resolves the relative path to an absolute path under the repo root
+    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['/repo/root/image.png']);
     expect(gitMock.cleanPath).not.toHaveBeenCalled();
   });
 
@@ -95,8 +95,11 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     // When
     await service.discardWorkingFile('new-name.ts');
 
-    // Then
-    expect(gitMock.restoreWorktree).toHaveBeenCalledWith(['old-name.ts', 'new-name.ts']);
+    // Then: resolveSafePath resolves both paths to absolute paths under the repo root
+    expect(gitMock.restoreWorktree).toHaveBeenCalledWith([
+      '/repo/root/old-name.ts',
+      '/repo/root/new-name.ts',
+    ]);
   });
 
   it('fails when file is not found in the working tree', async () => {

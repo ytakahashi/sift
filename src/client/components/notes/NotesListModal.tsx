@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import { formatNotesForClipboard } from '../../../domain/notes/format';
 
@@ -14,7 +14,7 @@ export function NotesListModal({
   onClose,
   onDeleteNote,
   resolveFilePath,
-}: NotesListModalProps) {
+}: NotesListModalProps): ReactElement {
   const [copied, setCopied] = useState(false);
 
   useEffect(() => {
@@ -26,7 +26,7 @@ export function NotesListModal({
     }
   }, [copied]);
 
-  const handleCopy = async () => {
+  const handleCopy = async (): Promise<void> => {
     const text = formatNotesForClipboard(notes, resolveFilePath);
     try {
       await navigator.clipboard.writeText(text);

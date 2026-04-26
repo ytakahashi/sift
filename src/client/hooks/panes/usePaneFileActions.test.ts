@@ -1,8 +1,10 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
+import type { RenderHookResult } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { PaneMode } from './useFileSelection';
 import { usePaneFileActions } from './usePaneFileActions';
+import type { UsePaneFileActionsResult } from './usePaneFileActions';
 
 function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
   return {
@@ -22,7 +24,12 @@ function renderPaneFileActions({
 }: {
   selectedFile: DiffFile | null;
   paneMode: PaneMode;
-}) {
+}): RenderHookResult<UsePaneFileActionsResult, unknown> & {
+  stage: ReturnType<typeof vi.fn>;
+  unstage: ReturnType<typeof vi.fn>;
+  discard: ReturnType<typeof vi.fn>;
+  applyActionResult: ReturnType<typeof vi.fn>;
+} {
   const stage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
   const unstage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
   const discard = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));

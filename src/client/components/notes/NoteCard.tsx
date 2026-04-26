@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import { NoteEditor } from './NoteEditor';
 import { NoteViewer } from './NoteViewer';
@@ -10,10 +10,15 @@ interface NoteCardProps {
   onDelete?: (id: string) => void;
 }
 
-export function NoteCard({ note, resolveFilePath, onUpdate, onDelete }: NoteCardProps) {
+export function NoteCard({
+  note,
+  resolveFilePath,
+  onUpdate,
+  onDelete,
+}: NoteCardProps): ReactElement {
   const [isEditing, setIsEditing] = useState(false);
 
-  const handleSave = (val: string) => {
+  const handleSave = (val: string): void => {
     if (val.trim()) {
       onUpdate?.(note.id, val);
     }

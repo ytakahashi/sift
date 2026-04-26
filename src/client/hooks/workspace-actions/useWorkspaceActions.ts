@@ -8,7 +8,15 @@ export function useWorkspaceActions(
   workspaceActions: WorkspaceActions,
   repoId: RepositoryId,
   onRefresh?: () => Promise<void> | void,
-) {
+): {
+  stageFile: (path: string) => Promise<void>;
+  unstageFile: (path: string) => Promise<void>;
+  discardWorkingFile: (path: string) => Promise<void>;
+  stageHunk: (path: string, hunkId: string) => Promise<void>;
+  unstageHunk: (path: string, hunkId: string) => Promise<void>;
+  acting: boolean;
+  error: string | null;
+} {
   const [acting, setActing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 

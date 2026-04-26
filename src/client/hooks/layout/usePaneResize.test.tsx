@@ -1,8 +1,9 @@
+import type { ReactElement } from 'react';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { usePaneResize } from './usePaneResize';
 
-function ResizeHarness() {
+function ResizeHarness(): ReactElement {
   const {
     appMainRef,
     sidebarRef,

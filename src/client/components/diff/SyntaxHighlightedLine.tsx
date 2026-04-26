@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useMemo, type ReactElement } from 'react';
 import Prism from 'prismjs';
 
 // Load common languages
@@ -60,7 +60,7 @@ interface Props {
  * that span across multiple diff rows may not be highlighted correctly and will
  * fallback to plain text.
  */
-export function SyntaxHighlightedLine({ content, filePath }: Props) {
+export function SyntaxHighlightedLine({ content, filePath }: Props): ReactElement {
   const tokens = useMemo(() => {
     const language = getLanguageFromPath(filePath);
     if (!language || !Prism.languages[language]) {

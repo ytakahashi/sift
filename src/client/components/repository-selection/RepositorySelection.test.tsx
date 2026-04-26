@@ -4,7 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import type { RepositoryList } from '../../../domain/repository/repository';
 import { RepositorySelection } from './RepositorySelection';
 
-function renderRepositorySelection(repositories: RepositoryList) {
+function renderRepositorySelection(repositories: RepositoryList): {
+  onSelectRepository: ReturnType<typeof vi.fn>;
+} {
   const onSelectRepository = vi.fn();
 
   render(

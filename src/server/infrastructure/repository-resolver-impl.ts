@@ -7,7 +7,6 @@ import type {
 import type { RepositoryConfigReadResult } from './config/repository-config-reader';
 import type { RepositoryValidator } from './repository-validator';
 import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
-import { getErrorMessage } from '../error/error-utils';
 
 class RepositoryRegistryError extends Error {
   constructor(message: string) {
@@ -16,7 +15,10 @@ class RepositoryRegistryError extends Error {
   }
 }
 
-function createRegistry(repositories: RepositoryDescriptor[]) {
+function createRegistry(repositories: RepositoryDescriptor[]): {
+  list: () => RepositoryDescriptor[];
+  resolve: (repoId: string) => RepositoryDescriptor;
+} {
   const repositoriesById = new Map<string, RepositoryDescriptor>();
 
   for (const repository of repositories) {
@@ -133,13 +135,10 @@ export function createRepositoryResolver(
           repositories,
         };
       } catch (error: unknown) {
-        return {
-          config: {
-            error: getErrorMessage(error),
-            status: 'invalid',
-          },
-          repositories: [],
-        };
+        if (error instanceof RepositoryRegistryError) {
+          return { config: { error: error.message, status: 'invalid' }, repositories: [] };
+        }
+        throw error;
       }
     },
   };

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import { formatNoteForClipboard } from '../../../domain/notes/format';
 
@@ -9,7 +9,12 @@ interface NoteViewerProps {
   onDelete?: (id: string) => void;
 }
 
-export function NoteViewer({ note, resolveFilePath, onEdit, onDelete }: NoteViewerProps) {
+export function NoteViewer({
+  note,
+  resolveFilePath,
+  onEdit,
+  onDelete,
+}: NoteViewerProps): ReactElement {
   const [copied, setCopied] = useState(false);
 
   // Auto-clear the "Copied!" feedback after 2 seconds
@@ -22,7 +27,7 @@ export function NoteViewer({ note, resolveFilePath, onEdit, onDelete }: NoteView
     }
   }, [copied]);
 
-  const handleCopy = () => {
+  const handleCopy = (): void => {
     const text = formatNoteForClipboard(note, resolveFilePath);
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);

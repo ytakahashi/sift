@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, type ReactElement } from 'react';
 
 interface NoteEditorProps {
   initialValue?: string;
@@ -6,7 +6,7 @@ interface NoteEditorProps {
   onCancel: () => void;
 }
 
-export function NoteEditor({ initialValue = '', onSave, onCancel }: NoteEditorProps) {
+export function NoteEditor({ initialValue = '', onSave, onCancel }: NoteEditorProps): ReactElement {
   const [val, setVal] = useState(initialValue);
 
   return (
