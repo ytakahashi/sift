@@ -22,7 +22,7 @@ export class RepositoryDiffProvider implements DiffProvider {
 
     try {
       rawDiff = await this.gitClient.getDiffOutput(isStaged);
-    } catch {
+    } catch (_error: unknown) {
       // In case diff fails (e.g. empty repo edges)
     }
 
@@ -54,7 +54,7 @@ export class RepositoryDiffProvider implements DiffProvider {
               newLines: lines.length,
               lines: diffLines,
             });
-          } catch {
+          } catch (_error: unknown) {
             // File might be binary or unreadable, leave hunks empty
           }
 
@@ -68,7 +68,7 @@ export class RepositoryDiffProvider implements DiffProvider {
             hunks,
           });
         }
-      } catch {
+      } catch (_error: unknown) {
         // Ignore error
       }
     }

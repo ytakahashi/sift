@@ -24,7 +24,7 @@ export class WorkspaceActionServiceImpl implements WorkspaceActionService {
     try {
       await this.git.runGitCommand(['rev-parse', 'HEAD']);
       await this.git.runGitCommand(['reset', 'HEAD', '--', safePath]);
-    } catch {
+    } catch (_error: unknown) {
       // Fallback for initial commit where HEAD does not exist
       await this.git.runGitCommand(['rm', '--cached', '-f', '--', safePath]);
     }

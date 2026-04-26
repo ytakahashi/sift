@@ -1,7 +1,7 @@
 import { createAdaptorServer } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { ServerType } from '@hono/node-server';
-import { createApp, Env } from './create-app.js';
+import { createApp, Env } from './create-app';
 import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,7 +99,7 @@ export async function startServer(): Promise<string> {
       const { readFile } = await import('node:fs/promises');
       const html = await readFile(path.join(clientDir, 'index.html'), 'utf-8');
       return c.html(html);
-    } catch {
+    } catch (_error: unknown) {
       return c.text('Not Found', 404);
     }
   });
