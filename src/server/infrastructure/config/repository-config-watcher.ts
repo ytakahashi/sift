@@ -1,9 +1,6 @@
 import chokidar, { type FSWatcher } from 'chokidar';
-import {
-  DEFAULT_REPOSITORY_CONFIG_PATH,
-  readRepositoryConfig,
-  type RepositoryConfigReadResult,
-} from './repository-config-reader';
+import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../../../local-config/repository-config-path';
+import { readRepositoryConfig, type RepositoryConfigReadResult } from './repository-config-reader';
 
 export class RepositoryConfigWatcher {
   private configPath: string;

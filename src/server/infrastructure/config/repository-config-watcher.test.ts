@@ -17,7 +17,6 @@ vi.mock('chokidar', () => ({
 
 vi.mock('./repository-config-reader', () => ({
   readRepositoryConfig: vi.fn(),
-  DEFAULT_REPOSITORY_CONFIG_PATH: '/default/config.json',
 }));
 
 let allHandler: WatchHandler = () => {

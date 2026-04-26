@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseRepositoryConfig, RepositoryConfigParseError } from './repository-config-parser';
+import { parseRepositoryConfig, RepositoryConfigParseError } from './repository-config';
 
 describe('parseRepositoryConfig', () => {
   it('parses repository ids and paths from the JSON config file', () => {

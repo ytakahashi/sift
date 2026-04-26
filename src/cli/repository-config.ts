@@ -1,11 +1,11 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../server/infrastructure/config/repository-config-reader';
+import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../local-config/repository-config-path';
 import {
   parseRepositoryConfig,
   type RepositoryConfig,
   RepositoryConfigParseError,
-} from '../server/infrastructure/config/repository-config-parser';
+} from '../domain/repository/repository-config';
 import type { RepositoryDescriptor } from '../domain/repository/repository';
 
 export interface AddedRepository {

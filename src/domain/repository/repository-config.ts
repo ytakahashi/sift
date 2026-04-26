@@ -1,4 +1,4 @@
-import type { RepositoryDescriptor } from '../../../domain/repository/repository';
+import type { RepositoryDescriptor } from './repository';
 
 export interface RepositoryConfig {
   repositories: RepositoryDescriptor[];
@@ -78,7 +78,7 @@ function toRepositoryConfig(value: unknown): RepositoryConfig {
  * Parses a raw JSON configuration string into a strongly-typed `RepositoryConfig`.
  *
  * @param rawConfig The raw JSON string read from the configuration file.
- * @returns A `RepositoryConfig` object containing an array of `RepositoryDescriptor` items.
+ * @returns A `RepositoryConfig` object containing an array of RepositoryDescriptor items.
  *          If individual repository entries are malformed, they will be included with placeholder
  *          `invalid-*` IDs and will be filtered/rejected later in the validation phase.
  * @throws {RepositoryConfigParseError} If the JSON is invalid or the root structure is incorrect.
