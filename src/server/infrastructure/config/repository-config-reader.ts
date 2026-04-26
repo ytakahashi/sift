@@ -1,14 +1,9 @@
 import { readFile } from 'node:fs/promises';
-import { homedir } from 'node:os';
-import path from 'node:path';
-import { parseRepositoryConfig, type RepositoryConfig } from './repository-config-parser';
-
-export const DEFAULT_REPOSITORY_CONFIG_PATH = path.join(
-  homedir(),
-  '.config',
-  'sift',
-  'config.json',
-);
+import {
+  parseRepositoryConfig,
+  type RepositoryConfig,
+} from '../../../domain/repository/repository-config';
+import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../../../local-config/repository-config-path';
 
 export interface FoundRepositoryConfig {
   config: RepositoryConfig;

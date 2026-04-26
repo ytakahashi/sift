@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_REPOSITORY_CONFIG_PATH, readRepositoryConfig } from './repository-config-reader';
+import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../../../local-config/repository-config-path';
+import { readRepositoryConfig } from './repository-config-reader';
 import { readFile } from 'node:fs/promises';
 
 vi.mock('node:fs/promises', () => ({

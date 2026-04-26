@@ -15,6 +15,7 @@ src/
 ├── cli/          # CLI entry point (commander, repo resolution, browser opener)
 ├── server/       # Hono HTTP server (routes, services, watch, infrastructure)
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
+├── local-config/ # Shared Node-facing local configuration paths
 └── domain/       # Pure business logic and models shared across server and client
 ```
 
@@ -24,12 +25,16 @@ Top-level dependency rules:
 - `server/` depends on `domain/` and Node.js APIs. It must not import from `client/`.
 - `client/` depends on `domain/` and React. It must not import from `server/` or `cli/`.
 - `cli/` is the entry point. It wires together `server/` and launches the HTTP server.
+- `local-config/` contains shared Node-facing local configuration helpers. It may import Node.js
+  APIs, but must not import from `server/`, `client/`, or `cli/`.
 
 ## Dependency Overview
 
 ```text
 domain/  <- client/
 domain/  <- server/
+local-config/ <- server/
+local-config/ <- cli/
 server/  <- cli/
 
 client/  !-> server/
@@ -63,6 +68,7 @@ Allowed dependencies:
 
 - `domain/`
 - `server/`
+- `local-config/`
 - Node.js APIs
 
 Disallowed dependencies:

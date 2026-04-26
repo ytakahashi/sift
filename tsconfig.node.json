@@ -14,5 +14,5 @@
     "rootDir": "./src",
     "types": ["node"]
   },
-  "include": ["src/cli", "src/server", "src/domain"]
+  "include": ["src/cli", "src/server", "src/domain", "src/local-config"]
 }
