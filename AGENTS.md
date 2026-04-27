@@ -24,6 +24,8 @@ This project uses **pnpm** as its package manager. See `package.json` for define
 - Strict mode is enabled (`"strict": true`).
 - Use explicit types for function parameters and return values.
 - Use `unknown` (not `any`) in `catch` blocks, with `instanceof Error` guards.
+- When intentionally discarding an error, bind it as `_error: unknown` rather than omitting the
+  binding entirely (`catch { ... }`).
 
 ### Code Comments
 
