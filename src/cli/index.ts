@@ -1,7 +1,7 @@
 import { Command } from 'commander';
 import { resolveRepoRoot } from './resolve-repo';
 import { openBrowser } from './open-browser';
-import { addRepositoryConfigEntry } from './repository-config';
+import { addRepositoryConfigEntry } from '../local-config/repository-config-store';
 import { startServer } from '../server/index';
 
 const program = new Command();
