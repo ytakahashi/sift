@@ -352,6 +352,36 @@ describe('App file list interactions', () => {
     );
   });
 
+  it('disables pane footer bulk action buttons while an action is running', () => {
+    // Given: a workspace action is in flight while panes still have files
+    vi.mocked(useWorkspaceActions).mockReturnValue({
+      stageFile,
+      unstageFile,
+      stageAllWorkingFiles,
+      unstageAllStagedFiles,
+      discardWorkingFile,
+      discardAllWorkingFiles,
+      stageHunk: vi.fn(),
+      unstageHunk: vi.fn(),
+      acting: true,
+      error: null,
+    });
+
+    // When
+    render(<App />);
+
+    // Then
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Stage All' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Discard All' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Unstage All' }).disabled).toBe(
+      true,
+    );
+  });
+
   it('moves from the last working file to the first staged file with ArrowDown', async () => {
     // Given: the last working file ("c") is selected and the working listbox has focus
     const user = userEvent.setup();

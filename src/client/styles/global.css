@@ -182,14 +182,14 @@ body {
 }
 
 .bulk-action-button {
-  min-width: 7rem;
+  min-width: 5rem;
   border: 1px solid rgba(240, 246, 252, 0.1);
   border-radius: 4px;
   color: #fff;
   cursor: pointer;
   font-size: 0.8rem;
-  line-height: 1;
-  padding: 0.45rem 0.65rem;
+  line-height: 0.5;
+  padding: 0.4rem 0.5rem;
 }
 
 .bulk-action-button:disabled {

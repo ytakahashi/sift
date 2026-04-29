@@ -211,6 +211,18 @@ describe('WorkspaceActionServiceImpl bulk actions', () => {
     ]);
   });
 
+  it('does not run git when unstaging all staged files with an empty pane', async () => {
+    // Given: no staged files are present
+    providerMock.getFiles.mockResolvedValue([]);
+
+    // When
+    await service.unstageAllStagedFiles();
+
+    // Then
+    expect(providerMock.getFiles).toHaveBeenCalledWith('staged');
+    expect(gitMock.runGitCommand).not.toHaveBeenCalled();
+  });
+
   it('falls back to removing cached files when unstaging all without HEAD', async () => {
     // Given: the repository is on an initial commit with no HEAD
     providerMock.getFiles.mockResolvedValue([createWorkingFile('new.ts', 'added')]);

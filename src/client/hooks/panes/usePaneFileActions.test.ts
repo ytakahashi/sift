@@ -2,9 +2,12 @@ import { act, renderHook, waitFor } from '@testing-library/react';
 import type { RenderHookResult } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
+import type { FileActionResult } from '../../application/panes/pane-action';
 import type { PaneMode } from './useFileSelection';
 import { usePaneFileActions } from './usePaneFileActions';
 import type { UsePaneFileActionsResult } from './usePaneFileActions';
+
+type BulkPaneAction = (previouslySelectedFile: DiffFile | null) => Promise<FileActionResult>;
 
 function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
   return {
@@ -21,16 +24,18 @@ function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
 function renderPaneFileActions({
   selectedFile,
   paneMode,
+  discardAllOverride,
 }: {
   selectedFile: DiffFile | null;
   paneMode: PaneMode;
+  discardAllOverride?: BulkPaneAction;
 }): RenderHookResult<UsePaneFileActionsResult, unknown> & {
   stage: ReturnType<typeof vi.fn>;
   unstage: ReturnType<typeof vi.fn>;
   discard: ReturnType<typeof vi.fn>;
   stageAll: ReturnType<typeof vi.fn>;
   unstageAll: ReturnType<typeof vi.fn>;
-  discardAll: ReturnType<typeof vi.fn>;
+  discardAll: BulkPaneAction;
   applyActionResult: ReturnType<typeof vi.fn>;
 } {
   const stage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
@@ -38,7 +43,8 @@ function renderPaneFileActions({
   const discard = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
   const stageAll = vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
   const unstageAll = vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
-  const discardAll = vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
+  const discardAll =
+    discardAllOverride ?? vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
   const applyActionResult = vi.fn();
 
   const hook = renderHook(() =>
@@ -269,7 +275,6 @@ describe('usePaneFileActions', () => {
     // Then
     expect(confirmMock).toHaveBeenCalledWith('Discard all working directory changes?');
     expect(discardAll).toHaveBeenCalledWith(file);
-    vi.unstubAllGlobals();
   });
 
   it('does not discard all working files when confirmation is cancelled', async () => {
@@ -289,6 +294,26 @@ describe('usePaneFileActions', () => {
     // Then
     expect(discardAll).not.toHaveBeenCalled();
     expect(applyActionResult).not.toHaveBeenCalled();
-    vi.unstubAllGlobals();
+  });
+
+  it('preserves previous selection when discarding all working files fails', async () => {
+    // Given: confirmation is accepted and the bulk discard action reports rollback selection
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+    const file = createFile('a', 'working');
+    const discardAllOverride = vi.fn(async () => ({ nextSelectedFile: file }));
+    const { result, applyActionResult } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'working',
+      discardAllOverride,
+    });
+
+    // When: all working files are discarded
+    await act(async () => {
+      await result.current.discardAllWorkingFiles();
+    });
+
+    // Then: the rollback selection is applied to the working pane
+    expect(discardAllOverride).toHaveBeenCalledWith(file);
+    expect(applyActionResult).toHaveBeenCalledWith({ nextSelectedFile: file }, 'working');
   });
 });
