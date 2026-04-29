@@ -284,20 +284,6 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
                 >
                   {paneMode === 'working' ? 'Stage file' : 'Unstage file'}
                 </button>
-                <button
-                  onClick={fileNoteEditor.open}
-                  style={{
-                    background: 'transparent',
-                    color: '#c9d1d9',
-                    border: '1px solid #30363d',
-                    borderRadius: '4px',
-                    padding: '0.1rem 0.6rem',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                  }}
-                >
-                  Add Note
-                </button>
                 {paneMode === 'working' && (
                   <button
                     onClick={() => void paneFileActions.discardFile(selectedFile)}
@@ -314,6 +300,20 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
                     Discard
                   </button>
                 )}
+                <button
+                  onClick={fileNoteEditor.open}
+                  style={{
+                    background: 'transparent',
+                    color: '#c9d1d9',
+                    border: '1px solid #30363d',
+                    borderRadius: '4px',
+                    padding: '0.1rem 0.6rem',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  Add Note
+                </button>
               </div>
             )}
           </div>
