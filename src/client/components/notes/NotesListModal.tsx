@@ -31,9 +31,9 @@ export function NotesListModal({
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
-    } catch (e) {
-      if (e instanceof Error) {
-        console.error('Failed to copy notes:', e.message);
+    } catch (error: unknown) {
+      if (error instanceof Error) {
+        console.error('Failed to copy notes:', error.message);
       }
     }
   };
@@ -104,14 +104,16 @@ export function NotesListModal({
         >
           {notes.map((note) => {
             const filePath = resolveFilePath(note.target.fileId);
+            const location =
+              note.target.kind === 'line'
+                ? `${filePath}#L${note.target.startNewLineNumber}`
+                : filePath;
             return (
               <div
                 key={note.id}
                 style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}
               >
-                <div style={{ fontSize: '0.8rem', color: '#c9d1d9' }}>
-                  {filePath}#L{note.target.startNewLineNumber}
-                </div>
+                <div style={{ fontSize: '0.8rem', color: '#c9d1d9' }}>{location}</div>
                 <div
                   style={{
                     backgroundColor: '#0d1117',

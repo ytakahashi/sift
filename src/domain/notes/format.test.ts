@@ -10,6 +10,7 @@ describe('formatNotesForClipboard', () => {
       {
         id: 'n1',
         target: {
+          kind: 'line',
           fileId: 'file-1',
           hunkId: 'h1',
           startNewLineNumber: 10,
@@ -21,10 +22,8 @@ describe('formatNotesForClipboard', () => {
       {
         id: 'n2',
         target: {
+          kind: 'file',
           fileId: 'file-2',
-          hunkId: 'h2',
-          startNewLineNumber: 20,
-          endNewLineNumber: 20,
         },
         body: 'Second note',
         createdAt: 2000,
@@ -41,9 +40,7 @@ describe('formatNotesForClipboard', () => {
     const result = formatNotesForClipboard(notes, resolveFilePath);
 
     // Then it matches the expected double-newline joined format
-    expect(result).toBe(
-      '> path/to/file1.txt#L10\nFirst note\n\n> path/to/file2.txt#L20\nSecond note',
-    );
+    expect(result).toBe('> path/to/file1.txt#L10\nFirst note\n\n> path/to/file2.txt\nSecond note');
   });
 
   it('returns empty string if notes are empty', () => {
@@ -65,6 +62,7 @@ describe('formatNoteForClipboard', () => {
     const note: Note = {
       id: 'n1',
       target: {
+        kind: 'line',
         fileId: 'file-1',
         hunkId: 'h1',
         startNewLineNumber: 10,
@@ -80,5 +78,25 @@ describe('formatNoteForClipboard', () => {
 
     // Then
     expect(result).toBe('> path/to/file.ts#L10\nMy note');
+  });
+
+  it('formats a file note without a line number', () => {
+    // Given
+    const note: Note = {
+      id: 'n1',
+      target: {
+        kind: 'file',
+        fileId: 'file-1',
+      },
+      body: 'My file note',
+      createdAt: 1000,
+    };
+    const resolveFilePath = (_fileId: string): string => 'path/to/file.ts';
+
+    // When
+    const result = formatNoteForClipboard(note, resolveFilePath);
+
+    // Then
+    expect(result).toBe('> path/to/file.ts\nMy file note');
   });
 });

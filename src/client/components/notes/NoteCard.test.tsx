@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { Note } from '../../../domain/notes/types';
@@ -7,7 +7,23 @@ import { NoteCard } from './NoteCard';
 function createNote(overrides?: Partial<Note>): Note {
   return {
     id: 'n1',
-    target: { fileId: 'file-1', hunkId: 'h1', startNewLineNumber: 10, endNewLineNumber: 10 },
+    target: {
+      kind: 'line',
+      fileId: 'file-1',
+      hunkId: 'h1',
+      startNewLineNumber: 10,
+      endNewLineNumber: 10,
+    },
+    body: 'original body',
+    createdAt: 1000,
+    ...overrides,
+  };
+}
+
+function createFileNote(overrides?: Partial<Note>): Note {
+  return {
+    id: 'n1',
+    target: { kind: 'file', fileId: 'file-1' },
     body: 'original body',
     createdAt: 1000,
     ...overrides,
@@ -15,10 +31,16 @@ function createNote(overrides?: Partial<Note>): Note {
 }
 
 const resolveFilePath = (_fileId: string): string => 'path/to/file.ts';
+const originalClipboard = navigator.clipboard;
 
 describe('NoteCard', () => {
   afterEach(() => {
     cleanup();
+    Object.defineProperty(navigator, 'clipboard', {
+      value: originalClipboard,
+      writable: true,
+      configurable: true,
+    });
   });
 
   it('shows NoteViewer with note body initially', () => {
@@ -103,5 +125,26 @@ describe('NoteCard', () => {
     // but the card still returns to view mode after the attempted save
     expect(onUpdate).not.toHaveBeenCalled();
     expect(screen.queryByRole('textbox')).toBeNull();
+  });
+
+  it('copies a file note without a line number', async () => {
+    // Given: a file-level note and a mocked clipboard
+    const user = userEvent.setup();
+    const writeText = vi.fn(async () => {});
+    Object.defineProperty(navigator, 'clipboard', {
+      value: { writeText },
+      writable: true,
+      configurable: true,
+    });
+    const note = createFileNote({ body: 'file note body' });
+    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={vi.fn()} />);
+
+    // When: the user clicks Copy
+    await user.click(screen.getByRole('button', { name: 'Copy' }));
+
+    // Then: the copied location contains only the file path
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith('> path/to/file.ts\nfile note body');
+    });
   });
 });

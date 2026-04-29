@@ -15,6 +15,7 @@ import { useRepositories } from './hooks/repositories/useRepositories';
 import { useRepository } from './hooks/repositories/useRepository';
 import { usePaneResize } from './hooks/layout/usePaneResize';
 import { useNotesPanel } from './hooks/notes/useNotesPanel';
+import { useFileNoteEditor } from './hooks/notes/useFileNoteEditor';
 import { useRefreshController } from './hooks/sync/useRefreshController';
 import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
@@ -129,6 +130,7 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
     stagedFiles,
     selectedFileId: selectedFile?.id ?? null,
   });
+  const fileNoteEditor = useFileNoteEditor(selectedFile?.id ?? null);
 
   const {
     appMainRef,
@@ -298,6 +300,20 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
                     Discard
                   </button>
                 )}
+                <button
+                  onClick={fileNoteEditor.open}
+                  style={{
+                    background: 'transparent',
+                    color: '#c9d1d9',
+                    border: '1px solid #30363d',
+                    borderRadius: '4px',
+                    padding: '0.1rem 0.6rem',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                  }}
+                >
+                  Add Note
+                </button>
               </div>
             )}
           </div>
@@ -317,6 +333,8 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}
                 resolveFilePath={notesPanel.resolveFilePath}
+                isFileNoteEditorOpen={fileNoteEditor.isOpen}
+                onCloseFileNoteEditor={fileNoteEditor.close}
               />
             )}
           </div>

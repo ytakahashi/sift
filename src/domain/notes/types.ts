@@ -1,4 +1,5 @@
-export type NoteTarget = {
+export type LineNoteTarget = {
+  kind: 'line';
   /** The file the note belongs to */
   fileId: string;
   /** The hunk the note belongs to (optional, depending on whether we need it for applying patches) */
@@ -7,6 +8,14 @@ export type NoteTarget = {
   startNewLineNumber: number;
   endNewLineNumber: number;
 };
+
+export type FileNoteTarget = {
+  kind: 'file';
+  /** The file the note belongs to */
+  fileId: string;
+};
+
+export type NoteTarget = LineNoteTarget | FileNoteTarget;
 
 export type Note = {
   id: string;

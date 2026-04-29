@@ -6,10 +6,23 @@ function createNote(id: string, fileId: string): Note {
   return {
     id,
     target: {
+      kind: 'line',
       fileId,
       hunkId: `hunk-${id}`,
       startNewLineNumber: 1,
       endNewLineNumber: 1,
+    },
+    body: `note-${id}`,
+    createdAt: 1,
+  };
+}
+
+function createFileNote(id: string, fileId: string): Note {
+  return {
+    id,
+    target: {
+      kind: 'file',
+      fileId,
     },
     body: `note-${id}`,
     createdAt: 1,
@@ -41,5 +54,20 @@ describe('selectNotesForFile', () => {
 
     // Then: only notes that belong to file-a are returned
     expect(result.map((note) => note.id)).toEqual(['n1', 'n3']);
+  });
+
+  it('returns line and file notes for the selected file', () => {
+    // Given: notes contain both target kinds for the same file
+    const notes = [
+      createNote('n1', 'file-a'),
+      createFileNote('n2', 'file-a'),
+      createFileNote('n3', 'file-b'),
+    ];
+
+    // When: notes are selected for file-a
+    const result = selectNotesForFile(notes, 'file-a');
+
+    // Then: both line and file notes for file-a are returned
+    expect(result.map((note) => note.id)).toEqual(['n1', 'n2']);
   });
 });

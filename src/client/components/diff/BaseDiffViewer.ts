@@ -11,4 +11,6 @@ export interface BaseDiffViewerProps {
   onUpdateNote?: (id: string, body: string) => void;
   onDeleteNote?: (id: string) => void;
   resolveFilePath: (fileId: string) => string;
+  isFileNoteEditorOpen?: boolean;
+  onCloseFileNoteEditor?: () => void;
 }

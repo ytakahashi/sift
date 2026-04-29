@@ -15,16 +15,56 @@ export function UnifiedDiffViewer({
   onUpdateNote,
   onDeleteNote,
   resolveFilePath,
+  isFileNoteEditorOpen = false,
+  onCloseFileNoteEditor,
 }: BaseDiffViewerProps): ReactElement {
   const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
   const [activeEditorLine, setActiveEditorLine] = useState<number | null>(null);
+  const fileNotes = notes.filter((note) => note.target.kind === 'file');
+
+  const renderFileNotes = (): ReactElement | null => {
+    if (!isFileNoteEditorOpen && fileNotes.length === 0) {
+      return null;
+    }
+
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
+        {isFileNoteEditorOpen && (
+          <NoteEditor
+            onSave={(val) => {
+              if (val.trim()) {
+                onAddNote?.({ kind: 'file', fileId: file.id }, val);
+              }
+              onCloseFileNoteEditor?.();
+            }}
+            onCancel={() => onCloseFileNoteEditor?.()}
+          />
+        )}
+        {/* Multiple notes may intentionally share the same file target. */}
+        {fileNotes.map((note) => (
+          <NoteCard
+            key={note.id}
+            note={note}
+            resolveFilePath={resolveFilePath}
+            onUpdate={onUpdateNote}
+            onDelete={onDeleteNote}
+          />
+        ))}
+      </div>
+    );
+  };
+
+  const fileNoteContent = renderFileNotes();
 
   if (file.kind !== 'text') {
     return (
-      <div style={{ padding: '2rem', textAlign: 'center', color: '#8b949e' }}>
-        {file.kind === 'binary' || file.kind === 'image'
-          ? 'Binary file changed'
-          : 'Submodule changed'}
+      <div>
+        {fileNoteContent && <div style={{ padding: '0.5rem 1rem 0' }}>{fileNoteContent}</div>}
+        <div style={{ padding: '2rem', textAlign: 'center', color: '#8b949e' }}>
+          {file.kind === 'binary' || file.kind === 'image'
+            ? 'Binary file changed'
+            : 'Submodule changed'}
+        </div>
       </div>
     );
   }
@@ -46,6 +86,13 @@ export function UnifiedDiffViewer({
           <col />
         </colgroup>
         <tbody>
+          {fileNoteContent && (
+            <tr>
+              <td colSpan={4} style={{ padding: '0.5rem 1rem' }}>
+                {fileNoteContent}
+              </td>
+            </tr>
+          )}
           {rows.map((row) => {
             let bgColor = 'transparent';
             if (row.type === 'add') bgColor = 'rgba(63, 185, 80, 0.15)';
@@ -53,9 +100,11 @@ export function UnifiedDiffViewer({
             if (row.type === 'hunk-header') bgColor = 'rgba(56, 139, 253, 0.15)';
 
             const lineNotes =
-              notes?.filter(
+              notes.filter(
                 (n) =>
-                  n.target.startNewLineNumber === row.newLineNumber && row.type !== 'hunk-header',
+                  n.target.kind === 'line' &&
+                  n.target.startNewLineNumber === row.newLineNumber &&
+                  row.type !== 'hunk-header',
               ) || [];
 
             return (
@@ -159,6 +208,7 @@ export function UnifiedDiffViewer({
                           if (val.trim()) {
                             onAddNote?.(
                               {
+                                kind: 'line',
                                 fileId: file.id,
                                 hunkId: row.hunkId,
                                 startNewLineNumber: row.newLineNumber!,
