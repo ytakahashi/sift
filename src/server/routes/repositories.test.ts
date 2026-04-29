@@ -3,13 +3,25 @@ import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createRepositoryRoutes } from './repositories';
 import {
+  RepositoryConfigUpdateError,
+  type RepositoryConfigUpdater,
+} from '../services/repository-config';
+import {
   RepositoryResolutionError,
   type RepositoryResolver,
 } from '../services/repository-resolver';
 
-function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
+function createApp(
+  repositoryResolver: RepositoryResolver,
+  repositoryConfigUpdater: RepositoryConfigUpdater = {
+    addRepository: vi.fn(),
+  },
+): Hono<Env> {
   const app = new Hono<Env>();
-  app.route('/api/repositories', createRepositoryRoutes({ repositoryResolver }));
+  app.route(
+    '/api/repositories',
+    createRepositoryRoutes({ repositoryConfigUpdater, repositoryResolver }),
+  );
   return app;
 }
 
@@ -184,6 +196,128 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(400);
     expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+  });
+
+  it('adds a repository and returns the added item without validation status', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn().mockResolvedValue({
+        id: 'sift',
+        path: '/Users/example/projects/sift',
+      }),
+    };
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveItem: vi.fn().mockResolvedValue({
+        id: 'sift',
+        isValid: true,
+        name: 'sift',
+        path: '/Users/example/projects/sift',
+      }),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories', {
+      body: JSON.stringify({ path: '/Users/example/projects/sift' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(201);
+    expect(mockUpdater.addRepository).toHaveBeenCalledWith('/Users/example/projects/sift');
+    expect(mockResolver.resolveItem).toHaveBeenCalledWith('sift');
+    expect(data).toEqual({
+      repository: {
+        id: 'sift',
+        name: 'sift',
+        path: '/Users/example/projects/sift',
+      },
+    });
+  });
+
+  it('returns 400 when adding a repository without a path', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+    };
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories', {
+      body: JSON.stringify({}),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Repository path is required.' });
+    expect(mockUpdater.addRepository).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when adding a repository with a non-string path', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+    };
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories', {
+      body: JSON.stringify({ path: 123 }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Repository path must be a string.' });
+    expect(mockUpdater.addRepository).not.toHaveBeenCalled();
+  });
+
+  it('returns updater errors with their configured status', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigUpdateError('Repository is already registered: /repo/sift', 409),
+        ),
+    };
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories', {
+      body: JSON.stringify({ path: '/repo/sift' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(409);
+    expect(data).toEqual({ error: 'Repository is already registered: /repo/sift' });
   });
 
   it('marks repositories invalid when their paths cannot be used', async () => {

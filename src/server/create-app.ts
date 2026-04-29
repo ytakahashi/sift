@@ -5,6 +5,7 @@ import { createDiffRoutes } from './routes/diff';
 import { createActionRoutes } from './routes/actions';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
+import type { RepositoryConfigUpdater } from './services/repository-config';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
 import {
   readRepositoryConfig,
@@ -17,12 +18,14 @@ import {
 } from './infrastructure/repository-validator';
 import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
 import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
+import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 
 export type Env = Record<string, never>;
 
 export interface CreateAppOptions {
   repoWatchManager: RepoWatchManager;
   readConfig?: () => Promise<RepositoryConfigReadResult>;
+  repositoryConfigUpdater?: RepositoryConfigUpdater;
   validateRepository?: RepositoryValidator;
 }
 
@@ -31,12 +34,20 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
   const readConfig = options.readConfig ?? readRepositoryConfig;
   const validateRepository = options.validateRepository ?? validateRepositoryPath;
   const resolver = createRepositoryResolver(readConfig, validateRepository);
+  const repositoryConfigUpdater =
+    options.repositoryConfigUpdater ?? createRepositoryConfigUpdater({ validateRepository });
 
   app.use('*', logger());
 
   // Mount API routes
   app.route('/api/health', healthRoutes);
-  app.route('/api/repositories', createRepositoryRoutes({ repositoryResolver: resolver }));
+  app.route(
+    '/api/repositories',
+    createRepositoryRoutes({
+      repositoryConfigUpdater,
+      repositoryResolver: resolver,
+    }),
+  );
   app.route(
     '/api',
     createDiffRoutes({

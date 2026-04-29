@@ -8,6 +8,7 @@ import { fileURLToPath } from 'node:url';
 import { createRepoWatchManager } from './watch/repo-watch-manager';
 import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
 import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
+import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
 interface ServerRuntime {
@@ -62,6 +63,9 @@ function createServerRuntime(): ServerRuntime {
     createApp({
       repoWatchManager,
       readConfig: () => configWatcher.readConfig(),
+      repositoryConfigUpdater: createRepositoryConfigUpdater({
+        invalidateConfig: () => configWatcher.invalidate(),
+      }),
     }),
   );
 

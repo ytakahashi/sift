@@ -1,18 +1,26 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { RepositoryList } from '../../../domain/repository/repository';
-import type { RepositoryReader } from '../../application/ports';
+import type { RepositoryReader, RepositoryWriter } from '../../application/ports';
 
 export interface UseRepositoriesResult {
+  addError: string | null;
+  addRepository: (path: string) => Promise<boolean>;
+  adding: boolean;
   error: string | null;
   loading: boolean;
   repositories: RepositoryList | null;
   refresh: () => Promise<void>;
 }
 
-export function useRepositories(repositoryReader: RepositoryReader): UseRepositoriesResult {
+export function useRepositories(
+  repositoryReader: RepositoryReader,
+  repositoryWriter: RepositoryWriter,
+): UseRepositoriesResult {
   const [repositories, setRepositories] = useState<RepositoryList | null>(null);
   const [loading, setLoading] = useState(true);
+  const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [addError, setAddError] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     setLoading(true);
@@ -27,11 +35,33 @@ export function useRepositories(repositoryReader: RepositoryReader): UseReposito
     }
   }, [repositoryReader]);
 
+  const addRepository = useCallback(
+    async (path: string): Promise<boolean> => {
+      setAdding(true);
+      setAddError(null);
+
+      try {
+        await repositoryWriter.addRepository(path);
+        await refresh();
+        return true;
+      } catch (err: unknown) {
+        setAddError(err instanceof Error ? err.message : String(err));
+        return false;
+      } finally {
+        setAdding(false);
+      }
+    },
+    [refresh, repositoryWriter],
+  );
+
   useEffect(() => {
     void refresh();
   }, [refresh]);
 
   return {
+    addError,
+    addRepository,
+    adding,
     error,
     loading,
     repositories,

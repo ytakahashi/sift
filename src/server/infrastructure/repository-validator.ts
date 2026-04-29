@@ -1,5 +1,5 @@
 import { execFile } from 'node:child_process';
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
 import { promisify } from 'node:util';
 import path from 'node:path';
 import { REPOSITORY_ID_PATTERN } from '../../domain/repository/repository';
@@ -41,7 +41,7 @@ export async function validateRepositoryPath(
         isValid: false,
       };
     }
-  } catch {
+  } catch (_error: unknown) {
     return {
       error: 'Repository path does not exist.',
       isValid: false,
@@ -49,23 +49,42 @@ export async function validateRepositoryPath(
   }
 
   try {
-    const { stdout } = await execFileAsync('git', ['rev-parse', '--is-inside-work-tree'], {
+    const insideWorkTree = await execFileAsync('git', ['rev-parse', '--is-inside-work-tree'], {
       cwd: repository.path,
       encoding: 'utf8',
     });
 
-    if (stdout.trim() === 'true') {
-      return { isValid: true };
+    if (insideWorkTree.stdout.trim() !== 'true') {
+      return {
+        error: 'Repository path is not a Git repository.',
+        isValid: false,
+      };
     }
-  } catch {
+
+    const topLevel = await execFileAsync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: repository.path,
+      encoding: 'utf8',
+    });
+
+    // Compare canonical paths so symlinked repository roots match Git's
+    // canonical top-level path instead of being rejected by string spelling.
+    const [inputPath, repositoryRootPath] = await Promise.all([
+      realpath(repository.path),
+      realpath(topLevel.stdout.trim()),
+    ]);
+
+    if (inputPath !== repositoryRootPath) {
+      return {
+        error: 'Repository path must be the Git repository root.',
+        isValid: false,
+      };
+    }
+
+    return { isValid: true };
+  } catch (_error: unknown) {
     return {
       error: 'Repository path is not a Git repository.',
       isValid: false,
     };
   }
-
-  return {
-    error: 'Repository path is not a Git repository.',
-    isValid: false,
-  };
 }

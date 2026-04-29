@@ -1,8 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { validateRepositoryPath } from './repository-validator';
 
-const { execFileMock, statMock } = vi.hoisted(() => ({
+const { execFileMock, realpathMock, statMock } = vi.hoisted(() => ({
   execFileMock: vi.fn(),
+  realpathMock: vi.fn(),
   statMock: vi.fn(),
 }));
 
@@ -11,6 +12,7 @@ vi.mock('node:child_process', () => ({
 }));
 
 vi.mock('node:fs/promises', () => ({
+  realpath: realpathMock,
   stat: statMock,
 }));
 
@@ -39,6 +41,33 @@ function mockGitResult(stdout: string): void {
   );
 }
 
+function mockGitRoot(inputPath: string, rootPath: string): void {
+  execFileMock.mockImplementation(
+    (
+      _file: string,
+      args: string[],
+      _options: unknown,
+      callback: (error: Error | null, result: { stdout: string; stderr: string }) => void,
+    ) => {
+      if (args[1] === '--is-inside-work-tree') {
+        callback(null, { stderr: '', stdout: 'true\n' });
+        return;
+      }
+
+      callback(null, { stderr: '', stdout: `${rootPath}\n` });
+    },
+  );
+  realpathMock.mockImplementation((targetPath: string) => {
+    if (targetPath === inputPath) {
+      return Promise.resolve(inputPath);
+    }
+    if (targetPath === rootPath) {
+      return Promise.resolve(rootPath);
+    }
+    return Promise.resolve(targetPath);
+  });
+}
+
 function mockGitFailure(): void {
   execFileMock.mockImplementation(
     (
@@ -55,12 +84,13 @@ function mockGitFailure(): void {
 describe('validateRepositoryPath', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    realpathMock.mockImplementation((targetPath: string) => Promise.resolve(targetPath));
   });
 
-  it('returns valid for an existing Git work tree', async () => {
+  it('returns valid for an existing Git repository root', async () => {
     // Given
     mockDirectory();
-    mockGitResult('true\n');
+    mockGitRoot('/repo/sift', '/repo/sift');
 
     // When
     const result = await validateRepositoryPath({ id: 'sift', path: '/repo/sift' });
@@ -70,6 +100,15 @@ describe('validateRepositoryPath', () => {
     expect(execFileMock).toHaveBeenCalledWith(
       'git',
       ['rev-parse', '--is-inside-work-tree'],
+      {
+        cwd: '/repo/sift',
+        encoding: 'utf8',
+      },
+      expect.any(Function),
+    );
+    expect(execFileMock).toHaveBeenCalledWith(
+      'git',
+      ['rev-parse', '--show-toplevel'],
       {
         cwd: '/repo/sift',
         encoding: 'utf8',
@@ -136,6 +175,39 @@ describe('validateRepositoryPath', () => {
       error: 'Repository path is not a Git repository.',
       isValid: false,
     });
+  });
+
+  it('returns invalid when the repository path is not the repository root', async () => {
+    // Given
+    mockDirectory();
+    mockGitRoot('/repo/sift/src', '/repo/sift');
+
+    // When
+    const result = await validateRepositoryPath({ id: 'sift', path: '/repo/sift/src' });
+
+    // Then
+    expect(result).toEqual({
+      error: 'Repository path must be the Git repository root.',
+      isValid: false,
+    });
+  });
+
+  it('accepts a symlinked repository root when canonical paths match', async () => {
+    // Given
+    mockDirectory();
+    mockGitRoot('/link/sift', '/repo/sift');
+    realpathMock.mockImplementation((targetPath: string) => {
+      if (targetPath === '/link/sift' || targetPath === '/repo/sift') {
+        return Promise.resolve('/private/repo/sift');
+      }
+      return Promise.resolve(targetPath);
+    });
+
+    // When
+    const result = await validateRepositoryPath({ id: 'sift', path: '/link/sift' });
+
+    // Then
+    expect(result).toEqual({ isValid: true });
   });
 
   it('returns invalid when the repository id contains invalid characters', async () => {

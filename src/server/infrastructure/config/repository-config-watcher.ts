@@ -19,6 +19,10 @@ export class RepositoryConfigWatcher {
     return this.cachedConfig;
   }
 
+  invalidate(): void {
+    this.cachedConfig = null;
+  }
+
   private startWatching(): void {
     if (this.watcher) {
       return;
@@ -35,7 +39,7 @@ export class RepositoryConfigWatcher {
 
     this.watcher.on('all', () => {
       // Clear cache on any change, addition, or deletion.
-      this.cachedConfig = null;
+      this.invalidate();
     });
   }
 
