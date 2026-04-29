@@ -9,6 +9,7 @@ import { createRepoWatchManager } from './watch/repo-watch-manager';
 import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
 import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
+import { validateRepositoryPath } from './infrastructure/repository-validator';
 import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
 
 interface ServerRuntime {
@@ -56,6 +57,7 @@ function createServerRuntime(): ServerRuntime {
   // createRepoWatcher is passed explicitly; repo-watch-manager no longer imports infra directly.
   const repoWatchManager = createRepoWatchManager({ createWatcher: createRepoWatcher });
   const configWatcher = new RepositoryConfigWatcher();
+  const validateRepository = validateRepositoryPath;
   const app = new Hono<Env>();
 
   app.route(
@@ -63,8 +65,10 @@ function createServerRuntime(): ServerRuntime {
     createApp({
       repoWatchManager,
       readConfig: () => configWatcher.readConfig(),
+      validateRepository,
       repositoryConfigUpdater: createRepositoryConfigUpdater({
         invalidateConfig: () => configWatcher.invalidate(),
+        validateRepository,
       }),
     }),
   );

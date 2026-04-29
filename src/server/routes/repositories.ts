@@ -42,6 +42,10 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
       }
 
       const addedRepository = await updater.addRepository(repositoryPath);
+      // The config has already been written at this point. If resolving the
+      // added id fails, surface the inconsistency instead of trying to roll
+      // back the local config; this should only happen if config readback or
+      // validation behavior diverges after the write.
       const addedItem = await resolver.resolveItem(addedRepository.id);
       const responseRepository: AddedRepositoryItem = {
         id: addedItem.id,

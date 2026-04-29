@@ -265,6 +265,32 @@ describe('repositoryRoutes', () => {
     expect(mockUpdater.addRepository).not.toHaveBeenCalled();
   });
 
+  it('returns 400 when adding a repository with an invalid JSON body', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+    };
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories', {
+      body: 'not-json',
+      headers: { 'Content-Type': 'application/json' },
+      method: 'POST',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Repository request body must be valid JSON.' });
+    expect(mockUpdater.addRepository).not.toHaveBeenCalled();
+  });
+
   it('returns 400 when adding a repository with a non-string path', async () => {
     // Given
     const mockUpdater = {
