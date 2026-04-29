@@ -3,6 +3,7 @@ import type { RepositoryId } from '../domain/repository/repository';
 import { useDiffData } from './hooks/diff/useDiffData';
 import { useNotes } from './hooks/notes/useNotes';
 import { FileList } from './components/file-list/FileList';
+import { PaneBulkActions } from './components/file-list/PaneBulkActions';
 import { UnifiedDiffViewer } from './components/diff/UnifiedDiffViewer';
 import { RepositorySelection } from './components/repository-selection/RepositorySelection';
 import { useWorkspaceActions } from './hooks/workspace-actions/useWorkspaceActions';
@@ -77,7 +78,10 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
   const {
     stageFile,
     unstageFile,
+    stageAllWorkingFiles,
+    unstageAllStagedFiles,
     discardWorkingFile,
+    discardAllWorkingFiles,
     stageHunk,
     unstageHunk,
     acting,
@@ -92,8 +96,20 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
     files: workingFiles,
     stage,
     discard,
-  } = useWorkingPane(serverWorkingFiles, stageFile, discardWorkingFile);
-  const { files: stagedFiles, unstage } = useStagedPane(serverStagedFiles, unstageFile);
+    stageAll,
+    discardAll,
+  } = useWorkingPane(
+    serverWorkingFiles,
+    stageFile,
+    discardWorkingFile,
+    stageAllWorkingFiles,
+    discardAllWorkingFiles,
+  );
+  const {
+    files: stagedFiles,
+    unstage,
+    unstageAll,
+  } = useStagedPane(serverStagedFiles, unstageFile, unstageAllStagedFiles);
   const { selectedFile, paneMode, select, applyActionResult, handleBoundaryNavigate } =
     useFileSelection(workingFiles, stagedFiles);
   const paneFileActions = usePaneFileActions({
@@ -102,6 +118,9 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
     stage,
     unstage,
     discard,
+    stageAll,
+    unstageAll,
+    discardAll,
     applyActionResult,
   });
   const notesPanel = useNotesPanel({
@@ -197,6 +216,21 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
                 />
               )}
             </div>
+            <PaneBulkActions
+              actions={[
+                {
+                  label: 'Stage All',
+                  tone: 'success',
+                  onClick: () => void paneFileActions.stageAllWorkingFiles(),
+                },
+                {
+                  label: 'Discard All',
+                  tone: 'danger',
+                  onClick: () => void paneFileActions.discardAllWorkingFiles(),
+                },
+              ]}
+              disabled={acting || workingFiles.length === 0}
+            />
           </div>
           <div {...paneSplitterProps} />
           <div className="sidebar-panel">
@@ -216,6 +250,16 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
                 />
               )}
             </div>
+            <PaneBulkActions
+              actions={[
+                {
+                  label: 'Unstage All',
+                  tone: 'danger',
+                  onClick: () => void paneFileActions.unstageAllStagedFiles(),
+                },
+              ]}
+              disabled={acting || stagedFiles.length === 0}
+            />
           </div>
         </div>
         <div {...sidebarSplitterProps} />

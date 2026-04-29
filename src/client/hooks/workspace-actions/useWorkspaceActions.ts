@@ -11,7 +11,10 @@ export function useWorkspaceActions(
 ): {
   stageFile: (path: string) => Promise<void>;
   unstageFile: (path: string) => Promise<void>;
+  stageAllWorkingFiles: () => Promise<void>;
+  unstageAllStagedFiles: () => Promise<void>;
   discardWorkingFile: (path: string) => Promise<void>;
+  discardAllWorkingFiles: () => Promise<void>;
   stageHunk: (path: string, hunkId: string) => Promise<void>;
   unstageHunk: (path: string, hunkId: string) => Promise<void>;
   acting: boolean;
@@ -50,8 +53,20 @@ export function useWorkspaceActions(
     (path: string) => performAction(() => workspaceActions.unstageFile(repoId, path)),
     [performAction, repoId, workspaceActions],
   );
+  const stageAllWorkingFiles = useCallback(
+    () => performAction(() => workspaceActions.stageAllWorkingFiles(repoId)),
+    [performAction, repoId, workspaceActions],
+  );
+  const unstageAllStagedFiles = useCallback(
+    () => performAction(() => workspaceActions.unstageAllStagedFiles(repoId)),
+    [performAction, repoId, workspaceActions],
+  );
   const discardWorkingFile = useCallback(
     (path: string) => performAction(() => workspaceActions.discardWorkingFile(repoId, path)),
+    [performAction, repoId, workspaceActions],
+  );
+  const discardAllWorkingFiles = useCallback(
+    () => performAction(() => workspaceActions.discardAllWorkingFiles(repoId)),
     [performAction, repoId, workspaceActions],
   );
   const stageHunk = useCallback(
@@ -68,7 +83,10 @@ export function useWorkspaceActions(
   return {
     stageFile,
     unstageFile,
+    stageAllWorkingFiles,
+    unstageAllStagedFiles,
     discardWorkingFile,
+    discardAllWorkingFiles,
     stageHunk,
     unstageHunk,
     acting,

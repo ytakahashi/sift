@@ -43,4 +43,47 @@ describe('httpWorkspaceActions', () => {
       method: 'POST',
     });
   });
+
+  it('posts bulk actions to repository-scoped endpoints', async () => {
+    // Given
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue({ success: true }),
+      ok: true,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When
+    await httpWorkspaceActions.stageAllWorkingFiles('my-app');
+    await httpWorkspaceActions.unstageAllStagedFiles('my-app');
+    await httpWorkspaceActions.discardAllWorkingFiles('my-app');
+
+    // Then
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      1,
+      '/api/repositories/my-app/actions/stage-all-working-files',
+      {
+        body: JSON.stringify({}),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      },
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      2,
+      '/api/repositories/my-app/actions/unstage-all-staged-files',
+      {
+        body: JSON.stringify({}),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      },
+    );
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      3,
+      '/api/repositories/my-app/actions/discard-all-working-files',
+      {
+        body: JSON.stringify({}),
+        headers: { 'Content-Type': 'application/json' },
+        method: 'POST',
+      },
+    );
+  });
 });

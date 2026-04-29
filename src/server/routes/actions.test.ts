@@ -6,13 +6,19 @@ import { RepositoryResolutionError } from '../services/repository-resolver';
 import type { WorkspaceActionService } from '../services/workspace-action-service';
 
 const discardWorkingFileMock = vi.fn();
+const stageAllWorkingFilesMock = vi.fn();
+const unstageAllStagedFilesMock = vi.fn();
+const discardAllWorkingFilesMock = vi.fn();
 
 const mockService: WorkspaceActionService = {
   stageFile: vi.fn(),
   unstageFile: vi.fn(),
+  stageAllWorkingFiles: stageAllWorkingFilesMock,
+  unstageAllStagedFiles: unstageAllStagedFilesMock,
   stageHunk: vi.fn(),
   unstageHunk: vi.fn(),
   discardWorkingFile: discardWorkingFileMock,
+  discardAllWorkingFiles: discardAllWorkingFilesMock,
 };
 
 function createApp(options: CreateActionRoutesOptions): Hono<Env> {
@@ -107,5 +113,98 @@ describe('actionRoutes discard-working-file', () => {
     // Then
     expect(response.status).toBe(500);
     expect(data).toEqual({ error: 'discard failed' });
+  });
+});
+
+describe('actionRoutes bulk actions', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('runs scoped stage-all-working-files action against the resolved repository', async () => {
+    // Given
+    stageAllWorkingFilesMock.mockResolvedValue(undefined);
+    const mockResolver = {
+      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
+    const app = createApp({ repositoryResolver: mockResolver, createWorkspaceActionService });
+
+    // When
+    const response = await app.request('/api/repositories/my-app/actions/stage-all-working-files', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ success: true });
+    expect(mockResolver.resolve).toHaveBeenCalledWith('my-app');
+    expect(createWorkspaceActionService).toHaveBeenCalledWith('/repo/my-app');
+    expect(stageAllWorkingFilesMock).toHaveBeenCalled();
+  });
+
+  it('runs scoped unstage-all-staged-files action against the resolved repository', async () => {
+    // Given
+    unstageAllStagedFilesMock.mockResolvedValue(undefined);
+    const mockResolver = {
+      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
+
+    // When
+    const response = await app.request(
+      '/api/repositories/my-app/actions/unstage-all-staged-files',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ success: true });
+    expect(unstageAllStagedFilesMock).toHaveBeenCalled();
+  });
+
+  it('runs scoped discard-all-working-files action against the resolved repository', async () => {
+    // Given
+    discardAllWorkingFilesMock.mockResolvedValue(undefined);
+    const mockResolver = {
+      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+      resolveItem: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
+
+    // When
+    const response = await app.request(
+      '/api/repositories/my-app/actions/discard-all-working-files',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({}),
+      },
+    );
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(data).toEqual({ success: true });
+    expect(discardAllWorkingFilesMock).toHaveBeenCalled();
   });
 });

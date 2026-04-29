@@ -21,7 +21,7 @@ describe('useStagedPane', () => {
     const serverFiles = [createFile('s1'), createFile('s2')];
 
     // When: the hook is rendered
-    const { result } = renderHook(() => useStagedPane(serverFiles, vi.fn()));
+    const { result } = renderHook(() => useStagedPane(serverFiles, vi.fn(), vi.fn()));
 
     // Then: the local mirror matches serverFiles
     expect(result.current.files.map((f) => f.id)).toEqual(['s1', 's2']);
@@ -31,7 +31,8 @@ describe('useStagedPane', () => {
     // Given: the hook is rendered with an initial file list
     const unstageFile = vi.fn();
     const { result, rerender } = renderHook(
-      ({ serverFiles }: { serverFiles: DiffFile[] }) => useStagedPane(serverFiles, unstageFile),
+      ({ serverFiles }: { serverFiles: DiffFile[] }) =>
+        useStagedPane(serverFiles, unstageFile, vi.fn()),
       { initialProps: { serverFiles: [createFile('s1')] } },
     );
 
@@ -46,7 +47,7 @@ describe('useStagedPane', () => {
     // Given: three files in the staged area
     const unstageFile = vi.fn().mockResolvedValue(undefined);
     const files = [createFile('s1'), createFile('s2'), createFile('s3')];
-    const { result } = renderHook(() => useStagedPane(files, unstageFile));
+    const { result } = renderHook(() => useStagedPane(files, unstageFile, vi.fn()));
 
     // When: the middle file ('s2') is unstaged
     let actionResult: Awaited<ReturnType<typeof result.current.unstage>>;
@@ -64,7 +65,7 @@ describe('useStagedPane', () => {
     // Given: two files where the last one is unstaged
     const unstageFile = vi.fn().mockResolvedValue(undefined);
     const files = [createFile('s1'), createFile('s2')];
-    const { result } = renderHook(() => useStagedPane(files, unstageFile));
+    const { result } = renderHook(() => useStagedPane(files, unstageFile, vi.fn()));
 
     // When: the last file ('s2') is unstaged
     let actionResult: Awaited<ReturnType<typeof result.current.unstage>>;
@@ -81,7 +82,7 @@ describe('useStagedPane', () => {
     // Given: only one file in the staged area
     const unstageFile = vi.fn().mockResolvedValue(undefined);
     const files = [createFile('s1')];
-    const { result } = renderHook(() => useStagedPane(files, unstageFile));
+    const { result } = renderHook(() => useStagedPane(files, unstageFile, vi.fn()));
 
     // When: the sole file is unstaged
     let actionResult: Awaited<ReturnType<typeof result.current.unstage>>;
@@ -98,7 +99,7 @@ describe('useStagedPane', () => {
     // Given: unstageFile rejects (e.g. network error)
     const unstageFile = vi.fn().mockRejectedValue(new Error('network error'));
     const files = [createFile('s1'), createFile('s2')];
-    const { result } = renderHook(() => useStagedPane(files, unstageFile));
+    const { result } = renderHook(() => useStagedPane(files, unstageFile, vi.fn()));
 
     // When: unstaging 's1' fails
     let actionResult: Awaited<ReturnType<typeof result.current.unstage>>;
@@ -116,7 +117,7 @@ describe('useStagedPane', () => {
     // Given: the file to unstage does not exist in the mirror (race condition)
     const unstageFile = vi.fn();
     const files = [createFile('s1')];
-    const { result } = renderHook(() => useStagedPane(files, unstageFile));
+    const { result } = renderHook(() => useStagedPane(files, unstageFile, vi.fn()));
     const missingFile = createFile('missing');
 
     // When
@@ -128,5 +129,40 @@ describe('useStagedPane', () => {
     // Then: no server call is made and nextSelectedFile is null (empty fallback)
     expect(unstageFile).not.toHaveBeenCalled();
     expect(actionResult!.nextSelectedFile).toBeNull();
+  });
+
+  it('clears the staged file mirror optimistically when all files are unstaged', async () => {
+    // Given: unstageAllStagedFiles resolves
+    const unstageAllStagedFiles = vi.fn().mockResolvedValue(undefined);
+    const files = [createFile('s1'), createFile('s2')];
+    const { result } = renderHook(() => useStagedPane(files, vi.fn(), unstageAllStagedFiles));
+
+    // When: all files are unstaged
+    let actionResult: Awaited<ReturnType<typeof result.current.unstageAll>>;
+    await act(async () => {
+      actionResult = await result.current.unstageAll(files[0]);
+    });
+
+    // Then: the pane is cleared and selection is cleared
+    expect(result.current.files).toEqual([]);
+    expect(actionResult!.nextSelectedFile).toBeNull();
+    expect(unstageAllStagedFiles).toHaveBeenCalled();
+  });
+
+  it('rolls back and returns previous selection when unstaging all fails', async () => {
+    // Given: unstageAllStagedFiles rejects
+    const unstageAllStagedFiles = vi.fn().mockRejectedValue(new Error('network error'));
+    const files = [createFile('s1'), createFile('s2')];
+    const { result } = renderHook(() => useStagedPane(files, vi.fn(), unstageAllStagedFiles));
+
+    // When: unstaging all fails
+    let actionResult: Awaited<ReturnType<typeof result.current.unstageAll>>;
+    await act(async () => {
+      actionResult = await result.current.unstageAll(files[1]);
+    });
+
+    // Then: the pane is restored and previous selection is preserved
+    expect(result.current.files.map((f) => f.id)).toEqual(['s1', 's2']);
+    expect(actionResult!.nextSelectedFile?.id).toBe('s2');
   });
 });
