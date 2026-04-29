@@ -104,6 +104,10 @@ Disallowed dependencies:
     Cross-feature hook composition belongs in `App.tsx` or a top-level composition hook.
 - `components/<name>/` contains React UI components and component-local interaction logic.
   - A component directory may import from itself, `application/`, `presentation/`, and `domain/`.
+  - It may import reusable UI components from another `components/<name>/` directory when the
+    imported component is presentation-focused and does not pull in hooks, composition,
+    infrastructure, or feature-specific state. For example, a diff component may reuse note UI
+    components.
   - It must not import from `infrastructure/`, `composition/`, or non-colocated `hooks/`.
   - Hooks used only by a component may be colocated inside that component directory.
 

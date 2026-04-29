@@ -22,8 +22,17 @@ vi.mock('./hooks/workspace-actions/useWorkspaceActions', () => ({
 }));
 
 vi.mock('./components/diff/UnifiedDiffViewer', () => ({
-  UnifiedDiffViewer: ({ file }: { file: DiffFile }) => (
-    <div data-testid="diff-viewer">{file.displayPath}</div>
+  UnifiedDiffViewer: ({
+    file,
+    isFileNoteEditorOpen,
+  }: {
+    file: DiffFile;
+    isFileNoteEditorOpen?: boolean;
+  }) => (
+    <div data-testid="diff-viewer">
+      {file.displayPath}
+      {isFileNoteEditorOpen && <span>file note editor open</span>}
+    </div>
   ),
 }));
 
@@ -255,6 +264,34 @@ describe('App file list interactions', () => {
 
     // Then: Discard is hidden
     expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
+  });
+
+  it('opens the file note editor from the selected file header action', async () => {
+    // Given: a working file is selected
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
+
+    // When: Add Note is clicked in the diff header
+    await user.click(screen.getByRole('button', { name: 'Add Note' }));
+
+    // Then: the diff viewer receives the open file note editor state
+    expect(screen.getByText('file note editor open')).toBeDefined();
+  });
+
+  it('closes the file note editor when the selected file changes', async () => {
+    // Given: the file note editor is open for one selected file
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
+    await user.click(screen.getByRole('button', { name: 'Add Note' }));
+    expect(screen.getByText('file note editor open')).toBeDefined();
+
+    // When: another file is selected
+    await user.click(screen.getByRole('option', { name: 'c.tsM' }));
+
+    // Then: the open state is reset
+    expect(screen.queryByText('file note editor open')).toBeNull();
   });
 
   it('calls discardWorkingFile when Discard is clicked from working pane', async () => {
@@ -564,7 +601,13 @@ describe('App Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          target: {
+            kind: 'line',
+            fileId: 'f1',
+            hunkId: 'h1',
+            startNewLineNumber: 1,
+            endNewLineNumber: 1,
+          },
           body: 'hello',
           createdAt: 100,
         },
@@ -588,7 +631,13 @@ describe('App Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          target: {
+            kind: 'line',
+            fileId: 'f1',
+            hunkId: 'h1',
+            startNewLineNumber: 1,
+            endNewLineNumber: 1,
+          },
           body: 'hello note',
           createdAt: 100,
         },
@@ -625,7 +674,13 @@ describe('App Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 1, endNewLineNumber: 1 },
+          target: {
+            kind: 'line',
+            fileId: 'f1',
+            hunkId: 'h1',
+            startNewLineNumber: 1,
+            endNewLineNumber: 1,
+          },
           body: 'hello note',
           createdAt: 100,
         },
@@ -667,7 +722,13 @@ describe('App Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: { fileId: 'f1', hunkId: 'h1', startNewLineNumber: 10, endNewLineNumber: 10 },
+          target: {
+            kind: 'line',
+            fileId: 'f1',
+            hunkId: 'h1',
+            startNewLineNumber: 10,
+            endNewLineNumber: 10,
+          },
           body: 'hello clipboard',
           createdAt: 100,
         },
