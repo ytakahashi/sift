@@ -19,6 +19,10 @@ export interface RepositoryReader {
   fetchRepository(repoId: RepositoryId): Promise<RepositoryListItem>;
 }
 
+export interface RepositoryWriter {
+  addRepository(path: string): Promise<void>;
+}
+
 export interface WorkspaceActions {
   stageFile(repoId: RepositoryId, path: string): Promise<void>;
   unstageFile(repoId: RepositoryId, path: string): Promise<void>;

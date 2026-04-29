@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useState, type FormEvent, type ReactElement } from 'react';
 import type {
   RepositoryId,
   RepositoryList,
@@ -6,8 +6,11 @@ import type {
 } from '../../../domain/repository/repository';
 
 export interface RepositorySelectionProps {
+  addError: string | null;
+  adding: boolean;
   error: string | null;
   loading: boolean;
+  onAddRepository: (path: string) => Promise<boolean>;
   onRefresh: () => void;
   onSelectRepository: (repoId: RepositoryId) => void;
   repositories: RepositoryList | null;
@@ -56,14 +59,34 @@ function RepositoryRow({
 }
 
 export function RepositorySelection({
+  addError,
+  adding,
   error,
   loading,
+  onAddRepository,
   onRefresh,
   onSelectRepository,
   repositories,
 }: RepositorySelectionProps): ReactElement {
+  const [isAddingRepository, setIsAddingRepository] = useState(false);
+  const [repositoryPath, setRepositoryPath] = useState('');
   const configMessage = getConfigMessage(repositories);
   const items = repositories?.repositories ?? [];
+  const trimmedRepositoryPath = repositoryPath.trim();
+  const canSubmitRepository = trimmedRepositoryPath.length > 0 && !adding;
+
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
+    event.preventDefault();
+    if (!canSubmitRepository) {
+      return;
+    }
+
+    const added = await onAddRepository(trimmedRepositoryPath);
+    if (added) {
+      setRepositoryPath('');
+      setIsAddingRepository(false);
+    }
+  };
 
   return (
     <div className="app-container">
@@ -104,6 +127,45 @@ export function RepositorySelection({
               {loading ? 'Loading repositories...' : 'No repositories available.'}
             </div>
           )}
+          <div className="repository-add">
+            {isAddingRepository ? (
+              <form className="repository-add-form" onSubmit={(event) => void handleSubmit(event)}>
+                <input
+                  aria-label="Repository path"
+                  className="repository-add-input"
+                  disabled={adding}
+                  onChange={(event) => setRepositoryPath(event.target.value)}
+                  placeholder="/Users/example/work/sift"
+                  type="text"
+                  value={repositoryPath}
+                />
+                <button className="secondary-button" disabled={!canSubmitRepository} type="submit">
+                  {adding ? 'Adding...' : 'OK'}
+                </button>
+                <button
+                  className="secondary-button"
+                  disabled={adding}
+                  onClick={() => {
+                    setRepositoryPath('');
+                    setIsAddingRepository(false);
+                  }}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                {addError && <div className="repository-add-error">{addError}</div>}
+              </form>
+            ) : (
+              <button
+                className="secondary-button"
+                disabled={loading}
+                onClick={() => setIsAddingRepository(true)}
+                type="button"
+              >
+                Add Repository
+              </button>
+            )}
+          </div>
         </section>
       </main>
     </div>

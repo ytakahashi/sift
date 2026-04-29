@@ -73,6 +73,9 @@ const testDependencies: AppDependencies = {
       path: `/Users/dev/projects/${repoId}`,
     })),
   },
+  repositoryWriter: {
+    addRepository: vi.fn(async () => {}),
+  },
   workspaceActions: {
     stageFile: vi.fn(async () => {}),
     unstageFile: vi.fn(async () => {}),

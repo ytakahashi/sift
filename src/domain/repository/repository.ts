@@ -30,3 +30,9 @@ export interface RepositoryDescriptor {
   id: RepositoryId;
   path: string;
 }
+
+export interface AddedRepositoryItem {
+  id: RepositoryId;
+  name: string;
+  path: string;
+}

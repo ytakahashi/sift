@@ -105,6 +105,26 @@ describe('RepositoryConfigWatcher', () => {
     expect(readRepositoryConfig).toHaveBeenCalledTimes(2);
   });
 
+  it('clears the cache when explicitly invalidated', async () => {
+    // Given
+    const mockResult1 = { status: 'missing' } as unknown as RepositoryConfigReadResult;
+    const mockResult2 = { status: 'found' } as unknown as RepositoryConfigReadResult;
+    vi.mocked(readRepositoryConfig)
+      .mockResolvedValueOnce(mockResult1)
+      .mockResolvedValueOnce(mockResult2);
+
+    const watcher = new RepositoryConfigWatcher('test.json');
+    await watcher.readConfig();
+
+    // When
+    watcher.invalidate();
+    const result2 = await watcher.readConfig();
+
+    // Then
+    expect(result2).toBe(mockResult2);
+    expect(readRepositoryConfig).toHaveBeenCalledTimes(2);
+  });
+
   it('stops the watcher', async () => {
     // Given
     vi.mocked(readRepositoryConfig).mockResolvedValueOnce(
