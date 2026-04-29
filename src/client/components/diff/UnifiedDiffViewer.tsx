@@ -100,7 +100,7 @@ export function UnifiedDiffViewer({
             if (row.type === 'hunk-header') bgColor = 'rgba(56, 139, 253, 0.15)';
 
             const lineNotes =
-              notes?.filter(
+              notes.filter(
                 (n) =>
                   n.target.kind === 'line' &&
                   n.target.startNewLineNumber === row.newLineNumber &&
