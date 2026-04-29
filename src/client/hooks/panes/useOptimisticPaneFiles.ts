@@ -16,6 +16,10 @@ interface UseOptimisticPaneFilesResult {
     file: DiffFile,
     serverCall: (filePath: string) => Promise<void>,
   ) => Promise<FileActionResult>;
+  runRemoveAllAction: (
+    previouslySelectedFile: DiffFile | null,
+    serverCall: () => Promise<void>,
+  ) => Promise<FileActionResult>;
 }
 
 export function useOptimisticPaneFiles(serverFiles: DiffFile[]): UseOptimisticPaneFilesResult {
@@ -62,5 +66,27 @@ export function useOptimisticPaneFiles(serverFiles: DiffFile[]): UseOptimisticPa
     [files],
   );
 
-  return { files, runRemoveAction };
+  const runRemoveAllAction = useCallback(
+    async (
+      previouslySelectedFile: DiffFile | null,
+      serverCall: () => Promise<void>,
+    ): Promise<FileActionResult> => {
+      const succeeded = await runOptimisticPaneAction(
+        () => files,
+        () => setFiles([]),
+        serverCall,
+        (snapshot) => setFiles(snapshot),
+      );
+
+      return {
+        // Success: the pane has been cleared, so clear selection in that pane.
+        // Failure: the mirror has been rolled back, so keep the previous
+        // selection pointing at an item that still exists.
+        nextSelectedFile: succeeded ? null : previouslySelectedFile,
+      };
+    },
+    [files],
+  );
+
+  return { files, runRemoveAction, runRemoveAllAction };
 }

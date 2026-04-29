@@ -22,7 +22,10 @@ export interface RepositoryReader {
 export interface WorkspaceActions {
   stageFile(repoId: RepositoryId, path: string): Promise<void>;
   unstageFile(repoId: RepositoryId, path: string): Promise<void>;
+  stageAllWorkingFiles(repoId: RepositoryId): Promise<void>;
+  unstageAllStagedFiles(repoId: RepositoryId): Promise<void>;
   discardWorkingFile(repoId: RepositoryId, path: string): Promise<void>;
+  discardAllWorkingFiles(repoId: RepositoryId): Promise<void>;
   stageHunk(repoId: RepositoryId, path: string, hunkId: string): Promise<void>;
   unstageHunk(repoId: RepositoryId, path: string, hunkId: string): Promise<void>;
 }

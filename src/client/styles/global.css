@@ -172,6 +172,39 @@ body {
   font-size: 0.85rem;
 }
 
+.pane-footer {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+  padding: 0.55rem 0.6rem;
+  background-color: var(--pane-bg);
+  border-top: 1px solid var(--border-color);
+}
+
+.bulk-action-button {
+  min-width: 7rem;
+  border: 1px solid rgba(240, 246, 252, 0.1);
+  border-radius: 4px;
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.8rem;
+  line-height: 1;
+  padding: 0.45rem 0.65rem;
+}
+
+.bulk-action-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.bulk-action-button-success {
+  background: #238636;
+}
+
+.bulk-action-button-danger {
+  background: #f85149;
+}
+
 .file-list:focus-visible {
   outline: 1px solid rgba(201, 50, 69, 0.45);
   outline-offset: -2px;

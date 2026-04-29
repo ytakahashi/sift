@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { RenderHookResult } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { PaneMode } from './useFileSelection';
 import { usePaneFileActions } from './usePaneFileActions';
@@ -28,11 +28,17 @@ function renderPaneFileActions({
   stage: ReturnType<typeof vi.fn>;
   unstage: ReturnType<typeof vi.fn>;
   discard: ReturnType<typeof vi.fn>;
+  stageAll: ReturnType<typeof vi.fn>;
+  unstageAll: ReturnType<typeof vi.fn>;
+  discardAll: ReturnType<typeof vi.fn>;
   applyActionResult: ReturnType<typeof vi.fn>;
 } {
   const stage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
   const unstage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
   const discard = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
+  const stageAll = vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
+  const unstageAll = vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
+  const discardAll = vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
   const applyActionResult = vi.fn();
 
   const hook = renderHook(() =>
@@ -42,6 +48,9 @@ function renderPaneFileActions({
       stage,
       unstage,
       discard,
+      stageAll,
+      unstageAll,
+      discardAll,
       applyActionResult,
     }),
   );
@@ -51,11 +60,18 @@ function renderPaneFileActions({
     stage,
     unstage,
     discard,
+    stageAll,
+    unstageAll,
+    discardAll,
     applyActionResult,
   };
 }
 
 describe('usePaneFileActions', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
   it('stages a working file and applies the result to the working pane', async () => {
     // Given: a working file action hook
     const file = createFile('a', 'working');
@@ -161,5 +177,118 @@ describe('usePaneFileActions', () => {
     // Then: no pane action is dispatched
     expect(stage).not.toHaveBeenCalled();
     expect(unstage).not.toHaveBeenCalled();
+  });
+
+  it('stages all working files and applies the result to the working pane', async () => {
+    // Given: a selected working file
+    const file = createFile('a', 'working');
+    const { result, stageAll, applyActionResult } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'working',
+    });
+
+    // When: all working files are staged
+    await act(async () => {
+      await result.current.stageAllWorkingFiles();
+    });
+
+    // Then: previous selection is passed through for failure rollback support
+    expect(stageAll).toHaveBeenCalledWith(file);
+    expect(applyActionResult).toHaveBeenCalledWith({ nextSelectedFile: file }, 'working');
+  });
+
+  it('does not clear staged selection when staging all working files from the inactive pane', async () => {
+    // Given: the selected file belongs to the staged pane
+    const file = createFile('s', 'staged');
+    const { result, stageAll, applyActionResult } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'staged',
+    });
+
+    // When: all working files are staged
+    await act(async () => {
+      await result.current.stageAllWorkingFiles();
+    });
+
+    // Then: the action runs without applying a working-pane selection change
+    expect(stageAll).toHaveBeenCalledWith(null);
+    expect(applyActionResult).not.toHaveBeenCalled();
+  });
+
+  it('unstages all staged files and applies the result to the staged pane', async () => {
+    // Given: a selected staged file
+    const file = createFile('s', 'staged');
+    const { result, unstageAll, applyActionResult } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'staged',
+    });
+
+    // When: all staged files are unstaged
+    await act(async () => {
+      await result.current.unstageAllStagedFiles();
+    });
+
+    // Then: previous selection is passed through for failure rollback support
+    expect(unstageAll).toHaveBeenCalledWith(file);
+    expect(applyActionResult).toHaveBeenCalledWith({ nextSelectedFile: file }, 'staged');
+  });
+
+  it('does not clear working selection when unstaging all staged files from the inactive pane', async () => {
+    // Given: the selected file belongs to the working pane
+    const file = createFile('a', 'working');
+    const { result, unstageAll, applyActionResult } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'working',
+    });
+
+    // When: all staged files are unstaged
+    await act(async () => {
+      await result.current.unstageAllStagedFiles();
+    });
+
+    // Then: the action runs without applying a staged-pane selection change
+    expect(unstageAll).toHaveBeenCalledWith(null);
+    expect(applyActionResult).not.toHaveBeenCalled();
+  });
+
+  it('asks for confirmation before discarding all working files', async () => {
+    // Given: confirmation is accepted
+    const confirmMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('confirm', confirmMock);
+    const file = createFile('a', 'working');
+    const { result, discardAll } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'working',
+    });
+
+    // When: all working files are discarded
+    await act(async () => {
+      await result.current.discardAllWorkingFiles();
+    });
+
+    // Then
+    expect(confirmMock).toHaveBeenCalledWith('Discard all working directory changes?');
+    expect(discardAll).toHaveBeenCalledWith(file);
+    vi.unstubAllGlobals();
+  });
+
+  it('does not discard all working files when confirmation is cancelled', async () => {
+    // Given: confirmation is cancelled
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+    const file = createFile('a', 'working');
+    const { result, discardAll, applyActionResult } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'working',
+    });
+
+    // When: all working files are discarded
+    await act(async () => {
+      await result.current.discardAllWorkingFiles();
+    });
+
+    // Then
+    expect(discardAll).not.toHaveBeenCalled();
+    expect(applyActionResult).not.toHaveBeenCalled();
+    vi.unstubAllGlobals();
   });
 });

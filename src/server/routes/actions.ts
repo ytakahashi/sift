@@ -57,12 +57,32 @@ function registerActionRoutes(
     ),
   );
 
+  routes.post(`${basePath}/stage-all-working-files`, (c) =>
+    handleAction(
+      c,
+      () => createService(c),
+      async (service, _body) => {
+        await service.stageAllWorkingFiles();
+      },
+    ),
+  );
+
   routes.post(`${basePath}/unstage-file`, (c) =>
     handleAction(
       c,
       () => createService(c),
       async (service, body) => {
         await service.unstageFile(getPath(body));
+      },
+    ),
+  );
+
+  routes.post(`${basePath}/unstage-all-staged-files`, (c) =>
+    handleAction(
+      c,
+      () => createService(c),
+      async (service, _body) => {
+        await service.unstageAllStagedFiles();
       },
     ),
   );
@@ -93,6 +113,16 @@ function registerActionRoutes(
       () => createService(c),
       async (service, body) => {
         await service.discardWorkingFile(getPath(body));
+      },
+    ),
+  );
+
+  routes.post(`${basePath}/discard-all-working-files`, (c) =>
+    handleAction(
+      c,
+      () => createService(c),
+      async (service, _body) => {
+        await service.discardAllWorkingFiles();
       },
     ),
   );

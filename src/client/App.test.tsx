@@ -67,7 +67,10 @@ const testDependencies: AppDependencies = {
   workspaceActions: {
     stageFile: vi.fn(async () => {}),
     unstageFile: vi.fn(async () => {}),
+    stageAllWorkingFiles: vi.fn(async () => {}),
+    unstageAllStagedFiles: vi.fn(async () => {}),
     discardWorkingFile: vi.fn(async () => {}),
+    discardAllWorkingFiles: vi.fn(async () => {}),
     stageHunk: vi.fn(async () => {}),
     unstageHunk: vi.fn(async () => {}),
   },
@@ -85,7 +88,10 @@ describe('App file list interactions', () => {
   const clearNotes = vi.fn();
   const stageFile = vi.fn(async () => {});
   const unstageFile = vi.fn(async () => {});
+  const stageAllWorkingFiles = vi.fn(async () => {});
+  const unstageAllStagedFiles = vi.fn(async () => {});
   const discardWorkingFile = vi.fn(async () => {});
+  const discardAllWorkingFiles = vi.fn(async () => {});
   let diffState: {
     workingFiles: DiffFile[];
     stagedFiles: DiffFile[];
@@ -122,7 +128,10 @@ describe('App file list interactions', () => {
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile,
       unstageFile,
+      stageAllWorkingFiles,
+      unstageAllStagedFiles,
       discardWorkingFile,
+      discardAllWorkingFiles,
       stageHunk: vi.fn(),
       unstageHunk: vi.fn(),
       acting: false,
@@ -132,6 +141,7 @@ describe('App file list interactions', () => {
 
   afterEach(() => {
     cleanup();
+    vi.unstubAllGlobals();
     window.history.pushState(null, '', '/');
   });
 
@@ -258,6 +268,88 @@ describe('App file list interactions', () => {
 
     // Then: discard action is sent for selected path
     expect(discardWorkingFile).toHaveBeenCalledWith('b.ts');
+  });
+
+  it('renders pane footer bulk action buttons', () => {
+    // Given: app is rendered with working and staged files
+    render(<App />);
+
+    // When / Then
+    expect(screen.getByRole('button', { name: 'Stage All' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Discard All' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Unstage All' })).toBeDefined();
+  });
+
+  it('calls stageAllWorkingFiles when Stage All is clicked', async () => {
+    // Given: app is rendered with working files
+    const user = userEvent.setup();
+    render(<App />);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Stage All' }));
+
+    // Then
+    expect(stageAllWorkingFiles).toHaveBeenCalled();
+  });
+
+  it('calls unstageAllStagedFiles when Unstage All is clicked', async () => {
+    // Given: app is rendered with staged files
+    const user = userEvent.setup();
+    render(<App />);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Unstage All' }));
+
+    // Then
+    expect(unstageAllStagedFiles).toHaveBeenCalled();
+  });
+
+  it('asks for confirmation before discarding all working files', async () => {
+    // Given: confirmation is accepted
+    const user = userEvent.setup();
+    const confirmMock = vi.fn().mockReturnValue(true);
+    vi.stubGlobal('confirm', confirmMock);
+    render(<App />);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Discard All' }));
+
+    // Then
+    expect(confirmMock).toHaveBeenCalledWith('Discard all working directory changes?');
+    expect(discardAllWorkingFiles).toHaveBeenCalled();
+  });
+
+  it('does not discard all working files when confirmation is cancelled', async () => {
+    // Given: confirmation is cancelled
+    const user = userEvent.setup();
+    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+    render(<App />);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Discard All' }));
+
+    // Then
+    expect(discardAllWorkingFiles).not.toHaveBeenCalled();
+  });
+
+  it('disables pane footer bulk action buttons when their panes are empty', () => {
+    // Given: the server reports no changed files
+    diffState.workingFiles = [];
+    diffState.stagedFiles = [];
+
+    // When
+    render(<App />);
+
+    // Then
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Stage All' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Discard All' }).disabled).toBe(
+      true,
+    );
+    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Unstage All' }).disabled).toBe(
+      true,
+    );
   });
 
   it('moves from the last working file to the first staged file with ArrowDown', async () => {
@@ -395,7 +487,10 @@ describe('App Notes Interactions', () => {
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile: vi.fn(),
       unstageFile: vi.fn(),
+      stageAllWorkingFiles: vi.fn(),
+      unstageAllStagedFiles: vi.fn(),
       discardWorkingFile: vi.fn(),
+      discardAllWorkingFiles: vi.fn(),
       stageHunk: vi.fn(),
       unstageHunk: vi.fn(),
       acting: false,

@@ -18,6 +18,7 @@ function createWorkingFile(path: string, status: DiffFile['status'], oldPath?: s
 describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
   let service: WorkspaceActionServiceImpl;
   let gitMock: {
+    runGitCommand: ReturnType<typeof vi.fn>;
     cleanPath: ReturnType<typeof vi.fn>;
     restoreWorktree: ReturnType<typeof vi.fn>;
   };
@@ -28,6 +29,7 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
   beforeEach(() => {
     service = new WorkspaceActionServiceImpl('/repo/root');
     gitMock = {
+      runGitCommand: vi.fn().mockResolvedValue(''),
       cleanPath: vi.fn().mockResolvedValue(undefined),
       restoreWorktree: vi.fn().mockResolvedValue(undefined),
     };
@@ -130,5 +132,152 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     await expect(service.discardWorkingFile('../outside.txt')).rejects.toThrow(
       'Path traversal detected',
     );
+  });
+});
+
+describe('WorkspaceActionServiceImpl bulk actions', () => {
+  let service: WorkspaceActionServiceImpl;
+  let gitMock: {
+    runGitCommand: ReturnType<typeof vi.fn>;
+    restoreWorktree: ReturnType<typeof vi.fn>;
+  };
+  let providerMock: {
+    getFiles: ReturnType<typeof vi.fn>;
+  };
+
+  beforeEach(() => {
+    service = new WorkspaceActionServiceImpl('/repo/root');
+    gitMock = {
+      runGitCommand: vi.fn().mockResolvedValue(''),
+      restoreWorktree: vi.fn().mockResolvedValue(undefined),
+    };
+    providerMock = {
+      getFiles: vi.fn(),
+    };
+    (service as unknown as { git: typeof gitMock; provider: typeof providerMock }).git = gitMock;
+    (service as unknown as { provider: typeof providerMock }).provider = providerMock;
+  });
+
+  it('stages all working files including both paths for renamed files', async () => {
+    // Given: working files include regular, untracked, and renamed changes
+    providerMock.getFiles.mockResolvedValue([
+      createWorkingFile('a.ts', 'modified'),
+      createWorkingFile('new.ts', 'untracked'),
+      createWorkingFile('renamed.ts', 'renamed', 'old.ts'),
+    ]);
+
+    // When
+    await service.stageAllWorkingFiles();
+
+    // Then
+    expect(providerMock.getFiles).toHaveBeenCalledWith('working');
+    expect(gitMock.runGitCommand).toHaveBeenCalledWith([
+      'add',
+      '-A',
+      '--',
+      '/repo/root/a.ts',
+      '/repo/root/new.ts',
+      '/repo/root/old.ts',
+      '/repo/root/renamed.ts',
+    ]);
+  });
+
+  it('does not run git when staging all working files with an empty pane', async () => {
+    // Given: no working files are present
+    providerMock.getFiles.mockResolvedValue([]);
+
+    // When
+    await service.stageAllWorkingFiles();
+
+    // Then
+    expect(gitMock.runGitCommand).not.toHaveBeenCalled();
+  });
+
+  it('unstages all staged files through HEAD when it exists', async () => {
+    // Given: staged files exist and HEAD can be resolved
+    providerMock.getFiles.mockResolvedValue([createWorkingFile('a.ts', 'modified')]);
+
+    // When
+    await service.unstageAllStagedFiles();
+
+    // Then
+    expect(providerMock.getFiles).toHaveBeenCalledWith('staged');
+    expect(gitMock.runGitCommand).toHaveBeenNthCalledWith(1, ['rev-parse', 'HEAD']);
+    expect(gitMock.runGitCommand).toHaveBeenNthCalledWith(2, [
+      'reset',
+      'HEAD',
+      '--',
+      '/repo/root/a.ts',
+    ]);
+  });
+
+  it('falls back to removing cached files when unstaging all without HEAD', async () => {
+    // Given: the repository is on an initial commit with no HEAD
+    providerMock.getFiles.mockResolvedValue([createWorkingFile('new.ts', 'added')]);
+    gitMock.runGitCommand.mockRejectedValueOnce(new Error('no HEAD')).mockResolvedValueOnce('');
+
+    // When
+    await service.unstageAllStagedFiles();
+
+    // Then
+    expect(gitMock.runGitCommand).toHaveBeenNthCalledWith(2, [
+      'rm',
+      '--cached',
+      '-f',
+      '--',
+      '/repo/root/new.ts',
+    ]);
+  });
+
+  it('cleans untracked files and restores tracked files when discarding all', async () => {
+    // Given: working files include untracked, modified, deleted, binary, and renamed changes
+    providerMock.getFiles.mockResolvedValue([
+      createWorkingFile('new.ts', 'untracked'),
+      createWorkingFile('a.ts', 'modified'),
+      createWorkingFile('deleted.ts', 'deleted'),
+      createWorkingFile('image.png', 'binary'),
+      createWorkingFile('renamed.ts', 'renamed', 'old.ts'),
+    ]);
+
+    // When
+    await service.discardAllWorkingFiles();
+
+    // Then
+    expect(gitMock.runGitCommand).toHaveBeenCalledWith(['clean', '-f', '--', '/repo/root/new.ts']);
+    expect(gitMock.restoreWorktree).toHaveBeenCalledWith([
+      '/repo/root/a.ts',
+      '/repo/root/deleted.ts',
+      '/repo/root/image.png',
+      '/repo/root/old.ts',
+      '/repo/root/renamed.ts',
+    ]);
+  });
+
+  it('rejects submodule changes before discarding all', async () => {
+    // Given: the working pane includes a submodule change
+    providerMock.getFiles.mockResolvedValue([
+      createWorkingFile('new.ts', 'untracked'),
+      createWorkingFile('submodule', 'submodule'),
+    ]);
+
+    // When / Then
+    await expect(service.discardAllWorkingFiles()).rejects.toThrow(
+      'Discard is not supported for submodule changes',
+    );
+    expect(gitMock.runGitCommand).not.toHaveBeenCalled();
+    expect(gitMock.restoreWorktree).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsafe traversal paths before discarding all', async () => {
+    // Given: one working file path escapes the repository root
+    providerMock.getFiles.mockResolvedValue([
+      createWorkingFile('new.ts', 'untracked'),
+      createWorkingFile('../outside.txt', 'modified'),
+    ]);
+
+    // When / Then
+    await expect(service.discardAllWorkingFiles()).rejects.toThrow('Path traversal detected');
+    expect(gitMock.runGitCommand).not.toHaveBeenCalled();
+    expect(gitMock.restoreWorktree).not.toHaveBeenCalled();
   });
 });

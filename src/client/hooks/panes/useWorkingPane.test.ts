@@ -21,7 +21,9 @@ describe('useWorkingPane', () => {
     const serverFiles = [createFile('a'), createFile('b')];
 
     // When: the hook is rendered
-    const { result } = renderHook(() => useWorkingPane(serverFiles, vi.fn(), vi.fn()));
+    const { result } = renderHook(() =>
+      useWorkingPane(serverFiles, vi.fn(), vi.fn(), vi.fn(), vi.fn()),
+    );
 
     // Then: the local mirror matches serverFiles
     expect(result.current.files.map((f) => f.id)).toEqual(['a', 'b']);
@@ -33,7 +35,7 @@ describe('useWorkingPane', () => {
     const discardWorkingFile = vi.fn();
     const { result, rerender } = renderHook(
       ({ serverFiles }: { serverFiles: DiffFile[] }) =>
-        useWorkingPane(serverFiles, stageFile, discardWorkingFile),
+        useWorkingPane(serverFiles, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
       { initialProps: { serverFiles: [createFile('a')] } },
     );
 
@@ -49,7 +51,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn().mockResolvedValue(undefined);
     const discardWorkingFile = vi.fn();
     const files = [createFile('a'), createFile('b'), createFile('c')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
 
     // When: the middle file ('b') is staged
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -68,7 +72,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn().mockResolvedValue(undefined);
     const discardWorkingFile = vi.fn();
     const files = [createFile('a'), createFile('b')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
 
     // When: the last file ('b') is staged
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -86,7 +92,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn().mockResolvedValue(undefined);
     const discardWorkingFile = vi.fn();
     const files = [createFile('a')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
 
     // When: the sole file is staged
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -104,7 +112,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn().mockRejectedValue(new Error('network error'));
     const discardWorkingFile = vi.fn();
     const files = [createFile('a'), createFile('b')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
 
     // When: staging 'a' fails
     let actionResult: Awaited<ReturnType<typeof result.current.stage>>;
@@ -123,7 +133,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn();
     const discardWorkingFile = vi.fn();
     const files = [createFile('a')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
     const missingFile = createFile('missing');
 
     // When
@@ -142,7 +154,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn();
     const discardWorkingFile = vi.fn().mockResolvedValue(undefined);
     const files = [createFile('a'), createFile('b'), createFile('c')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
 
     // When: middle file is discarded
     let actionResult: Awaited<ReturnType<typeof result.current.discard>>;
@@ -161,7 +175,9 @@ describe('useWorkingPane', () => {
     const stageFile = vi.fn();
     const discardWorkingFile = vi.fn().mockRejectedValue(new Error('network error'));
     const files = [createFile('a'), createFile('b')];
-    const { result } = renderHook(() => useWorkingPane(files, stageFile, discardWorkingFile));
+    const { result } = renderHook(() =>
+      useWorkingPane(files, stageFile, discardWorkingFile, vi.fn(), vi.fn()),
+    );
 
     // When: discard fails
     let actionResult: Awaited<ReturnType<typeof result.current.discard>>;
@@ -170,6 +186,84 @@ describe('useWorkingPane', () => {
     });
 
     // Then: mirror is rolled back and original file is returned
+    expect(result.current.files.map((f) => f.id)).toEqual(['a', 'b']);
+    expect(actionResult!.nextSelectedFile?.id).toBe('a');
+  });
+
+  it('clears the working file mirror optimistically when all files are staged', async () => {
+    // Given: stageAllWorkingFiles resolves
+    const stageAllWorkingFiles = vi.fn().mockResolvedValue(undefined);
+    const files = [createFile('a'), createFile('b')];
+    const { result } = renderHook(() =>
+      useWorkingPane(files, vi.fn(), vi.fn(), stageAllWorkingFiles, vi.fn()),
+    );
+
+    // When: all files are staged
+    let actionResult: Awaited<ReturnType<typeof result.current.stageAll>>;
+    await act(async () => {
+      actionResult = await result.current.stageAll(files[0]);
+    });
+
+    // Then: the pane is cleared and selection is cleared
+    expect(result.current.files).toEqual([]);
+    expect(actionResult!.nextSelectedFile).toBeNull();
+    expect(stageAllWorkingFiles).toHaveBeenCalled();
+  });
+
+  it('rolls back and returns previous selection when staging all fails', async () => {
+    // Given: stageAllWorkingFiles rejects
+    const stageAllWorkingFiles = vi.fn().mockRejectedValue(new Error('network error'));
+    const files = [createFile('a'), createFile('b')];
+    const { result } = renderHook(() =>
+      useWorkingPane(files, vi.fn(), vi.fn(), stageAllWorkingFiles, vi.fn()),
+    );
+
+    // When: staging all fails
+    let actionResult: Awaited<ReturnType<typeof result.current.stageAll>>;
+    await act(async () => {
+      actionResult = await result.current.stageAll(files[1]);
+    });
+
+    // Then: the pane is restored and previous selection is preserved
+    expect(result.current.files.map((f) => f.id)).toEqual(['a', 'b']);
+    expect(actionResult!.nextSelectedFile?.id).toBe('b');
+  });
+
+  it('clears the working file mirror optimistically when all files are discarded', async () => {
+    // Given: discardAllWorkingFiles resolves
+    const discardAllWorkingFiles = vi.fn().mockResolvedValue(undefined);
+    const files = [createFile('a'), createFile('b')];
+    const { result } = renderHook(() =>
+      useWorkingPane(files, vi.fn(), vi.fn(), vi.fn(), discardAllWorkingFiles),
+    );
+
+    // When: all files are discarded
+    let actionResult: Awaited<ReturnType<typeof result.current.discardAll>>;
+    await act(async () => {
+      actionResult = await result.current.discardAll(files[0]);
+    });
+
+    // Then: the pane is cleared and selection is cleared
+    expect(result.current.files).toEqual([]);
+    expect(actionResult!.nextSelectedFile).toBeNull();
+    expect(discardAllWorkingFiles).toHaveBeenCalled();
+  });
+
+  it('rolls back and returns previous selection when discarding all fails', async () => {
+    // Given: discardAllWorkingFiles rejects
+    const discardAllWorkingFiles = vi.fn().mockRejectedValue(new Error('network error'));
+    const files = [createFile('a'), createFile('b')];
+    const { result } = renderHook(() =>
+      useWorkingPane(files, vi.fn(), vi.fn(), vi.fn(), discardAllWorkingFiles),
+    );
+
+    // When: discarding all fails
+    let actionResult: Awaited<ReturnType<typeof result.current.discardAll>>;
+    await act(async () => {
+      actionResult = await result.current.discardAll(files[0]);
+    });
+
+    // Then: the pane is restored and previous selection is preserved
     expect(result.current.files.map((f) => f.id)).toEqual(['a', 'b']);
     expect(actionResult!.nextSelectedFile?.id).toBe('a');
   });
