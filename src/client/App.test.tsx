@@ -54,13 +54,10 @@ const testDependencies: AppDependencies = {
   },
   repositoryReader: {
     fetchRepositories: vi.fn(async () => ({
-      config: {
-        status: 'found' as const,
-      },
+      invalidRepositories: [],
       repositories: [
         {
           id: 'my-app',
-          isValid: true,
           name: 'my-app',
           path: '/Users/dev/projects/my-app',
         },
@@ -479,13 +476,10 @@ describe('App file list interactions', () => {
     const user = userEvent.setup();
     window.history.pushState(null, '', '/');
     vi.mocked(testDependencies.repositoryReader.fetchRepositories).mockResolvedValueOnce({
-      config: {
-        status: 'found',
-      },
+      invalidRepositories: [],
       repositories: [
         {
           id: 'demo-repo',
-          isValid: true,
           name: 'demo-repo',
           path: '/absolute/path/to/demo-repo',
         },

@@ -16,11 +16,11 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
   const updater = options.repositoryConfigUpdater;
 
   repositoryRoutes.get('/', async (c) => {
-    const list = await resolver.list();
-    if (list.config.status === 'invalid') {
-      return c.json(list, 400);
+    try {
+      return c.json(await resolver.list());
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
     }
-    return c.json(list);
   });
 
   repositoryRoutes.post('/', async (c) => {

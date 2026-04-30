@@ -35,13 +35,22 @@ function RepositorySelectionScreen({
   dependencies,
   onSelectRepository,
 }: RepositorySelectionScreenProps): ReactElement {
-  const { repositories, loading, adding, error, addError, refresh, addRepository } =
-    useRepositories(dependencies.repositoryReader, dependencies.repositoryWriter);
+  const {
+    repositories,
+    loading,
+    adding,
+    configMissingError,
+    error,
+    addError,
+    refresh,
+    addRepository,
+  } = useRepositories(dependencies.repositoryReader, dependencies.repositoryWriter);
 
   return (
     <RepositorySelection
       adding={adding}
       addError={addError}
+      configMissingError={configMissingError}
       error={error}
       loading={loading}
       onAddRepository={addRepository}

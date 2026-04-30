@@ -7,6 +7,7 @@ import {
   type RepositoryConfigUpdater,
 } from '../services/repository-config';
 import {
+  RepositoryConfigResolutionError,
   RepositoryResolutionError,
   type RepositoryResolver,
 } from '../services/repository-resolver';
@@ -32,11 +33,11 @@ describe('repositoryRoutes', () => {
       resolve: vi.fn(),
       resolveItem: vi.fn(),
       list: vi.fn().mockResolvedValue({
-        config: { status: 'found' },
         repositories: [
-          { id: 'sift', isValid: true, name: 'sift', path: '/Users/example/projects/sift' },
-          { id: 'my-app', isValid: true, name: 'my-app', path: '/Users/example/work/my-app' },
+          { id: 'sift', name: 'sift', path: '/Users/example/projects/sift' },
+          { id: 'my-app', name: 'my-app', path: '/Users/example/work/my-app' },
         ],
+        invalidRepositories: [],
       }),
     };
     const app = createApp(mockResolver);
@@ -48,35 +49,35 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(200);
     expect(data).toEqual({
-      config: {
-        status: 'found',
-      },
       repositories: [
         {
           id: 'sift',
-          isValid: true,
           name: 'sift',
           path: '/Users/example/projects/sift',
         },
         {
           id: 'my-app',
-          isValid: true,
           name: 'my-app',
           path: '/Users/example/work/my-app',
         },
       ],
+      invalidRepositories: [],
     });
   });
 
-  it('returns an empty repository list when config is missing', async () => {
+  it('returns 404 when config is missing', async () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
       resolveItem: vi.fn(),
-      list: vi.fn().mockResolvedValue({
-        config: { path: '/Users/example/.config/sift/config.json', status: 'missing' },
-        repositories: [],
-      }),
+      list: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigResolutionError(
+            'Repository config is missing: /Users/example/.config/sift/config.json',
+            'missing',
+          ),
+        ),
     };
     const app = createApp(mockResolver);
 
@@ -85,25 +86,22 @@ describe('repositoryRoutes', () => {
     const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(404);
     expect(data).toEqual({
-      config: {
-        path: '/Users/example/.config/sift/config.json',
-        status: 'missing',
-      },
-      repositories: [],
+      error: 'Repository config is missing: /Users/example/.config/sift/config.json',
     });
   });
 
-  it('returns an empty repository list and 400 when config is invalid', async () => {
+  it('returns 400 when config is invalid', async () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
       resolveItem: vi.fn(),
-      list: vi.fn().mockResolvedValue({
-        config: { error: 'Invalid JSON config: Unexpected token', status: 'invalid' },
-        repositories: [],
-      }),
+      list: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigResolutionError('Invalid JSON config: Unexpected token', 'invalid'),
+        ),
     };
     const app = createApp(mockResolver);
 
@@ -114,11 +112,7 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(400);
     expect(data).toEqual({
-      config: {
-        error: 'Invalid JSON config: Unexpected token',
-        status: 'invalid',
-      },
-      repositories: [],
+      error: 'Invalid JSON config: Unexpected token',
     });
   });
 
@@ -352,13 +346,11 @@ describe('repositoryRoutes', () => {
       resolve: vi.fn(),
       resolveItem: vi.fn(),
       list: vi.fn().mockResolvedValue({
-        config: { status: 'found' },
-        repositories: [
-          { id: 'sift', isValid: true, name: 'sift', path: '/Users/example/projects/sift' },
+        repositories: [{ id: 'sift', name: 'sift', path: '/Users/example/projects/sift' }],
+        invalidRepositories: [
           {
             id: 'missing-repo',
-            isValid: false,
-            error: 'Repository path does not exist.',
+            reason: 'Repository path does not exist.',
             name: 'missing-repo',
             path: '/Users/example/missing-repo',
           },
@@ -374,22 +366,19 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(200);
     expect(data).toEqual({
-      config: {
-        status: 'found',
-      },
       repositories: [
         {
           id: 'sift',
-          isValid: true,
           name: 'sift',
           path: '/Users/example/projects/sift',
         },
+      ],
+      invalidRepositories: [
         {
-          error: 'Repository path does not exist.',
           id: 'missing-repo',
-          isValid: false,
           name: 'missing-repo',
           path: '/Users/example/missing-repo',
+          reason: 'Repository path does not exist.',
         },
       ],
     });
@@ -430,10 +419,11 @@ describe('repositoryRoutes', () => {
     const mockResolver = {
       resolve: vi.fn(),
       resolveItem: vi.fn(),
-      list: vi.fn().mockResolvedValue({
-        config: { error: 'Repository id "sift" is duplicated.', status: 'invalid' },
-        repositories: [],
-      }),
+      list: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigResolutionError('Repository id "sift" is duplicated.', 'invalid'),
+        ),
     };
     const app = createApp(mockResolver);
 
@@ -444,11 +434,7 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(400);
     expect(data).toEqual({
-      config: {
-        error: 'Repository id "sift" is duplicated.',
-        status: 'invalid',
-      },
-      repositories: [],
+      error: 'Repository id "sift" is duplicated.',
     });
   });
 });

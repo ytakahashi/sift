@@ -11,6 +11,16 @@ export class RepositoryResolutionError extends Error {
   }
 }
 
+export class RepositoryConfigResolutionError extends Error {
+  constructor(
+    message: string,
+    public readonly kind: 'invalid' | 'missing',
+  ) {
+    super(message);
+    this.name = 'RepositoryConfigResolutionError';
+  }
+}
+
 export interface RepositoryResolver {
   /** Resolves a repoId to a RepositoryDescriptor. Throws RepositoryResolutionError if not found. */
   resolve(repoId: string): Promise<RepositoryDescriptor>;

@@ -1,12 +1,18 @@
 import path from 'node:path';
 import type {
+  InvalidRepository,
   RepositoryDescriptor,
   RepositoryList,
   RepositoryListItem,
+  ResolvedRepository,
 } from '../../domain/repository/repository';
 import type { RepositoryConfigReadResult } from './config/repository-config-reader';
 import type { RepositoryValidator } from './repository-validator';
-import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
+import {
+  RepositoryConfigResolutionError,
+  RepositoryResolver,
+  RepositoryResolutionError,
+} from '../services/repository-resolver';
 
 class RepositoryRegistryError extends Error {
   constructor(message: string) {
@@ -60,6 +66,46 @@ async function toRepositoryListItem(
   };
 }
 
+function toResolvedRepository(repository: RepositoryDescriptor): ResolvedRepository {
+  return {
+    id: repository.id,
+    name: deriveRepositoryName(repository.path),
+    path: repository.path,
+  };
+}
+
+async function toRepositoryListEntry(
+  repository: RepositoryDescriptor,
+  validateRepository: RepositoryValidator,
+): Promise<
+  | {
+      repository: InvalidRepository;
+      status: 'invalid';
+    }
+  | {
+      repository: ResolvedRepository;
+      status: 'valid';
+    }
+> {
+  const validation = await validateRepository(repository);
+  const baseRepository = toResolvedRepository(repository);
+
+  if (validation.isValid) {
+    return {
+      repository: baseRepository,
+      status: 'valid',
+    };
+  }
+
+  return {
+    repository: {
+      ...baseRepository,
+      reason: validation.error ?? 'Repository path is invalid.',
+    },
+    status: 'invalid',
+  };
+}
+
 export function createRepositoryResolver(
   readConfig: () => Promise<RepositoryConfigReadResult>,
   validateRepository: RepositoryValidator,
@@ -103,40 +149,35 @@ export function createRepositoryResolver(
       const configResult = await readConfig();
 
       if (configResult.status === 'missing') {
-        return {
-          config: {
-            path: configResult.configPath,
-            status: 'missing',
-          },
-          repositories: [],
-        };
+        throw new RepositoryConfigResolutionError(
+          `Repository config is missing: ${configResult.configPath}`,
+          'missing',
+        );
       }
 
       if (configResult.status === 'invalid') {
-        return {
-          config: {
-            error: configResult.error,
-            status: 'invalid',
-          },
-          repositories: [],
-        };
+        throw new RepositoryConfigResolutionError(configResult.error, 'invalid');
       }
 
       try {
         const registry = createRegistry(configResult.config.repositories);
-        const repositories = await Promise.all(
-          registry.list().map((repository) => toRepositoryListItem(repository, validateRepository)),
+        const entries = await Promise.all(
+          registry
+            .list()
+            .map((repository) => toRepositoryListEntry(repository, validateRepository)),
         );
 
         return {
-          config: {
-            status: 'found',
-          },
-          repositories,
+          invalidRepositories: entries
+            .filter((entry) => entry.status === 'invalid')
+            .map((entry) => entry.repository),
+          repositories: entries
+            .filter((entry) => entry.status === 'valid')
+            .map((entry) => entry.repository),
         };
       } catch (error: unknown) {
         if (error instanceof RepositoryRegistryError) {
-          return { config: { error: error.message, status: 'invalid' }, repositories: [] };
+          throw new RepositoryConfigResolutionError(error.message, 'invalid');
         }
         throw error;
       }

@@ -2,7 +2,10 @@ import { describe, expect, it } from 'vitest';
 import { createRepositoryResolver } from './repository-resolver-impl';
 import type { RepositoryConfigReadResult } from './config/repository-config-reader';
 import type { RepositoryValidator } from './repository-validator';
-import { RepositoryResolutionError } from '../services/repository-resolver';
+import {
+  RepositoryConfigResolutionError,
+  RepositoryResolutionError,
+} from '../services/repository-resolver';
 
 describe('createRepositoryResolver', () => {
   const validReadConfig = async (): Promise<RepositoryConfigReadResult> => ({
@@ -156,7 +159,7 @@ describe('createRepositoryResolver', () => {
   });
 
   describe('list', () => {
-    it('returns all repositories with their individual validation results', async () => {
+    it('returns valid repositories and invalid repositories separately', async () => {
       // Given
       const resolver = createRepositoryResolver(validReadConfig, mockValidator);
 
@@ -165,65 +168,57 @@ describe('createRepositoryResolver', () => {
 
       // Then
       expect(result).toEqual({
-        config: { status: 'found' },
         repositories: [
           {
             id: 'repo-1',
             name: 'repo1',
             path: '/path/to/repo1',
-            isValid: true,
-            error: undefined,
           },
+        ],
+        invalidRepositories: [
           {
             id: 'repo-2',
             name: 'repo2',
             path: '/path/to/repo2',
-            isValid: false,
-            error: 'Not a git repo',
+            reason: 'Not a git repo',
           },
         ],
       });
     });
 
-    it('returns missing config status with an empty repository list', async () => {
+    it('throws when config file does not exist', async () => {
       // Given
       const resolver = createRepositoryResolver(missingReadConfig, mockValidator);
 
-      // When
-      const result = await resolver.list();
-
-      // Then
-      expect(result).toEqual({
-        config: { status: 'missing', path: '/missing/config.json' },
-        repositories: [],
+      // When / Then
+      await expect(resolver.list()).rejects.toThrow(RepositoryConfigResolutionError);
+      await expect(resolver.list()).rejects.toMatchObject({
+        kind: 'missing',
+        message: 'Repository config is missing: /missing/config.json',
       });
     });
 
-    it('returns invalid config status with an empty repository list', async () => {
+    it('throws when config file cannot be parsed', async () => {
       // Given
       const resolver = createRepositoryResolver(invalidReadConfig, mockValidator);
 
-      // When
-      const result = await resolver.list();
-
-      // Then
-      expect(result).toEqual({
-        config: { status: 'invalid', error: 'Syntax error' },
-        repositories: [],
+      // When / Then
+      await expect(resolver.list()).rejects.toThrow(RepositoryConfigResolutionError);
+      await expect(resolver.list()).rejects.toMatchObject({
+        kind: 'invalid',
+        message: 'Syntax error',
       });
     });
 
-    it('returns invalid config status when the registry rejects duplicated ids', async () => {
+    it('throws when the registry rejects duplicated ids', async () => {
       // Given: config has two entries sharing the same id; registry construction will fail
       const resolver = createRepositoryResolver(duplicateReadConfig, mockValidator);
 
-      // When
-      const result = await resolver.list();
-
-      // Then
-      expect(result).toEqual({
-        config: { status: 'invalid', error: 'Repository id "dup-repo" is duplicated.' },
-        repositories: [],
+      // When / Then
+      await expect(resolver.list()).rejects.toThrow(RepositoryConfigResolutionError);
+      await expect(resolver.list()).rejects.toMatchObject({
+        kind: 'invalid',
+        message: 'Repository id "dup-repo" is duplicated.',
       });
     });
   });

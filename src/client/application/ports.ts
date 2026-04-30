@@ -5,6 +5,16 @@ import type {
   RepositoryListItem,
 } from '../../domain/repository/repository';
 
+export class RepositoryFetchError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'RepositoryFetchError';
+  }
+}
+
 export interface DiffData {
   workingFiles: DiffFile[];
   stagedFiles: DiffFile[];
