@@ -219,7 +219,7 @@ describe('repositoryRoutes', () => {
     });
   });
 
-  it('adds a repository and returns the added item without validation status', async () => {
+  it('adds a repository and returns the added descriptor', async () => {
     // Given
     const mockUpdater = {
       addRepository: vi.fn().mockResolvedValue({
@@ -229,11 +229,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolve: vi.fn(),
-      resolveRepository: vi.fn().mockResolvedValue({
-        id: 'sift',
-        name: 'sift',
-        path: '/Users/example/projects/sift',
-      }),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
@@ -249,13 +245,10 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(201);
     expect(mockUpdater.addRepository).toHaveBeenCalledWith('/Users/example/projects/sift');
-    expect(mockResolver.resolveRepository).toHaveBeenCalledWith('sift');
+    expect(mockResolver.resolveRepository).not.toHaveBeenCalled();
     expect(data).toEqual({
-      repository: {
-        id: 'sift',
-        name: 'sift',
-        path: '/Users/example/projects/sift',
-      },
+      id: 'sift',
+      path: '/Users/example/projects/sift',
     });
   });
 
