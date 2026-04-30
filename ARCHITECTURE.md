@@ -50,9 +50,9 @@ For Sift's internal HTTP APIs, successful response bodies may intentionally use 
 directly when the payload represents the same business concept without transport-specific fields.
 This avoids duplicating internal API DTOs that would have the same shape as domain models.
 
-Transport-specific concerns must stay outside `domain/`. Examples include HTTP status codes,
-request parsing errors, and `{ error: string }` error response bodies. Do not add fields to domain
-models solely to encode HTTP state.
+Transport-specific concerns must stay outside `domain/`. Examples include HTTP status codes, request
+parsing errors, and `{ error: string }` error response bodies. Do not add fields to domain models
+solely to encode HTTP state.
 
 Allowed dependencies:
 
