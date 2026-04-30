@@ -1,5 +1,4 @@
 import { Hono } from 'hono';
-import type { AddedRepositoryItem } from '../../domain/repository/repository';
 import type { Env } from '../create-app';
 import type { RepositoryConfigUpdater } from '../services/repository-config';
 import type { RepositoryResolver } from '../services/repository-resolver';
@@ -16,11 +15,11 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
   const updater = options.repositoryConfigUpdater;
 
   repositoryRoutes.get('/', async (c) => {
-    const list = await resolver.list();
-    if (list.config.status === 'invalid') {
-      return c.json(list, 400);
+    try {
+      return c.json(await resolver.list());
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
     }
-    return c.json(list);
   });
 
   repositoryRoutes.post('/', async (c) => {
@@ -41,19 +40,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
         return c.json({ error: 'Repository path must be a string.' }, 400);
       }
 
-      const addedRepository = await updater.addRepository(repositoryPath);
-      // The config has already been written at this point. If resolving the
-      // added id fails, surface the inconsistency instead of trying to roll
-      // back the local config; this should only happen if config readback or
-      // validation behavior diverges after the write.
-      const addedItem = await resolver.resolveItem(addedRepository.id);
-      const responseRepository: AddedRepositoryItem = {
-        id: addedItem.id,
-        name: addedItem.name,
-        path: addedItem.path,
-      };
-
-      return c.json({ repository: responseRepository }, 201);
+      return c.json(await updater.addRepository(repositoryPath), 201);
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }
@@ -61,8 +48,8 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
 
   repositoryRoutes.get('/:repoId', async (c) => {
     try {
-      const listItem = await resolver.resolveItem(c.req.param('repoId') as string);
-      return c.json(listItem);
+      const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
+      return c.json(repository);
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }

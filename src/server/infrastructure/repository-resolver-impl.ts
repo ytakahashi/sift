@@ -1,15 +1,25 @@
 import path from 'node:path';
 import type {
+  InvalidRepository,
   RepositoryDescriptor,
   RepositoryList,
-  RepositoryListItem,
+  ResolvedRepository,
 } from '../../domain/repository/repository';
 import type { RepositoryConfigReadResult } from './config/repository-config-reader';
 import type { RepositoryValidator } from './repository-validator';
-import { RepositoryResolver, RepositoryResolutionError } from '../services/repository-resolver';
+import {
+  RepositoryConfigResolutionError,
+  RepositoryNotFoundError,
+  RepositoryResolver,
+  RepositoryResolutionError,
+  RepositoryValidationError,
+} from '../services/repository-resolver';
 
 class RepositoryRegistryError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly kind: 'duplicate' | 'not-found',
+  ) {
     super(message);
     this.name = 'RepositoryRegistryError';
   }
@@ -23,7 +33,10 @@ function createRegistry(repositories: RepositoryDescriptor[]): {
 
   for (const repository of repositories) {
     if (repositoriesById.has(repository.id)) {
-      throw new RepositoryRegistryError(`Repository id "${repository.id}" is duplicated.`);
+      throw new RepositoryRegistryError(
+        `Repository id "${repository.id}" is duplicated.`,
+        'duplicate',
+      );
     }
 
     repositoriesById.set(repository.id, repository);
@@ -34,7 +47,10 @@ function createRegistry(repositories: RepositoryDescriptor[]): {
     resolve: (repoId: string): RepositoryDescriptor => {
       const repository = repositoriesById.get(repoId);
       if (!repository) {
-        throw new RepositoryRegistryError(`Repository id "${repoId}" is not configured.`);
+        throw new RepositoryRegistryError(
+          `Repository id "${repoId}" is not configured.`,
+          'not-found',
+        );
       }
 
       return repository;
@@ -46,17 +62,56 @@ function deriveRepositoryName(repositoryPath: string): string {
   return path.basename(repositoryPath) || repositoryPath;
 }
 
-async function toRepositoryListItem(
-  repository: RepositoryDescriptor,
-  validateRepository: RepositoryValidator,
-): Promise<RepositoryListItem> {
-  const validation = await validateRepository(repository);
+function toResolvedRepository(repository: RepositoryDescriptor): ResolvedRepository {
   return {
-    error: validation.error,
     id: repository.id,
-    isValid: validation.isValid,
     name: deriveRepositoryName(repository.path),
     path: repository.path,
+  };
+}
+
+async function validateResolvedRepository(
+  repository: RepositoryDescriptor,
+  validateRepository: RepositoryValidator,
+): Promise<ResolvedRepository> {
+  const validation = await validateRepository(repository);
+
+  if (!validation.isValid) {
+    throw new RepositoryValidationError(validation.error ?? 'Repository path is invalid.');
+  }
+
+  return toResolvedRepository(repository);
+}
+
+async function toRepositoryListEntry(
+  repository: RepositoryDescriptor,
+  validateRepository: RepositoryValidator,
+): Promise<
+  | {
+      repository: InvalidRepository;
+      status: 'invalid';
+    }
+  | {
+      repository: ResolvedRepository;
+      status: 'valid';
+    }
+> {
+  const validation = await validateRepository(repository);
+  const baseRepository = toResolvedRepository(repository);
+
+  if (validation.isValid) {
+    return {
+      repository: baseRepository,
+      status: 'valid',
+    };
+  }
+
+  return {
+    repository: {
+      ...baseRepository,
+      reason: validation.error ?? 'Repository path is invalid.',
+    },
+    status: 'invalid',
   };
 }
 
@@ -95,48 +150,75 @@ export function createRepositoryResolver(
 
   return {
     resolve,
-    resolveItem: async (repoId: string): Promise<RepositoryListItem> => {
-      const repository = await resolve(repoId);
-      return toRepositoryListItem(repository, validateRepository);
+    resolveRepository: async (repoId: string): Promise<ResolvedRepository> => {
+      if (!repoId) {
+        throw new RepositoryNotFoundError('Repository id is required.');
+      }
+
+      const configResult = await readConfig();
+
+      if (configResult.status === 'missing') {
+        throw new RepositoryConfigResolutionError(
+          `Repository config is missing: ${configResult.configPath}`,
+          'missing',
+        );
+      }
+
+      if (configResult.status === 'invalid') {
+        throw new RepositoryConfigResolutionError(
+          `Repository config is invalid: ${configResult.error}`,
+          'invalid',
+        );
+      }
+
+      try {
+        const registry = createRegistry(configResult.config.repositories);
+        return await validateResolvedRepository(registry.resolve(repoId), validateRepository);
+      } catch (error: unknown) {
+        if (error instanceof RepositoryRegistryError) {
+          if (error.kind === 'not-found') {
+            throw new RepositoryNotFoundError(error.message);
+          }
+
+          throw new RepositoryConfigResolutionError(error.message, 'invalid');
+        }
+
+        throw error;
+      }
     },
     list: async (): Promise<RepositoryList> => {
       const configResult = await readConfig();
 
       if (configResult.status === 'missing') {
-        return {
-          config: {
-            path: configResult.configPath,
-            status: 'missing',
-          },
-          repositories: [],
-        };
+        throw new RepositoryConfigResolutionError(
+          `Repository config is missing: ${configResult.configPath}`,
+          'missing',
+        );
       }
 
       if (configResult.status === 'invalid') {
-        return {
-          config: {
-            error: configResult.error,
-            status: 'invalid',
-          },
-          repositories: [],
-        };
+        throw new RepositoryConfigResolutionError(configResult.error, 'invalid');
       }
 
       try {
         const registry = createRegistry(configResult.config.repositories);
-        const repositories = await Promise.all(
-          registry.list().map((repository) => toRepositoryListItem(repository, validateRepository)),
+        const entries = await Promise.all(
+          registry
+            .list()
+            .map((repository) => toRepositoryListEntry(repository, validateRepository)),
         );
 
         return {
-          config: {
-            status: 'found',
-          },
-          repositories,
+          invalidRepositories: entries
+            .filter((entry) => entry.status === 'invalid')
+            .map((entry) => entry.repository),
+          repositories: entries
+            .filter((entry) => entry.status === 'valid')
+            .map((entry) => entry.repository),
         };
       } catch (error: unknown) {
         if (error instanceof RepositoryRegistryError) {
-          return { config: { error: error.message, status: 'invalid' }, repositories: [] };
+          throw new RepositoryConfigResolutionError(error.message, 'invalid');
         }
         throw error;
       }

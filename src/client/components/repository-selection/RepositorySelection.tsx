@@ -1,13 +1,15 @@
 import { useState, type FormEvent, type ReactElement } from 'react';
 import type {
+  InvalidRepository,
   RepositoryId,
   RepositoryList,
-  RepositoryListItem,
+  ResolvedRepository,
 } from '../../../domain/repository/repository';
 
 export interface RepositorySelectionProps {
   addError: string | null;
   adding: boolean;
+  configMissingError: string | null;
   error: string | null;
   loading: boolean;
   onAddRepository: (path: string) => Promise<boolean>;
@@ -16,44 +18,36 @@ export interface RepositorySelectionProps {
   repositories: RepositoryList | null;
 }
 
-function getConfigMessage(repositories: RepositoryList | null): string | null {
-  if (!repositories) {
-    return null;
-  }
-
-  if (repositories.config.status === 'missing') {
-    return `Config missing: ${repositories.config.path}`;
-  }
-
-  if (repositories.config.status === 'invalid') {
-    return repositories.config.error;
-  }
-
-  return null;
-}
-
 function RepositoryRow({
   repository,
   onSelectRepository,
 }: {
   onSelectRepository: (repoId: RepositoryId) => void;
-  repository: RepositoryListItem;
+  repository: ResolvedRepository;
 }): ReactElement {
   return (
-    <li className={`repository-item ${repository.isValid ? '' : 'repository-item-invalid'}`}>
+    <li className="repository-item">
       <button
         className="repository-button"
-        disabled={!repository.isValid}
         onClick={() => onSelectRepository(repository.id)}
         title={repository.path}
         type="button"
       >
         <span className="repository-name">{repository.name}</span>
         <span className="repository-path">{repository.path}</span>
-        {!repository.isValid && repository.error && (
-          <span className="repository-error">{repository.error}</span>
-        )}
       </button>
+    </li>
+  );
+}
+
+function InvalidRepositoryRow({ repository }: { repository: InvalidRepository }): ReactElement {
+  return (
+    <li className="repository-item repository-item-invalid">
+      <div className="repository-item-content" title={repository.path}>
+        <span className="repository-name">{repository.name}</span>
+        <span className="repository-path">{repository.path}</span>
+        <span className="repository-error">{repository.reason}</span>
+      </div>
     </li>
   );
 }
@@ -61,6 +55,7 @@ function RepositoryRow({
 export function RepositorySelection({
   addError,
   adding,
+  configMissingError,
   error,
   loading,
   onAddRepository,
@@ -70,8 +65,9 @@ export function RepositorySelection({
 }: RepositorySelectionProps): ReactElement {
   const [isAddingRepository, setIsAddingRepository] = useState(false);
   const [repositoryPath, setRepositoryPath] = useState('');
-  const configMessage = getConfigMessage(repositories);
   const items = repositories?.repositories ?? [];
+  const invalidItems = repositories?.invalidRepositories ?? [];
+  const itemCount = items.length + invalidItems.length;
   const trimmedRepositoryPath = repositoryPath.trim();
   const canSubmitRepository = trimmedRepositoryPath.length > 0 && !adding;
 
@@ -98,8 +94,8 @@ export function RepositorySelection({
         <div className="app-header-actions">
           {/* Fetch errors mean the latest repository list is unknown, so show
           them ahead of config-state messages derived from older or partial data. */}
-          {(error || configMessage) && (
-            <span className="repository-selection-status">{error || configMessage}</span>
+          {(error || configMissingError) && (
+            <span className="repository-selection-status">{error || configMissingError}</span>
           )}
           <button className="secondary-button" onClick={onRefresh} type="button">
             Refresh
@@ -110,9 +106,9 @@ export function RepositorySelection({
         <section className="repository-selection-content">
           <div className="repository-selection-heading">
             <h2>Repositories</h2>
-            <span>{loading ? 'Loading...' : `${items.length} configured`}</span>
+            <span>{loading ? 'Loading...' : `${itemCount} configured`}</span>
           </div>
-          {items.length > 0 ? (
+          {itemCount > 0 ? (
             <ul className="repository-list">
               {items.map((repository) => (
                 <RepositoryRow
@@ -120,6 +116,9 @@ export function RepositorySelection({
                   onSelectRepository={onSelectRepository}
                   repository={repository}
                 />
+              ))}
+              {invalidItems.map((repository) => (
+                <InvalidRepositoryRow key={repository.id} repository={repository} />
               ))}
             </ul>
           ) : (

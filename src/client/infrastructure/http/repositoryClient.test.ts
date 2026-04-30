@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { RepositoryFetchError } from '../../application/ports';
 import { httpRepositoryReader, httpRepositoryWriter } from './repositoryClient';
 
 describe('httpRepositoryReader', () => {
@@ -9,8 +10,8 @@ describe('httpRepositoryReader', () => {
   it('fetches configured repositories', async () => {
     // Given
     const response = {
-      config: { status: 'found' },
-      repositories: [{ id: 'sift', isValid: true, name: 'sift', path: '/repo/sift' }],
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
     };
     const fetchMock = vi.fn().mockResolvedValue({
       json: vi.fn().mockResolvedValue(response),
@@ -32,6 +33,7 @@ describe('httpRepositoryReader', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: false,
+        status: 500,
         statusText: 'Internal Server Error',
       }),
     );
@@ -40,13 +42,38 @@ describe('httpRepositoryReader', () => {
     await expect(httpRepositoryReader.fetchRepositories()).rejects.toThrow(
       'Failed to fetch repositories: Internal Server Error',
     );
+    await expect(httpRepositoryReader.fetchRepositories()).rejects.toThrow(RepositoryFetchError);
+    await expect(httpRepositoryReader.fetchRepositories()).rejects.toMatchObject({
+      statusCode: 500,
+    });
+  });
+
+  it('throws a RepositoryFetchError with status when configured repositories cannot be fetched', async () => {
+    // Given
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: vi
+          .fn()
+          .mockResolvedValue({ error: 'Repository config is missing: /missing/config.json' }),
+        ok: false,
+        status: 404,
+        statusText: 'Not Found',
+      }),
+    );
+
+    // When / Then
+    await expect(httpRepositoryReader.fetchRepositories()).rejects.toMatchObject({
+      message: 'Repository config is missing: /missing/config.json',
+      statusCode: 404,
+    });
+    await expect(httpRepositoryReader.fetchRepositories()).rejects.toThrow(RepositoryFetchError);
   });
 
   it('fetches one configured repository by id', async () => {
     // Given
     const response = {
       id: 'my-app',
-      isValid: true,
       name: 'my-app',
       path: '/repo/my-app',
     };
@@ -70,6 +97,7 @@ describe('httpRepositoryReader', () => {
       'fetch',
       vi.fn().mockResolvedValue({
         ok: false,
+        status: 400,
         statusText: 'Bad Request',
       }),
     );
@@ -78,6 +106,12 @@ describe('httpRepositoryReader', () => {
     await expect(httpRepositoryReader.fetchRepository('missing')).rejects.toThrow(
       'Failed to fetch repository: Bad Request',
     );
+    await expect(httpRepositoryReader.fetchRepository('missing')).rejects.toThrow(
+      RepositoryFetchError,
+    );
+    await expect(httpRepositoryReader.fetchRepository('missing')).rejects.toMatchObject({
+      statusCode: 400,
+    });
   });
 });
 

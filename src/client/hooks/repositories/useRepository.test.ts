@@ -10,7 +10,6 @@ describe('useRepository', () => {
       fetchRepositories: vi.fn(),
       fetchRepository: vi.fn().mockResolvedValue({
         id: 'sift',
-        isValid: true,
         name: 'sift',
         path: '/repo/sift',
       }),

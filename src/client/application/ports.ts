@@ -2,8 +2,18 @@ import type { DiffFile } from '../../domain/diff/types';
 import type {
   RepositoryId,
   RepositoryList,
-  RepositoryListItem,
+  ResolvedRepository,
 } from '../../domain/repository/repository';
+
+export class RepositoryFetchError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'RepositoryFetchError';
+  }
+}
 
 export interface DiffData {
   workingFiles: DiffFile[];
@@ -16,7 +26,7 @@ export interface DiffReader {
 
 export interface RepositoryReader {
   fetchRepositories(): Promise<RepositoryList>;
-  fetchRepository(repoId: RepositoryId): Promise<RepositoryListItem>;
+  fetchRepository(repoId: RepositoryId): Promise<ResolvedRepository>;
 }
 
 export interface RepositoryWriter {

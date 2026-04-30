@@ -1,9 +1,13 @@
 import type {
   RepositoryId,
   RepositoryList,
-  RepositoryListItem,
+  ResolvedRepository,
 } from '../../../domain/repository/repository';
-import type { RepositoryReader, RepositoryWriter } from '../../application/ports';
+import {
+  RepositoryFetchError,
+  type RepositoryReader,
+  type RepositoryWriter,
+} from '../../application/ports';
 
 async function readErrorMessage(res: Response, fallback: string): Promise<string> {
   try {
@@ -27,18 +31,24 @@ export const httpRepositoryReader: RepositoryReader = {
   async fetchRepositories(): Promise<RepositoryList> {
     const res = await fetch('/api/repositories');
     if (!res.ok) {
-      throw new Error(`Failed to fetch repositories: ${res.statusText}`);
+      throw new RepositoryFetchError(
+        await readErrorMessage(res, `Failed to fetch repositories: ${res.statusText}`),
+        res.status,
+      );
     }
 
     return (await res.json()) as RepositoryList;
   },
-  async fetchRepository(repoId: RepositoryId): Promise<RepositoryListItem> {
+  async fetchRepository(repoId: RepositoryId): Promise<ResolvedRepository> {
     const res = await fetch(`/api/repositories/${encodeURIComponent(repoId)}`);
     if (!res.ok) {
-      throw new Error(`Failed to fetch repository: ${res.statusText}`);
+      throw new RepositoryFetchError(
+        await readErrorMessage(res, `Failed to fetch repository: ${res.statusText}`),
+        res.status,
+      );
     }
 
-    return (await res.json()) as RepositoryListItem;
+    return (await res.json()) as ResolvedRepository;
   },
 };
 

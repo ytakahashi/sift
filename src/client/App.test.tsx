@@ -54,13 +54,10 @@ const testDependencies: AppDependencies = {
   },
   repositoryReader: {
     fetchRepositories: vi.fn(async () => ({
-      config: {
-        status: 'found' as const,
-      },
+      invalidRepositories: [],
       repositories: [
         {
           id: 'my-app',
-          isValid: true,
           name: 'my-app',
           path: '/Users/dev/projects/my-app',
         },
@@ -68,7 +65,6 @@ const testDependencies: AppDependencies = {
     })),
     fetchRepository: vi.fn(async (repoId) => ({
       id: repoId,
-      isValid: true,
       name: repoId,
       path: `/Users/dev/projects/${repoId}`,
     })),
@@ -479,13 +475,10 @@ describe('App file list interactions', () => {
     const user = userEvent.setup();
     window.history.pushState(null, '', '/');
     vi.mocked(testDependencies.repositoryReader.fetchRepositories).mockResolvedValueOnce({
-      config: {
-        status: 'found',
-      },
+      invalidRepositories: [],
       repositories: [
         {
           id: 'demo-repo',
-          isValid: true,
           name: 'demo-repo',
           path: '/absolute/path/to/demo-repo',
         },
@@ -493,7 +486,6 @@ describe('App file list interactions', () => {
     });
     vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
       id: 'demo-repo',
-      isValid: true,
       name: 'demo-repo',
       path: '/absolute/path/to/demo-repo',
     });
@@ -515,7 +507,6 @@ describe('App file list interactions', () => {
     window.history.pushState(null, '', '/repos/demo-repo');
     vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
       id: 'demo-repo',
-      isValid: true,
       name: 'demo-repo',
       path: '/absolute/path/to/demo-repo',
     });

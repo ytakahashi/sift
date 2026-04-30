@@ -1,11 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { RepositoryList } from '../../../domain/repository/repository';
-import type { RepositoryReader, RepositoryWriter } from '../../application/ports';
+import {
+  RepositoryFetchError,
+  type RepositoryReader,
+  type RepositoryWriter,
+} from '../../application/ports';
 
 export interface UseRepositoriesResult {
   addError: string | null;
   addRepository: (path: string) => Promise<boolean>;
   adding: boolean;
+  configMissingError: string | null;
   error: string | null;
   loading: boolean;
   repositories: RepositoryList | null;
@@ -21,14 +26,22 @@ export function useRepositories(
   const [adding, setAdding] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
+  const [configMissingError, setConfigMissingError] = useState<string | null>(null);
 
   const refresh = useCallback(async (): Promise<void> => {
     setLoading(true);
     setError(null);
+    setConfigMissingError(null);
 
     try {
       setRepositories(await repositoryReader.fetchRepositories());
     } catch (err: unknown) {
+      setRepositories(null);
+      if (err instanceof RepositoryFetchError && err.statusCode === 404) {
+        setConfigMissingError(err.message);
+        return;
+      }
+
       setError(err instanceof Error ? err.message : String(err));
     } finally {
       setLoading(false);
@@ -62,6 +75,7 @@ export function useRepositories(
     addError,
     addRepository,
     adding,
+    configMissingError,
     error,
     loading,
     repositories,

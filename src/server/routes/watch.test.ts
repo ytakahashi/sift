@@ -31,7 +31,7 @@ describe('watchRoutes', () => {
         .mockRejectedValue(
           new RepositoryResolutionError('Repository id "missing" is not configured.'),
         ),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);

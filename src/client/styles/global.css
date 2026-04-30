@@ -259,7 +259,8 @@ body {
   list-style: none;
 }
 
-.repository-button {
+.repository-button,
+.repository-item-content {
   display: grid;
   width: 100%;
   min-height: 74px;
@@ -270,6 +271,9 @@ body {
   background: #161b22;
   border: 1px solid var(--border-color);
   border-radius: 6px;
+}
+
+.repository-button {
   cursor: pointer;
 }
 

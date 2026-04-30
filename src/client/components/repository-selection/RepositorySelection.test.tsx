@@ -15,6 +15,7 @@ function renderRepositorySelection(repositories: RepositoryList): {
     <RepositorySelection
       addError={null}
       adding={false}
+      configMissingError={null}
       error={null}
       loading={false}
       onAddRepository={onAddRepository}
@@ -35,87 +36,71 @@ describe('RepositorySelection', () => {
     cleanup();
   });
 
-  it('disables invalid repository buttons and shows their error', () => {
+  it('shows invalid repositories with their reason', () => {
     // Given
     renderRepositorySelection({
-      config: { status: 'found' },
-      repositories: [
+      invalidRepositories: [
         {
-          error: 'Repository path does not exist.',
           id: 'missing-repo',
-          isValid: false,
           name: 'missing-repo',
           path: '/repo/missing-repo',
+          reason: 'Repository path does not exist.',
         },
       ],
+      repositories: [],
     });
 
-    // When
-    const button = screen.getByRole('button', { name: /missing-repo/ });
-
     // Then
-    expect(button).toHaveProperty('disabled', true);
+    expect(screen.getByText('missing-repo')).toBeDefined();
     expect(screen.getByText('Repository path does not exist.')).toBeDefined();
   });
 
-  it('does not select a disabled repository button', async () => {
+  it('does not render invalid repositories as selectable buttons', () => {
     // Given
-    const user = userEvent.setup();
     const { onSelectRepository } = renderRepositorySelection({
-      config: { status: 'found' },
-      repositories: [
+      invalidRepositories: [
         {
-          error: 'Repository path is not a Git repository.',
           id: 'invalid-repo',
-          isValid: false,
           name: 'invalid-repo',
           path: '/repo/invalid-repo',
+          reason: 'Repository path is not a Git repository.',
         },
       ],
+      repositories: [],
     });
 
-    // When
-    await user.click(screen.getByRole('button', { name: /invalid-repo/ }));
-
     // Then
+    expect(screen.queryByRole('button', { name: /invalid-repo/ })).toBeNull();
     expect(onSelectRepository).not.toHaveBeenCalled();
   });
 
-  it('shows the config path when repository config is missing', () => {
+  it('shows the config missing error from the fetch status handling', () => {
     // Given / When
-    renderRepositorySelection({
-      config: {
-        path: '/Users/example/.config/sift/config.json',
-        status: 'missing',
-      },
-      repositories: [],
-    });
+    render(
+      <RepositorySelection
+        addError={null}
+        adding={false}
+        configMissingError="Repository config is missing: /Users/example/.config/sift/config.json"
+        error={null}
+        loading={false}
+        onAddRepository={vi.fn()}
+        onRefresh={vi.fn()}
+        onSelectRepository={vi.fn()}
+        repositories={null}
+      />,
+    );
 
     // Then
     expect(
-      screen.getByText('Config missing: /Users/example/.config/sift/config.json'),
+      screen.getByText('Repository config is missing: /Users/example/.config/sift/config.json'),
     ).toBeDefined();
-  });
-
-  it('shows the config error when repository config is invalid', () => {
-    // Given / When
-    renderRepositorySelection({
-      config: {
-        error: 'Repository id "sift" is duplicated.',
-        status: 'invalid',
-      },
-      repositories: [],
-    });
-
-    // Then
-    expect(screen.getByText('Repository id "sift" is duplicated.')).toBeDefined();
   });
 
   it('opens an add repository form and submits the entered path', async () => {
     // Given
     const user = userEvent.setup();
     const { onAddRepository } = renderRepositorySelection({
-      config: { status: 'found' },
+      invalidRepositories: [],
       repositories: [],
     });
 
@@ -137,13 +122,14 @@ describe('RepositorySelection', () => {
       <RepositorySelection
         adding={false}
         addError="Repository path is not a directory."
+        configMissingError={null}
         error={null}
         loading={false}
         onAddRepository={onAddRepository}
         onRefresh={vi.fn()}
         onSelectRepository={vi.fn()}
         repositories={{
-          config: { status: 'found' },
+          invalidRepositories: [],
           repositories: [],
         }}
       />,
@@ -168,13 +154,14 @@ describe('RepositorySelection', () => {
       <RepositorySelection
         addError={null}
         adding={true}
+        configMissingError={null}
         error={null}
         loading={false}
         onAddRepository={vi.fn()}
         onRefresh={vi.fn()}
         onSelectRepository={vi.fn()}
         repositories={{
-          config: { status: 'found' },
+          invalidRepositories: [],
           repositories: [],
         }}
       />,
