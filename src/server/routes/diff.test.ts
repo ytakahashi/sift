@@ -38,7 +38,7 @@ describe('diffRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -61,7 +61,7 @@ describe('diffRoutes', () => {
         .mockRejectedValue(
           new RepositoryResolutionError('Repository id "missing" is not configured.'),
         ),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -83,7 +83,7 @@ describe('diffRoutes', () => {
         .mockRejectedValue(
           new RepositoryResolutionError('Repository config is missing: /missing/config.json'),
         ),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);

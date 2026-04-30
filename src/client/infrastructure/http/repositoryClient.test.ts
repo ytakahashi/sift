@@ -74,7 +74,6 @@ describe('httpRepositoryReader', () => {
     // Given
     const response = {
       id: 'my-app',
-      isValid: true,
       name: 'my-app',
       path: '/repo/my-app',
     };

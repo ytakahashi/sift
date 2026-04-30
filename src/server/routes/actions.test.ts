@@ -37,7 +37,7 @@ describe('actionRoutes discard-working-file', () => {
     discardWorkingFileMock.mockResolvedValue(undefined);
     const mockResolver = {
       resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
@@ -68,7 +68,7 @@ describe('actionRoutes discard-working-file', () => {
         .mockRejectedValue(
           new RepositoryResolutionError('Repository id "missing" is not configured.'),
         ),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp({
@@ -94,7 +94,7 @@ describe('actionRoutes discard-working-file', () => {
     discardWorkingFileMock.mockRejectedValue(new Error('discard failed'));
     const mockResolver = {
       resolve: vi.fn().mockResolvedValue({ id: 'sift', path: '/repo/sift' }),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp({
@@ -126,7 +126,7 @@ describe('actionRoutes bulk actions', () => {
     stageAllWorkingFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
       resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
@@ -153,7 +153,7 @@ describe('actionRoutes bulk actions', () => {
     unstageAllStagedFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
       resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp({
@@ -183,7 +183,7 @@ describe('actionRoutes bulk actions', () => {
     discardAllWorkingFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
       resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp({

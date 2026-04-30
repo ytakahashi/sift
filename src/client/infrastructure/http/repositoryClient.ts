@@ -1,7 +1,7 @@
 import type {
   RepositoryId,
   RepositoryList,
-  RepositoryListItem,
+  ResolvedRepository,
 } from '../../../domain/repository/repository';
 import {
   RepositoryFetchError,
@@ -39,7 +39,7 @@ export const httpRepositoryReader: RepositoryReader = {
 
     return (await res.json()) as RepositoryList;
   },
-  async fetchRepository(repoId: RepositoryId): Promise<RepositoryListItem> {
+  async fetchRepository(repoId: RepositoryId): Promise<ResolvedRepository> {
     const res = await fetch(`/api/repositories/${encodeURIComponent(repoId)}`);
     if (!res.ok) {
       throw new RepositoryFetchError(
@@ -48,7 +48,7 @@ export const httpRepositoryReader: RepositoryReader = {
       );
     }
 
-    return (await res.json()) as RepositoryListItem;
+    return (await res.json()) as ResolvedRepository;
   },
 };
 

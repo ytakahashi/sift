@@ -4,7 +4,9 @@ import type { RepositoryConfigReadResult } from './config/repository-config-read
 import type { RepositoryValidator } from './repository-validator';
 import {
   RepositoryConfigResolutionError,
+  RepositoryNotFoundError,
   RepositoryResolutionError,
+  RepositoryValidationError,
 } from '../services/repository-resolver';
 
 describe('createRepositoryResolver', () => {
@@ -113,48 +115,84 @@ describe('createRepositoryResolver', () => {
     });
   });
 
-  describe('resolveItem', () => {
-    it('returns a valid RepositoryListItem including validation result', async () => {
+  describe('resolveRepository', () => {
+    it('returns a resolved repository when validation succeeds', async () => {
       // Given
       const resolver = createRepositoryResolver(validReadConfig, mockValidator);
 
       // When
-      const item = await resolver.resolveItem('repo-1');
+      const item = await resolver.resolveRepository('repo-1');
 
       // Then
       expect(item).toEqual({
         id: 'repo-1',
         name: 'repo1',
         path: '/path/to/repo1',
-        isValid: true,
-        error: undefined,
       });
     });
 
-    it('returns an invalid RepositoryListItem when the validator rejects the path', async () => {
+    it('throws RepositoryValidationError when the validator rejects the path', async () => {
       // Given
       const resolver = createRepositoryResolver(validReadConfig, mockValidator);
 
-      // When
-      const item = await resolver.resolveItem('repo-2');
-
-      // Then
-      expect(item).toEqual({
-        id: 'repo-2',
-        name: 'repo2',
-        path: '/path/to/repo2',
-        isValid: false,
-        error: 'Not a git repo',
-      });
+      // When / Then
+      await expect(resolver.resolveRepository('repo-2')).rejects.toThrow(RepositoryValidationError);
+      await expect(resolver.resolveRepository('repo-2')).rejects.toThrow('Not a git repo');
     });
 
-    it('throws RepositoryResolutionError when config file does not exist', async () => {
+    it('throws RepositoryNotFoundError when repoId is not in the registry', async () => {
+      // Given
+      const resolver = createRepositoryResolver(validReadConfig, mockValidator);
+
+      // When / Then
+      await expect(resolver.resolveRepository('unknown-repo')).rejects.toThrow(
+        RepositoryNotFoundError,
+      );
+      await expect(resolver.resolveRepository('unknown-repo')).rejects.toThrow(
+        'Repository id "unknown-repo" is not configured.',
+      );
+    });
+
+    it('throws RepositoryConfigResolutionError when config file does not exist', async () => {
       // Given
       const resolver = createRepositoryResolver(missingReadConfig, mockValidator);
 
       // When / Then
-      // resolveItem delegates to resolve first, so config errors surface here too
-      await expect(resolver.resolveItem('repo-1')).rejects.toThrow(RepositoryResolutionError);
+      await expect(resolver.resolveRepository('repo-1')).rejects.toThrow(
+        RepositoryConfigResolutionError,
+      );
+      await expect(resolver.resolveRepository('repo-1')).rejects.toMatchObject({
+        kind: 'missing',
+        message: 'Repository config is missing: /missing/config.json',
+      });
+    });
+
+    it('throws RepositoryConfigResolutionError when config file cannot be parsed', async () => {
+      // Given
+      const resolver = createRepositoryResolver(invalidReadConfig, mockValidator);
+
+      // When / Then
+      await expect(resolver.resolveRepository('repo-1')).rejects.toThrow(
+        RepositoryConfigResolutionError,
+      );
+      await expect(resolver.resolveRepository('repo-1')).rejects.toMatchObject({
+        kind: 'invalid',
+        message: 'Repository config is invalid: Syntax error',
+      });
+    });
+
+    it('throws RepositoryConfigResolutionError when the registry has duplicated ids', async () => {
+      // Given: config contains two entries with the same id, making registry construction fail
+      const resolver = createRepositoryResolver(duplicateReadConfig, mockValidator);
+
+      // When / Then
+      await expect(resolver.resolveRepository('dup-repo')).rejects.toThrow(
+        RepositoryConfigResolutionError,
+      );
+      await expect(resolver.resolveRepository('dup-repo')).rejects.toMatchObject({
+        kind: 'invalid',
+        message: 'Repository id "dup-repo" is duplicated.',
+      });
     });
   });
 

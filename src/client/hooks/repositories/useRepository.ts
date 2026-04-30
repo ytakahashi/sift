@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useState } from 'react';
-import type { RepositoryId, RepositoryListItem } from '../../../domain/repository/repository';
+import type { RepositoryId, ResolvedRepository } from '../../../domain/repository/repository';
 import type { RepositoryReader } from '../../application/ports';
 
 export interface UseRepositoryResult {
   error: string | null;
   loading: boolean;
-  repository: RepositoryListItem | null;
+  repository: ResolvedRepository | null;
   refresh: () => Promise<void>;
 }
 
@@ -13,7 +13,7 @@ export function useRepository(
   repositoryReader: RepositoryReader,
   repoId: RepositoryId,
 ): UseRepositoryResult {
-  const [repository, setRepository] = useState<RepositoryListItem | null>(null);
+  const [repository, setRepository] = useState<ResolvedRepository | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

@@ -46,7 +46,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
       // added id fails, surface the inconsistency instead of trying to roll
       // back the local config; this should only happen if config readback or
       // validation behavior diverges after the write.
-      const addedItem = await resolver.resolveItem(addedRepository.id);
+      const addedItem = await resolver.resolveRepository(addedRepository.id);
       const responseRepository: AddedRepositoryItem = {
         id: addedItem.id,
         name: addedItem.name,
@@ -61,8 +61,8 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
 
   repositoryRoutes.get('/:repoId', async (c) => {
     try {
-      const listItem = await resolver.resolveItem(c.req.param('repoId') as string);
-      return c.json(listItem);
+      const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
+      return c.json(repository);
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }

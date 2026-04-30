@@ -20,16 +20,6 @@ export interface RepositoryList {
   repositories: ResolvedRepository[];
 }
 
-// Temporary legacy shape used by the single-repository endpoint until Step 2
-// migrates it to ResolvedRepository plus HTTP error statuses.
-export interface RepositoryListItem {
-  error?: string;
-  id: RepositoryId;
-  isValid: boolean;
-  name: string;
-  path: string;
-}
-
 export interface RepositoryDescriptor {
   id: RepositoryId;
   path: string;

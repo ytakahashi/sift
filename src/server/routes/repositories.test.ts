@@ -8,7 +8,8 @@ import {
 } from '../services/repository-config';
 import {
   RepositoryConfigResolutionError,
-  RepositoryResolutionError,
+  RepositoryNotFoundError,
+  RepositoryValidationError,
   type RepositoryResolver,
 } from '../services/repository-resolver';
 
@@ -31,7 +32,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn().mockResolvedValue({
         repositories: [
           { id: 'sift', name: 'sift', path: '/Users/example/projects/sift' },
@@ -69,7 +70,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi
         .fn()
         .mockRejectedValue(
@@ -96,7 +97,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi
         .fn()
         .mockRejectedValue(
@@ -120,9 +121,8 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn().mockResolvedValue({
+      resolveRepository: vi.fn().mockResolvedValue({
         id: 'my-app',
-        isValid: true,
         name: 'my-app',
         path: '/Users/example/work/my-app',
       }),
@@ -138,7 +138,6 @@ describe('repositoryRoutes', () => {
     expect(response.status).toBe(200);
     expect(data).toEqual({
       id: 'my-app',
-      isValid: true,
       name: 'my-app',
       path: '/Users/example/work/my-app',
     });
@@ -148,11 +147,61 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi
+      resolveRepository: vi
         .fn()
         .mockRejectedValue(
-          new RepositoryResolutionError(
+          new RepositoryConfigResolutionError(
             'Repository config is missing: /Users/example/.config/sift/config.json',
+            'missing',
+          ),
+        ),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
+
+    // When
+    const response = await app.request('/api/repositories/sift');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(data).toEqual({
+      error: 'Repository config is missing: /Users/example/.config/sift/config.json',
+    });
+  });
+
+  it('returns an error for an unconfigured repository id', async () => {
+    // Given
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryNotFoundError('Repository id "missing" is not configured.'),
+        ),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
+
+    // When
+    const response = await app.request('/api/repositories/missing');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+  });
+
+  it('returns an error by repoId when config is invalid', async () => {
+    // Given
+    const mockResolver = {
+      resolve: vi.fn(),
+      resolveRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigResolutionError(
+            'Repository config is invalid: Invalid JSON config: Unexpected token',
+            'invalid',
           ),
         ),
       list: vi.fn(),
@@ -166,30 +215,8 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(400);
     expect(data).toEqual({
-      error: 'Repository config is missing: /Users/example/.config/sift/config.json',
+      error: 'Repository config is invalid: Invalid JSON config: Unexpected token',
     });
-  });
-
-  it('returns an error for an unconfigured repository id', async () => {
-    // Given
-    const mockResolver = {
-      resolve: vi.fn(),
-      resolveItem: vi
-        .fn()
-        .mockRejectedValue(
-          new RepositoryResolutionError('Repository id "missing" is not configured.'),
-        ),
-      list: vi.fn(),
-    };
-    const app = createApp(mockResolver);
-
-    // When
-    const response = await app.request('/api/repositories/missing');
-    const data = await response.json();
-
-    // Then
-    expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
   });
 
   it('adds a repository and returns the added item without validation status', async () => {
@@ -202,9 +229,8 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn().mockResolvedValue({
+      resolveRepository: vi.fn().mockResolvedValue({
         id: 'sift',
-        isValid: true,
         name: 'sift',
         path: '/Users/example/projects/sift',
       }),
@@ -223,7 +249,7 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(201);
     expect(mockUpdater.addRepository).toHaveBeenCalledWith('/Users/example/projects/sift');
-    expect(mockResolver.resolveItem).toHaveBeenCalledWith('sift');
+    expect(mockResolver.resolveRepository).toHaveBeenCalledWith('sift');
     expect(data).toEqual({
       repository: {
         id: 'sift',
@@ -240,7 +266,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
@@ -266,7 +292,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
@@ -292,7 +318,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
@@ -322,7 +348,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
@@ -344,7 +370,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi.fn().mockResolvedValue({
         repositories: [{ id: 'sift', name: 'sift', path: '/Users/example/projects/sift' }],
         invalidRepositories: [
@@ -388,13 +414,11 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn().mockResolvedValue({
-        id: 'invalid-repo',
-        isValid: false,
-        error: 'Repository path is not a Git repository.',
-        name: 'invalid-repo',
-        path: '/Users/example/invalid-repo',
-      }),
+      resolveRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryValidationError('Repository path is not a Git repository.'),
+        ),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -404,13 +428,9 @@ describe('repositoryRoutes', () => {
     const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
+    expect(response.status).toBe(422);
     expect(data).toEqual({
       error: 'Repository path is not a Git repository.',
-      id: 'invalid-repo',
-      isValid: false,
-      name: 'invalid-repo',
-      path: '/Users/example/invalid-repo',
     });
   });
 
@@ -418,7 +438,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolve: vi.fn(),
-      resolveItem: vi.fn(),
+      resolveRepository: vi.fn(),
       list: vi
         .fn()
         .mockRejectedValue(
