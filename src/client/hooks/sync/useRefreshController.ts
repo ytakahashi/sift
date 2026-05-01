@@ -3,13 +3,12 @@ import {
   computeDiffRefreshHash,
   decideRefreshEffects,
 } from '../../application/sync/refresh-policy';
-import type { DiffData } from '../../application/ports';
-import type { DiffFile } from '../../../domain/diff/types';
+import type { DiffFile, RepositoryDiff } from '../../../domain/diff/types';
 
 export interface UseRefreshControllerOptions {
   workingFiles: DiffFile[];
   stagedFiles: DiffFile[];
-  refresh: () => Promise<DiffData | null>;
+  refresh: () => Promise<RepositoryDiff | null>;
   clearNotes: () => void;
 }
 

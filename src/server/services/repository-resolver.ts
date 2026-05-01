@@ -1,15 +1,4 @@
-import type {
-  RepositoryDescriptor,
-  RepositoryList,
-  ResolvedRepository,
-} from '../../domain/repository/repository';
-
-export class RepositoryResolutionError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = 'RepositoryResolutionError';
-  }
-}
+import type { RepositoryList, ResolvedRepository } from '../../domain/repository/repository';
 
 export class RepositoryConfigResolutionError extends Error {
   constructor(
@@ -36,12 +25,9 @@ export class RepositoryValidationError extends Error {
 }
 
 export interface RepositoryResolver {
-  /** Resolves a repoId to a RepositoryDescriptor. Throws RepositoryResolutionError if not found. */
-  resolve(repoId: string): Promise<RepositoryDescriptor>;
-
   /** Resolves and validates a repoId for display. Throws typed repository errors when unavailable. */
   resolveRepository(repoId: string): Promise<ResolvedRepository>;
 
   /** Returns the full repository list with validation status. */
-  list(): Promise<RepositoryList>;
+  listRepositories(): Promise<RepositoryList>;
 }

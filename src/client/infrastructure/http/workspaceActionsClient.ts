@@ -1,5 +1,6 @@
 import type { RepositoryId } from '../../../domain/repository/repository';
-import type { WorkspaceActions } from '../../application/ports';
+import { WorkspaceActionError, type WorkspaceActions } from '../../application/ports';
+import { readErrorMessage } from './errorResponse';
 
 async function post(
   repoId: RepositoryId,
@@ -11,10 +12,11 @@ async function post(
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  const data = await res.json();
-  if (!res.ok || !data.success) {
-    throw new Error(data.error || 'Action failed');
+  if (res.ok) {
+    return;
   }
+  const errorMessage = await readErrorMessage(res, 'Action failed');
+  throw new WorkspaceActionError(errorMessage, res.status);
 }
 
 export const httpWorkspaceActions: WorkspaceActions = {

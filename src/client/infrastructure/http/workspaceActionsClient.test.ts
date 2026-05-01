@@ -9,7 +9,6 @@ describe('httpWorkspaceActions', () => {
   it('posts file actions to the repository-scoped endpoint', async () => {
     // Given
     const fetchMock = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue({ success: true }),
       ok: true,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -28,7 +27,6 @@ describe('httpWorkspaceActions', () => {
   it('posts hunk actions with both path and hunk id', async () => {
     // Given
     const fetchMock = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue({ success: true }),
       ok: true,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -47,7 +45,6 @@ describe('httpWorkspaceActions', () => {
   it('posts bulk actions to repository-scoped endpoints', async () => {
     // Given
     const fetchMock = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue({ success: true }),
       ok: true,
     });
     vi.stubGlobal('fetch', fetchMock);
@@ -85,5 +82,22 @@ describe('httpWorkspaceActions', () => {
         method: 'POST',
       },
     );
+  });
+
+  it('throws WorkspaceActionError on failure', async () => {
+    // Given
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: false,
+      status: 400,
+      json: vi.fn().mockResolvedValue({ error: 'Validation failed' }),
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When & Then
+    await expect(httpWorkspaceActions.stageFile('my-app', 'src/app.ts')).rejects.toMatchObject({
+      name: 'WorkspaceActionError',
+      message: 'Validation failed',
+      statusCode: 400,
+    });
   });
 });

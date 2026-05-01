@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
-import type { DiffFile } from '../../domain/diff/types';
+import type { RepositoryDiff } from '../../domain/diff/types';
 import type { Env } from '../create-app';
 import type { RepositoryResolver } from '../services/repository-resolver';
 import { handleRouteError } from './route-error';
@@ -10,19 +10,10 @@ export interface CreateDiffRoutesOptions {
   createDiffProvider: (repositoryPath: string) => DiffProvider;
 }
 
-interface DiffResponse {
-  metadata: {
-    repoRoot: string;
-    revision: 'HEAD';
-  };
-  stagedFiles: DiffFile[];
-  workingFiles: DiffFile[];
-}
-
 async function buildDiffResponse(
   repositoryPath: string,
   createDiffProvider: (path: string) => DiffProvider,
-): Promise<DiffResponse> {
+): Promise<RepositoryDiff> {
   const provider = createDiffProvider(repositoryPath);
   const [workingFiles, stagedFiles] = await Promise.all([
     provider.getFiles('working'),
@@ -46,7 +37,7 @@ export function createDiffRoutes(options: CreateDiffRoutesOptions): Hono<Env> {
 
   diffRoutes.get('/repositories/:repoId/diff', async (c) => {
     try {
-      const repository = await resolver.resolve(c.req.param('repoId') as string);
+      const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
       return c.json(await buildDiffResponse(repository.path, createDiffProvider));
     } catch (error: unknown) {
       return handleRouteError(c, error);

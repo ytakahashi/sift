@@ -1,5 +1,14 @@
 export type FileBucket = 'working' | 'staged' | 'single';
 
+export interface RepositoryDiff {
+  metadata: {
+    repoRoot: string;
+    revision: 'HEAD';
+  };
+  stagedFiles: DiffFile[];
+  workingFiles: DiffFile[];
+}
+
 export interface DiffFile {
   id: string; // Typically file path, consider creating a "FileId" type
   bucket: FileBucket;

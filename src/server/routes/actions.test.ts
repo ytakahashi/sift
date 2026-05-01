@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createActionRoutes, type CreateActionRoutesOptions } from './actions';
-import { RepositoryResolutionError } from '../services/repository-resolver';
+import { RepositoryNotFoundError } from '../services/repository-resolver';
 import type { WorkspaceActionService } from '../services/workspace-action-service';
 
 const discardWorkingFileMock = vi.fn();
@@ -36,12 +36,14 @@ describe('actionRoutes discard-working-file', () => {
     // Given
     discardWorkingFileMock.mockResolvedValue(undefined);
     const mockResolver = {
-      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
-    const app = createApp({ repositoryResolver: mockResolver, createWorkspaceActionService });
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService,
+    });
 
     // When
     const response = await app.request('/api/repositories/my-app/actions/discard-working-file', {
@@ -49,27 +51,28 @@ describe('actionRoutes discard-working-file', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ path: 'a.ts' }),
     });
-    const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true });
-    expect(mockResolver.resolve).toHaveBeenCalledWith('my-app');
+    expect(response.status).toBe(204);
+    // 204 No Content has no body
+    expect(response.headers.get('content-type')).toBeNull();
+    expect(await response.text()).toBe('');
+
+    expect(mockResolver.resolveRepository).toHaveBeenCalledWith('my-app');
     // Verify the factory received the path resolved from the repository descriptor
     expect(createWorkspaceActionService).toHaveBeenCalledWith('/repo/my-app');
     expect(discardWorkingFileMock).toHaveBeenCalledWith('a.ts');
   });
 
-  it('returns 400 when scoped action repoId is not configured', async () => {
+  it('returns 404 when scoped action repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      resolve: vi
+      listRepositories: vi.fn(),
+      resolveRepository: vi
         .fn()
         .mockRejectedValue(
-          new RepositoryResolutionError('Repository id "missing" is not configured.'),
+          new RepositoryNotFoundError('Repository id "missing" is not configured.'),
         ),
-      resolveRepository: vi.fn(),
-      list: vi.fn(),
     };
     const app = createApp({
       repositoryResolver: mockResolver,
@@ -85,7 +88,7 @@ describe('actionRoutes discard-working-file', () => {
     const data = await response.json();
 
     // Then
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
   });
 
@@ -93,9 +96,8 @@ describe('actionRoutes discard-working-file', () => {
     // Given: the service throws
     discardWorkingFileMock.mockRejectedValue(new Error('discard failed'));
     const mockResolver = {
-      resolve: vi.fn().mockResolvedValue({ id: 'sift', path: '/repo/sift' }),
-      resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'sift', path: '/repo/sift' }),
     };
     const app = createApp({
       repositoryResolver: mockResolver,
@@ -114,6 +116,78 @@ describe('actionRoutes discard-working-file', () => {
     expect(response.status).toBe(500);
     expect(data).toEqual({ error: 'discard failed' });
   });
+
+  it('returns 400 when request body is not JSON', async () => {
+    // Given
+    const mockResolver = {
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+    };
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
+
+    // When
+    const response = await app.request('/api/repositories/my-app/actions/discard-working-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: 'invalid json',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Action request body must be a JSON object.' });
+  });
+
+  it('returns 400 when request body is not an object', async () => {
+    // Given
+    const mockResolver = {
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+    };
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
+
+    // When
+    const response = await app.request('/api/repositories/my-app/actions/discard-working-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify([]),
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Action request body must be a JSON object.' });
+  });
+
+  it('returns 400 when path is missing or empty', async () => {
+    // Given
+    const mockResolver = {
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
+    };
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService: () => mockService,
+    });
+
+    // When
+    const response = await app.request('/api/repositories/my-app/actions/discard-working-file', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({}),
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data.error).toBe('Action requires a non-empty string path parameter.');
+  });
 });
 
 describe('actionRoutes bulk actions', () => {
@@ -125,12 +199,14 @@ describe('actionRoutes bulk actions', () => {
     // Given
     stageAllWorkingFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
-      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
-    const app = createApp({ repositoryResolver: mockResolver, createWorkspaceActionService });
+    const app = createApp({
+      repositoryResolver: mockResolver,
+      createWorkspaceActionService,
+    });
 
     // When
     const response = await app.request('/api/repositories/my-app/actions/stage-all-working-files', {
@@ -138,12 +214,10 @@ describe('actionRoutes bulk actions', () => {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({}),
     });
-    const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true });
-    expect(mockResolver.resolve).toHaveBeenCalledWith('my-app');
+    expect(response.status).toBe(204);
+    expect(mockResolver.resolveRepository).toHaveBeenCalledWith('my-app');
     expect(createWorkspaceActionService).toHaveBeenCalledWith('/repo/my-app');
     expect(stageAllWorkingFilesMock).toHaveBeenCalled();
   });
@@ -152,9 +226,8 @@ describe('actionRoutes bulk actions', () => {
     // Given
     unstageAllStagedFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
-      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({
       repositoryResolver: mockResolver,
@@ -170,11 +243,9 @@ describe('actionRoutes bulk actions', () => {
         body: JSON.stringify({}),
       },
     );
-    const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true });
+    expect(response.status).toBe(204);
     expect(unstageAllStagedFilesMock).toHaveBeenCalled();
   });
 
@@ -182,9 +253,8 @@ describe('actionRoutes bulk actions', () => {
     // Given
     discardAllWorkingFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
-      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
+      resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({
       repositoryResolver: mockResolver,
@@ -200,11 +270,9 @@ describe('actionRoutes bulk actions', () => {
         body: JSON.stringify({}),
       },
     );
-    const data = await response.json();
 
     // Then
-    expect(response.status).toBe(200);
-    expect(data).toEqual({ success: true });
+    expect(response.status).toBe(204);
     expect(discardAllWorkingFilesMock).toHaveBeenCalled();
   });
 });

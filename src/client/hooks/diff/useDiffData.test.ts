@@ -1,7 +1,8 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
-import type { DiffData, DiffReader } from '../../application/ports';
+import type { RepositoryDiff } from '../../../domain/diff/types';
+import type { DiffReader } from '../../application/ports';
 import { useDiffData } from './useDiffData';
 
 function createFile(id: string): DiffFile {
@@ -35,6 +36,7 @@ describe('useDiffData', () => {
     const stagedFile = { ...createFile('staged'), bucket: 'staged' as const };
     const diffReader: DiffReader = {
       fetchDiff: vi.fn().mockResolvedValue({
+        metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
         workingFiles: [workingFile],
         stagedFiles: [stagedFile],
       }),
@@ -56,9 +58,10 @@ describe('useDiffData', () => {
 
   it('keeps the latest overlapping refresh result', async () => {
     // Given: the initial request resolves, then two refreshes overlap
-    const olderRefresh = createDeferred<DiffData>();
-    const newerRefresh = createDeferred<DiffData>();
+    const olderRefresh = createDeferred<RepositoryDiff>();
+    const newerRefresh = createDeferred<RepositoryDiff>();
     const fetchDiff = vi.fn().mockResolvedValueOnce({
+      metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
       workingFiles: [createFile('initial')],
       stagedFiles: [],
     });
@@ -76,6 +79,7 @@ describe('useDiffData', () => {
     const secondPromise = result.current.refresh();
 
     newerRefresh.resolve({
+      metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
       workingFiles: [createFile('latest')],
       stagedFiles: [],
     });
@@ -83,6 +87,7 @@ describe('useDiffData', () => {
       return await secondPromise;
     });
     olderRefresh.resolve({
+      metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
       workingFiles: [createFile('stale')],
       stagedFiles: [],
     });

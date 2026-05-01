@@ -9,12 +9,19 @@ export interface CreateActionRoutesOptions {
   createWorkspaceActionService: (repositoryPath: string) => WorkspaceActionService;
 }
 
+class ActionParameterError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'ActionParameterError';
+  }
+}
+
 async function createScopedActionService(
   c: Context<Env>,
   resolver: RepositoryResolver,
   createService: (path: string) => WorkspaceActionService,
 ): Promise<WorkspaceActionService> {
-  const repository = await resolver.resolve(c.req.param('repoId') as string);
+  const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
   return createService(repository.path);
 }
 
@@ -23,23 +30,43 @@ async function handleAction(
   createService: () => Promise<WorkspaceActionService> | WorkspaceActionService,
   runAction: (service: WorkspaceActionService, body: Record<string, unknown>) => Promise<void>,
 ): Promise<Response> {
-  const body = (await c.req.json()) as Record<string, unknown>;
-
   try {
+    let body: unknown;
+    try {
+      body = await c.req.json();
+    } catch (_error: unknown) {
+      return c.json({ error: 'Action request body must be a JSON object.' }, 400);
+    }
+
+    if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+      return c.json({ error: 'Action request body must be a JSON object.' }, 400);
+    }
+
     const service = await createService();
-    await runAction(service, body);
-    return c.json({ success: true });
+    await runAction(service, body as Record<string, unknown>);
+    return c.body(null, 204);
   } catch (error: unknown) {
+    if (error instanceof ActionParameterError) {
+      return c.json({ error: error.message }, 400);
+    }
     return handleRouteError(c, error);
   }
 }
 
 function getPath(body: Record<string, unknown>): string {
-  return String(body.path);
+  const path = body.path;
+  if (typeof path !== 'string' || path.trim() === '') {
+    throw new ActionParameterError('Action requires a non-empty string path parameter.');
+  }
+  return path;
 }
 
 function getHunkId(body: Record<string, unknown>): string {
-  return String(body.hunkId);
+  const hunkId = body.hunkId;
+  if (typeof hunkId !== 'string' || hunkId.trim() === '') {
+    throw new ActionParameterError('Action requires a non-empty string hunkId parameter.');
+  }
+  return hunkId;
 }
 
 function registerActionRoutes(
