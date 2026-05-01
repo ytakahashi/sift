@@ -25,6 +25,16 @@ export class DiffFetchError extends Error {
   }
 }
 
+export class WorkspaceActionError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'WorkspaceActionError';
+  }
+}
+
 export interface DiffReader {
   fetchDiff(repoId: RepositoryId): Promise<RepositoryDiff>;
 }
