@@ -28,13 +28,14 @@ describe('watchRoutes', () => {
   it('returns 404 when scoped watch repoId is not configured', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
           new RepositoryNotFoundError('Repository id "missing" is not configured.'),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/missing/watch');
@@ -48,13 +49,14 @@ describe('watchRoutes', () => {
   it('returns 422 when the repository path is not a valid Git repository', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
           new RepositoryValidationError('Repository path is not a Git repository.'),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/bad-repo/watch');
@@ -68,13 +70,14 @@ describe('watchRoutes', () => {
   it('returns 400 when the repository config is invalid', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
           new RepositoryConfigResolutionError('Invalid JSON config: Unexpected token', 'invalid'),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/invalid-config/watch');

@@ -39,11 +39,12 @@ describe('diffRoutes', () => {
   it('returns RepositoryDiff for a valid repository', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/my-app/diff');
@@ -63,13 +64,14 @@ describe('diffRoutes', () => {
   it('returns 404 when repoId is not configured', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
           new RepositoryNotFoundError('Repository id "missing" is not configured.'),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/missing/diff');
@@ -83,13 +85,14 @@ describe('diffRoutes', () => {
   it('returns 422 when the repository path is not a valid Git repository', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
           new RepositoryValidationError('Repository path is not a Git repository.'),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/bad-repo/diff');
@@ -103,6 +106,7 @@ describe('diffRoutes', () => {
   it('returns 404 when the repository config is missing', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -112,7 +116,7 @@ describe('diffRoutes', () => {
           ),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/sift/diff');
@@ -126,13 +130,14 @@ describe('diffRoutes', () => {
   it('returns 400 when the repository config is invalid', async () => {
     // Given
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
           new RepositoryConfigResolutionError('Invalid JSON config: Unexpected token', 'invalid'),
         ),
     };
-    const app = createApp(mockResolver as any);
+    const app = createApp(mockResolver);
 
     // When
     const response = await app.request('/api/repositories/sift/diff');
@@ -146,6 +151,7 @@ describe('diffRoutes', () => {
   it('returns 500 when the diff provider throws an unexpected error', async () => {
     // Given: resolver succeeds but the diff provider fails
     const mockResolver = {
+      list: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
@@ -154,7 +160,7 @@ describe('diffRoutes', () => {
     app.route(
       '/api',
       createDiffRoutes({
-        repositoryResolver: mockResolver as any,
+        repositoryResolver: mockResolver,
         createDiffProvider: () => ({
           getFiles: vi.fn().mockRejectedValue(new Error('git: fatal error')),
         }),
