@@ -39,7 +39,7 @@ describe('diffRoutes', () => {
   it('returns RepositoryDiff for a valid repository', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
@@ -64,7 +64,7 @@ describe('diffRoutes', () => {
   it('returns 404 when repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -85,7 +85,7 @@ describe('diffRoutes', () => {
   it('returns 422 when the repository path is not a valid Git repository', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -106,7 +106,7 @@ describe('diffRoutes', () => {
   it('returns 404 when the repository config is missing', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -130,7 +130,7 @@ describe('diffRoutes', () => {
   it('returns 400 when the repository config is invalid', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -151,7 +151,7 @@ describe('diffRoutes', () => {
   it('returns 500 when the diff provider throws an unexpected error', async () => {
     // Given: resolver succeeds but the diff provider fails
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),

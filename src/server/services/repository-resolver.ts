@@ -29,5 +29,5 @@ export interface RepositoryResolver {
   resolveRepository(repoId: string): Promise<ResolvedRepository>;
 
   /** Returns the full repository list with validation status. */
-  list(): Promise<RepositoryList>;
+  listRepositories(): Promise<RepositoryList>;
 }

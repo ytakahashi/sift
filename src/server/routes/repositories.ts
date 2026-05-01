@@ -16,7 +16,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
 
   repositoryRoutes.get('/', async (c) => {
     try {
-      return c.json(await resolver.list());
+      return c.json(await resolver.listRepositories());
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }

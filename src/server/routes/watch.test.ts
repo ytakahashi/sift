@@ -28,7 +28,7 @@ describe('watchRoutes', () => {
   it('returns 404 when scoped watch repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -49,7 +49,7 @@ describe('watchRoutes', () => {
   it('returns 422 when the repository path is not a valid Git repository', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -70,7 +70,7 @@ describe('watchRoutes', () => {
   it('returns 400 when the repository config is invalid', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(

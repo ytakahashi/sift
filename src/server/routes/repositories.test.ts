@@ -32,7 +32,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn().mockResolvedValue({
+      listRepositories: vi.fn().mockResolvedValue({
         repositories: [
           { id: 'sift', name: 'sift', path: '/Users/example/projects/sift' },
           { id: 'my-app', name: 'my-app', path: '/Users/example/work/my-app' },
@@ -69,7 +69,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi
+      listRepositories: vi
         .fn()
         .mockRejectedValue(
           new RepositoryConfigResolutionError(
@@ -95,7 +95,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi
+      listRepositories: vi
         .fn()
         .mockRejectedValue(
           new RepositoryConfigResolutionError('Invalid JSON config: Unexpected token', 'invalid'),
@@ -122,7 +122,7 @@ describe('repositoryRoutes', () => {
         name: 'my-app',
         path: '/Users/example/work/my-app',
       }),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver);
 
@@ -150,7 +150,7 @@ describe('repositoryRoutes', () => {
             'missing',
           ),
         ),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver);
 
@@ -173,7 +173,7 @@ describe('repositoryRoutes', () => {
         .mockRejectedValue(
           new RepositoryNotFoundError('Repository id "missing" is not configured.'),
         ),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver);
 
@@ -197,7 +197,7 @@ describe('repositoryRoutes', () => {
             'invalid',
           ),
         ),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver);
 
@@ -222,7 +222,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
 
@@ -251,7 +251,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
 
@@ -276,7 +276,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
 
@@ -301,7 +301,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
 
@@ -330,7 +330,7 @@ describe('repositoryRoutes', () => {
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver, mockUpdater);
 
@@ -351,7 +351,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi.fn().mockResolvedValue({
+      listRepositories: vi.fn().mockResolvedValue({
         repositories: [{ id: 'sift', name: 'sift', path: '/Users/example/projects/sift' }],
         invalidRepositories: [
           {
@@ -398,7 +398,7 @@ describe('repositoryRoutes', () => {
         .mockRejectedValue(
           new RepositoryValidationError('Repository path is not a Git repository.'),
         ),
-      list: vi.fn(),
+      listRepositories: vi.fn(),
     };
     const app = createApp(mockResolver);
 
@@ -417,7 +417,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockResolver = {
       resolveRepository: vi.fn(),
-      list: vi
+      listRepositories: vi
         .fn()
         .mockRejectedValue(
           new RepositoryConfigResolutionError('Repository id "sift" is duplicated.', 'invalid'),

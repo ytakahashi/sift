@@ -36,7 +36,7 @@ describe('actionRoutes discard-working-file', () => {
     // Given
     discardWorkingFileMock.mockResolvedValue(undefined);
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
@@ -67,7 +67,7 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 404 when scoped action repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -96,7 +96,7 @@ describe('actionRoutes discard-working-file', () => {
     // Given: the service throws
     discardWorkingFileMock.mockRejectedValue(new Error('discard failed'));
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'sift', path: '/repo/sift' }),
     };
     const app = createApp({
@@ -120,7 +120,7 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 400 when request body is not JSON', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({
@@ -144,7 +144,7 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 400 when request body is not an object', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({
@@ -168,7 +168,7 @@ describe('actionRoutes discard-working-file', () => {
   it('returns 400 when path is missing or empty', async () => {
     // Given
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({
@@ -199,7 +199,7 @@ describe('actionRoutes bulk actions', () => {
     // Given
     stageAllWorkingFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const createWorkspaceActionService = vi.fn().mockReturnValue(mockService);
@@ -226,7 +226,7 @@ describe('actionRoutes bulk actions', () => {
     // Given
     unstageAllStagedFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({
@@ -253,7 +253,7 @@ describe('actionRoutes bulk actions', () => {
     // Given
     discardAllWorkingFilesMock.mockResolvedValue(undefined);
     const mockResolver = {
-      list: vi.fn(),
+      listRepositories: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
     };
     const app = createApp({

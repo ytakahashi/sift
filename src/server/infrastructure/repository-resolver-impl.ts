@@ -155,7 +155,7 @@ export function createRepositoryResolver(
         throw error;
       }
     },
-    list: async (): Promise<RepositoryList> => {
+    listRepositories: async (): Promise<RepositoryList> => {
       const configResult = await readConfig();
 
       if (configResult.status === 'missing') {

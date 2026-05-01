@@ -129,13 +129,13 @@ describe('createRepositoryResolver', () => {
     });
   });
 
-  describe('list', () => {
+  describe('listRepositories', () => {
     it('returns valid repositories and invalid repositories separately', async () => {
       // Given
       const resolver = createRepositoryResolver(validReadConfig, mockValidator);
 
       // When
-      const result = await resolver.list();
+      const result = await resolver.listRepositories();
 
       // Then
       expect(result).toEqual({
@@ -162,8 +162,8 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(missingReadConfig, mockValidator);
 
       // When / Then
-      await expect(resolver.list()).rejects.toThrow(RepositoryConfigResolutionError);
-      await expect(resolver.list()).rejects.toMatchObject({
+      await expect(resolver.listRepositories()).rejects.toThrow(RepositoryConfigResolutionError);
+      await expect(resolver.listRepositories()).rejects.toMatchObject({
         kind: 'missing',
         message: 'Repository config is missing: /missing/config.json',
       });
@@ -174,8 +174,8 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(invalidReadConfig, mockValidator);
 
       // When / Then
-      await expect(resolver.list()).rejects.toThrow(RepositoryConfigResolutionError);
-      await expect(resolver.list()).rejects.toMatchObject({
+      await expect(resolver.listRepositories()).rejects.toThrow(RepositoryConfigResolutionError);
+      await expect(resolver.listRepositories()).rejects.toMatchObject({
         kind: 'invalid',
         message: 'Syntax error',
       });
@@ -186,8 +186,8 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(duplicateReadConfig, mockValidator);
 
       // When / Then
-      await expect(resolver.list()).rejects.toThrow(RepositoryConfigResolutionError);
-      await expect(resolver.list()).rejects.toMatchObject({
+      await expect(resolver.listRepositories()).rejects.toThrow(RepositoryConfigResolutionError);
+      await expect(resolver.listRepositories()).rejects.toMatchObject({
         kind: 'invalid',
         message: 'Repository id "dup-repo" is duplicated.',
       });
