@@ -50,7 +50,11 @@ function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
 
 const testDependencies: AppDependencies = {
   diffReader: {
-    fetchDiff: vi.fn(async () => ({ workingFiles: [], stagedFiles: [] })),
+    fetchDiff: vi.fn(async () => ({
+      metadata: { repoRoot: '/repo/my-app', revision: 'HEAD' as const },
+      workingFiles: [],
+      stagedFiles: [],
+    })),
   },
   repositoryReader: {
     fetchRepositories: vi.fn(async () => ({

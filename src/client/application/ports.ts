@@ -1,4 +1,4 @@
-import type { DiffFile } from '../../domain/diff/types';
+import type { RepositoryDiff } from '../../domain/diff/types';
 import type {
   RepositoryId,
   RepositoryList,
@@ -15,13 +15,18 @@ export class RepositoryFetchError extends Error {
   }
 }
 
-export interface DiffData {
-  workingFiles: DiffFile[];
-  stagedFiles: DiffFile[];
+export class DiffFetchError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'DiffFetchError';
+  }
 }
 
 export interface DiffReader {
-  fetchDiff(repoId: RepositoryId): Promise<DiffData>;
+  fetchDiff(repoId: RepositoryId): Promise<RepositoryDiff>;
 }
 
 export interface RepositoryReader {

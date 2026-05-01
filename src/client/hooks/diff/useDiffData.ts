@@ -1,12 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
-import type { DiffFile } from '../../../domain/diff/types';
+import type { DiffFile, RepositoryDiff } from '../../../domain/diff/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type { DiffReader } from '../../application/ports';
-
-export interface DiffDataRefreshResult {
-  workingFiles: DiffFile[];
-  stagedFiles: DiffFile[];
-}
 
 export interface UseDiffDataResult {
   /** Files with unstaged working-tree changes returned by the latest accepted diff read. */
@@ -20,7 +15,7 @@ export interface UseDiffDataResult {
   /** Message from the latest accepted diff read failure, or null after a successful read. */
   error: string | null;
   /** Reads diff data again and applies the result only if no newer request superseded it. */
-  refresh: () => Promise<DiffDataRefreshResult | null>;
+  refresh: () => Promise<RepositoryDiff | null>;
 }
 
 export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDiffDataResult {
@@ -34,7 +29,7 @@ export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDi
   // and auto refresh overlap.
   const latestRequestId = useRef(0);
 
-  const fetchDiffs = useCallback(async (): Promise<DiffDataRefreshResult | null> => {
+  const fetchDiffs = useCallback(async (): Promise<RepositoryDiff | null> => {
     const requestId = latestRequestId.current + 1;
     latestRequestId.current = requestId;
     setLoading(true);

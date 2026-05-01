@@ -3,7 +3,9 @@ import { Hono } from 'hono';
 import type { Env } from '../create-app';
 import { createDiffRoutes } from './diff';
 import {
-  RepositoryResolutionError,
+  RepositoryConfigResolutionError,
+  RepositoryNotFoundError,
+  RepositoryValidationError,
   type RepositoryResolver,
 } from '../services/repository-resolver';
 
@@ -34,11 +36,14 @@ describe('diffRoutes', () => {
     });
   });
 
-  it('returns diff for the repository resolved from repoId', async () => {
+  it('returns RepositoryDiff for a valid repository', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn().mockResolvedValue({ id: 'my-app', path: '/repo/my-app' }),
-      resolveRepository: vi.fn(),
+      resolveRepository: vi
+        .fn()
+        .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
+      listRepositories: vi.fn(),
+      resolve: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -51,17 +56,21 @@ describe('diffRoutes', () => {
     expect(response.status).toBe(200);
     // Confirm the factory was called with the resolved repository path
     expect(data.metadata.repoRoot).toBe('/repo/my-app');
+    expect(data.metadata.revision).toBe('HEAD');
+    expect(data).toHaveProperty('workingFiles');
+    expect(data).toHaveProperty('stagedFiles');
   });
 
-  it('returns an error when repoId is not configured', async () => {
+  it('returns 404 when repoId is not configured', async () => {
     // Given
     const mockResolver = {
-      resolve: vi
+      resolveRepository: vi
         .fn()
         .mockRejectedValue(
-          new RepositoryResolutionError('Repository id "missing" is not configured.'),
+          new RepositoryNotFoundError('Repository id "missing" is not configured.'),
         ),
-      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+      resolve: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -71,19 +80,69 @@ describe('diffRoutes', () => {
     const data = await response.json();
 
     // Then
-    expect(response.status).toBe(400);
+    expect(response.status).toBe(404);
     expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
   });
 
-  it('returns an error when config is missing for a non-default scoped diff', async () => {
+  it('returns 422 when the repository path is not a valid Git repository', async () => {
     // Given
     const mockResolver = {
-      resolve: vi
+      resolveRepository: vi
         .fn()
         .mockRejectedValue(
-          new RepositoryResolutionError('Repository config is missing: /missing/config.json'),
+          new RepositoryValidationError('Repository path is not a Git repository.'),
         ),
-      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+      resolve: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
+
+    // When
+    const response = await app.request('/api/repositories/bad-repo/diff');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(422);
+    expect(data).toEqual({ error: 'Repository path is not a Git repository.' });
+  });
+
+  it('returns 404 when the repository config is missing', async () => {
+    // Given
+    const mockResolver = {
+      resolveRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigResolutionError(
+            'Repository config is missing: /missing/config.json',
+            'missing',
+          ),
+        ),
+      listRepositories: vi.fn(),
+      resolve: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = createApp(mockResolver);
+
+    // When
+    const response = await app.request('/api/repositories/sift/diff');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(data).toEqual({ error: 'Repository config is missing: /missing/config.json' });
+  });
+
+  it('returns 400 when the repository config is invalid', async () => {
+    // Given
+    const mockResolver = {
+      resolveRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigResolutionError('Invalid JSON config: Unexpected token', 'invalid'),
+        ),
+      listRepositories: vi.fn(),
+      resolve: vi.fn(),
       list: vi.fn(),
     };
     const app = createApp(mockResolver);
@@ -94,6 +153,36 @@ describe('diffRoutes', () => {
 
     // Then
     expect(response.status).toBe(400);
-    expect(data).toEqual({ error: 'Repository config is missing: /missing/config.json' });
+    expect(data).toEqual({ error: 'Invalid JSON config: Unexpected token' });
+  });
+
+  it('returns 500 when the diff provider throws an unexpected error', async () => {
+    // Given: resolver succeeds but the diff provider fails
+    const mockResolver = {
+      resolveRepository: vi
+        .fn()
+        .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
+      listRepositories: vi.fn(),
+      resolve: vi.fn(),
+      list: vi.fn(),
+    };
+    const app = new Hono<Env>();
+    app.route(
+      '/api',
+      createDiffRoutes({
+        repositoryResolver: mockResolver,
+        createDiffProvider: () => ({
+          getFiles: vi.fn().mockRejectedValue(new Error('git: fatal error')),
+        }),
+      }),
+    );
+
+    // When
+    const response = await app.request('/api/repositories/my-app/diff');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(500);
+    expect(data).toEqual({ error: 'git: fatal error' });
   });
 });

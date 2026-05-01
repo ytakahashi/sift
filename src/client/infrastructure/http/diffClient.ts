@@ -1,16 +1,17 @@
+import type { RepositoryDiff } from '../../../domain/diff/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
-import type { DiffData, DiffReader } from '../../application/ports';
+import { DiffFetchError, type DiffReader } from '../../application/ports';
+import { readErrorMessage } from './errorResponse';
 
 export const httpDiffReader: DiffReader = {
-  async fetchDiff(repoId: RepositoryId): Promise<DiffData> {
+  async fetchDiff(repoId: RepositoryId): Promise<RepositoryDiff> {
     const res = await fetch(`/api/repositories/${encodeURIComponent(repoId)}/diff`);
     if (!res.ok) {
-      throw new Error(`Failed to fetch diff: ${res.statusText}`);
+      throw new DiffFetchError(
+        await readErrorMessage(res, `Failed to fetch diff: ${res.statusText}`),
+        res.status,
+      );
     }
-    const data = await res.json();
-    return {
-      workingFiles: data.workingFiles ?? [],
-      stagedFiles: data.stagedFiles ?? [],
-    };
+    return (await res.json()) as RepositoryDiff;
   },
 };
