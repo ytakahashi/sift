@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { cleanup, render, screen, fireEvent, act, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, within, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../domain/diff/types';
@@ -297,14 +297,15 @@ describe('App file list interactions', () => {
     expect(screen.queryByText('file note editor open')).toBeNull();
   });
 
-  it('calls discardWorkingFile when Discard is clicked from working pane', async () => {
+  it('calls discardWorkingFile after confirming the modal when Discard is clicked from working pane', async () => {
     // Given: app with a selected working file
     const user = userEvent.setup();
     render(<App />);
     await user.click(screen.getByRole('option', { name: 'b.tsM' }));
 
-    // When: Discard button is clicked
+    // When: Discard button is clicked and confirmed in the modal
     await user.click(screen.getByRole('button', { name: 'Discard' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Discard' }));
 
     // Then: discard action is sent for selected path
     expect(discardWorkingFile).toHaveBeenCalledWith('b.ts');
@@ -344,32 +345,55 @@ describe('App file list interactions', () => {
     expect(unstageAllStagedFiles).toHaveBeenCalled();
   });
 
-  it('asks for confirmation before discarding all working files', async () => {
-    // Given: confirmation is accepted
+  it('shows confirmation modal and discards all files on confirm', async () => {
+    // Given
     const user = userEvent.setup();
-    const confirmMock = vi.fn().mockReturnValue(true);
-    vi.stubGlobal('confirm', confirmMock);
     render(<App />);
 
     // When
     await user.click(screen.getByRole('button', { name: 'Discard All' }));
 
+    // Then: modal is shown (getByRole throws if the element is absent)
+    const dialog = screen.getByRole('dialog');
+
+    // When: user confirms in the dialog
+    await user.click(within(dialog).getByRole('button', { name: 'Discard' }));
+
     // Then
-    expect(confirmMock).toHaveBeenCalledWith('Discard all working directory changes?');
     expect(discardAllWorkingFiles).toHaveBeenCalled();
   });
 
-  it('does not discard all working files when confirmation is cancelled', async () => {
-    // Given: confirmation is cancelled
+  it('does not discard all working files when modal is cancelled', async () => {
+    // Given
     const user = userEvent.setup();
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
     render(<App />);
 
     // When
     await user.click(screen.getByRole('button', { name: 'Discard All' }));
+    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
 
     // Then
     expect(discardAllWorkingFiles).not.toHaveBeenCalled();
+  });
+
+  it('shows confirmation modal with file name and discards the file on confirm', async () => {
+    // Given: select a.ts from the working file list to reveal the header Discard button
+    const user = userEvent.setup();
+    render(<App />);
+    await user.click(screen.getByRole('option', { name: 'a.tsM' }));
+
+    // When: click the header Discard button
+    await user.click(screen.getByRole('button', { name: 'Discard' }));
+
+    // Then: modal is shown with the file name (getByRole / getByText throw if absent)
+    const dialog = screen.getByRole('dialog');
+    within(dialog).getByText(/a\.ts/);
+
+    // When: user confirms in the dialog
+    await user.click(within(dialog).getByRole('button', { name: 'Discard' }));
+
+    // Then
+    expect(discardWorkingFile).toHaveBeenCalled();
   });
 
   it('disables pane footer bulk action buttons when their panes are empty', () => {

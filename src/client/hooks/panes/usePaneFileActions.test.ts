@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import type { RenderHookResult } from '@testing-library/react';
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { FileActionResult } from '../../application/panes/pane-action';
 import type { PaneMode } from './useFileSelection';
@@ -37,6 +37,7 @@ function renderPaneFileActions({
   unstageAll: ReturnType<typeof vi.fn>;
   discardAll: BulkPaneAction;
   applyActionResult: ReturnType<typeof vi.fn>;
+  requestConfirmation: ReturnType<typeof vi.fn>;
 } {
   const stage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
   const unstage = vi.fn(async (file: DiffFile) => ({ nextSelectedFile: file }));
@@ -46,6 +47,7 @@ function renderPaneFileActions({
   const discardAll =
     discardAllOverride ?? vi.fn(async (file: DiffFile | null) => ({ nextSelectedFile: file }));
   const applyActionResult = vi.fn();
+  const requestConfirmation = vi.fn();
 
   const hook = renderHook(() =>
     usePaneFileActions({
@@ -58,6 +60,7 @@ function renderPaneFileActions({
       unstageAll,
       discardAll,
       applyActionResult,
+      requestConfirmation,
     }),
   );
 
@@ -70,14 +73,11 @@ function renderPaneFileActions({
     unstageAll,
     discardAll,
     applyActionResult,
+    requestConfirmation,
   };
 }
 
 describe('usePaneFileActions', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('stages a working file and applies the result to the working pane', async () => {
     // Given: a working file action hook
     const file = createFile('a', 'working');
@@ -114,17 +114,43 @@ describe('usePaneFileActions', () => {
     expect(applyActionResult).toHaveBeenCalledWith({ nextSelectedFile: file }, 'staged');
   });
 
-  it('discards a working file and keeps selection updates scoped to the working pane', async () => {
+  it('requests confirmation with single mode before discarding a file', () => {
     // Given: a selected working file
     const file = createFile('a', 'working');
-    const { result, discard, applyActionResult } = renderPaneFileActions({
+    const { result, requestConfirmation } = renderPaneFileActions({
       selectedFile: file,
       paneMode: 'working',
     });
 
     // When: the file is discarded
+    act(() => {
+      result.current.discardFile(file);
+    });
+
+    // Then: confirmation is requested with the correct mode and file name
+    expect(requestConfirmation).toHaveBeenCalledWith(
+      expect.objectContaining({ mode: 'single', fileName: 'a.ts' }),
+    );
+  });
+
+  it('discards the file and applies the result after confirmation callback is invoked', async () => {
+    // Given: a selected working file
+    const file = createFile('a', 'working');
+    const { result, discard, applyActionResult, requestConfirmation } = renderPaneFileActions({
+      selectedFile: file,
+      paneMode: 'working',
+    });
+
+    act(() => {
+      result.current.discardFile(file);
+    });
+
+    // When: the user confirms via the modal
+    const { onConfirm } = requestConfirmation.mock.calls[0][0] as {
+      onConfirm: () => Promise<void>;
+    };
     await act(async () => {
-      await result.current.discardFile(file);
+      await onConfirm();
     });
 
     // Then: the discard result is applied to the working selection state
@@ -257,62 +283,64 @@ describe('usePaneFileActions', () => {
     expect(applyActionResult).not.toHaveBeenCalled();
   });
 
-  it('asks for confirmation before discarding all working files', async () => {
-    // Given: confirmation is accepted
-    const confirmMock = vi.fn().mockReturnValue(true);
-    vi.stubGlobal('confirm', confirmMock);
+  it('requests confirmation with all mode before discarding all working files', () => {
+    // Given: a selected working file
     const file = createFile('a', 'working');
-    const { result, discardAll } = renderPaneFileActions({
+    const { result, requestConfirmation } = renderPaneFileActions({
       selectedFile: file,
       paneMode: 'working',
     });
 
     // When: all working files are discarded
-    await act(async () => {
-      await result.current.discardAllWorkingFiles();
+    act(() => {
+      result.current.discardAllWorkingFiles();
     });
 
-    // Then
-    expect(confirmMock).toHaveBeenCalledWith('Discard all working directory changes?');
-    expect(discardAll).toHaveBeenCalledWith(file);
+    // Then: confirmation is requested with all mode
+    expect(requestConfirmation).toHaveBeenCalledWith(expect.objectContaining({ mode: 'all' }));
   });
 
-  it('does not discard all working files when confirmation is cancelled', async () => {
-    // Given: confirmation is cancelled
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(false));
+  it('does not discard all working files when confirmation callback is never invoked', () => {
+    // Given: a selected working file
     const file = createFile('a', 'working');
     const { result, discardAll, applyActionResult } = renderPaneFileActions({
       selectedFile: file,
       paneMode: 'working',
     });
 
-    // When: all working files are discarded
-    await act(async () => {
-      await result.current.discardAllWorkingFiles();
+    // When: requestConfirmation is called but onConfirm is never invoked (user cancels)
+    act(() => {
+      result.current.discardAllWorkingFiles();
     });
 
-    // Then
+    // Then: no destructive action is taken
     expect(discardAll).not.toHaveBeenCalled();
     expect(applyActionResult).not.toHaveBeenCalled();
   });
 
-  it('preserves previous selection when discarding all working files fails', async () => {
-    // Given: confirmation is accepted and the bulk discard action reports rollback selection
-    vi.stubGlobal('confirm', vi.fn().mockReturnValue(true));
+  it('discards all working files and applies the result after confirmation callback is invoked', async () => {
+    // Given: a selected working file
     const file = createFile('a', 'working');
     const discardAllOverride = vi.fn(async () => ({ nextSelectedFile: file }));
-    const { result, applyActionResult } = renderPaneFileActions({
+    const { result, applyActionResult, requestConfirmation } = renderPaneFileActions({
       selectedFile: file,
       paneMode: 'working',
       discardAllOverride,
     });
 
-    // When: all working files are discarded
-    await act(async () => {
-      await result.current.discardAllWorkingFiles();
+    act(() => {
+      result.current.discardAllWorkingFiles();
     });
 
-    // Then: the rollback selection is applied to the working pane
+    // When: the user confirms via the modal
+    const { onConfirm } = requestConfirmation.mock.calls[0][0] as {
+      onConfirm: () => Promise<void>;
+    };
+    await act(async () => {
+      await onConfirm();
+    });
+
+    // Then: previous selection is passed through for failure rollback support
     expect(discardAllOverride).toHaveBeenCalledWith(file);
     expect(applyActionResult).toHaveBeenCalledWith({ nextSelectedFile: file }, 'working');
   });

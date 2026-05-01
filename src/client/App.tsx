@@ -20,6 +20,8 @@ import { useRefreshController } from './hooks/sync/useRefreshController';
 import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
 import { useRepositoryRoute } from './hooks/routing/useRepositoryRoute';
+import { useDiscardConfirmModal } from './hooks/discard-confirm/useDiscardConfirmModal';
+import { DiscardConfirmModal } from './components/discard-confirm/DiscardConfirmModal';
 import type { AppDependencies } from './composition/dependencies';
 
 interface AppProps {
@@ -126,6 +128,9 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
   } = useStagedPane(serverStagedFiles, unstageFile, unstageAllStagedFiles);
   const { selectedFile, paneMode, select, applyActionResult, handleBoundaryNavigate } =
     useFileSelection(workingFiles, stagedFiles);
+  const { pendingRequest, requestConfirmation, handleConfirm, handleCancel } =
+    useDiscardConfirmModal();
+
   const paneFileActions = usePaneFileActions({
     selectedFile,
     paneMode,
@@ -136,6 +141,7 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
     unstageAll,
     discardAll,
     applyActionResult,
+    requestConfirmation,
   });
   const notesPanel = useNotesPanel({
     notes,
@@ -353,6 +359,13 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
           </div>
         </div>
       </main>
+      {pendingRequest && (
+        <DiscardConfirmModal
+          {...pendingRequest}
+          onConfirm={handleConfirm}
+          onCancel={handleCancel}
+        />
+      )}
     </div>
   );
 }
