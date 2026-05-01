@@ -16,7 +16,7 @@ export function createWatchRoutes(options: CreateWatchRoutesOptions): Hono<Env> 
 
   watchRoutes.get('/repositories/:repoId/watch', async (c) => {
     try {
-      const repository = await resolver.resolve(c.req.param('repoId') as string);
+      const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
 
       return streamSSE(c, async (stream) => {
         await options.repoWatchManager.subscribe(repository, stream);

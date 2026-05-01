@@ -42,11 +42,8 @@ describe('diffRoutes', () => {
       resolveRepository: vi
         .fn()
         .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
-      listRepositories: vi.fn(),
-      resolve: vi.fn(),
-      list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp(mockResolver as any);
 
     // When
     const response = await app.request('/api/repositories/my-app/diff');
@@ -54,6 +51,8 @@ describe('diffRoutes', () => {
 
     // Then
     expect(response.status).toBe(200);
+    // Intentionally asserting against the shared RepositoryDiff domain model
+    // as it serves as the API response contract.
     // Confirm the factory was called with the resolved repository path
     expect(data.metadata.repoRoot).toBe('/repo/my-app');
     expect(data.metadata.revision).toBe('HEAD');
@@ -69,11 +68,8 @@ describe('diffRoutes', () => {
         .mockRejectedValue(
           new RepositoryNotFoundError('Repository id "missing" is not configured.'),
         ),
-      listRepositories: vi.fn(),
-      resolve: vi.fn(),
-      list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp(mockResolver as any);
 
     // When
     const response = await app.request('/api/repositories/missing/diff');
@@ -92,11 +88,8 @@ describe('diffRoutes', () => {
         .mockRejectedValue(
           new RepositoryValidationError('Repository path is not a Git repository.'),
         ),
-      listRepositories: vi.fn(),
-      resolve: vi.fn(),
-      list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp(mockResolver as any);
 
     // When
     const response = await app.request('/api/repositories/bad-repo/diff');
@@ -118,11 +111,8 @@ describe('diffRoutes', () => {
             'missing',
           ),
         ),
-      listRepositories: vi.fn(),
-      resolve: vi.fn(),
-      list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp(mockResolver as any);
 
     // When
     const response = await app.request('/api/repositories/sift/diff');
@@ -141,11 +131,8 @@ describe('diffRoutes', () => {
         .mockRejectedValue(
           new RepositoryConfigResolutionError('Invalid JSON config: Unexpected token', 'invalid'),
         ),
-      listRepositories: vi.fn(),
-      resolve: vi.fn(),
-      list: vi.fn(),
     };
-    const app = createApp(mockResolver);
+    const app = createApp(mockResolver as any);
 
     // When
     const response = await app.request('/api/repositories/sift/diff');
@@ -162,15 +149,12 @@ describe('diffRoutes', () => {
       resolveRepository: vi
         .fn()
         .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
-      listRepositories: vi.fn(),
-      resolve: vi.fn(),
-      list: vi.fn(),
     };
     const app = new Hono<Env>();
     app.route(
       '/api',
       createDiffRoutes({
-        repositoryResolver: mockResolver,
+        repositoryResolver: mockResolver as any,
         createDiffProvider: () => ({
           getFiles: vi.fn().mockRejectedValue(new Error('git: fatal error')),
         }),

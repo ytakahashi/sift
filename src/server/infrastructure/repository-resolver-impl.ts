@@ -11,7 +11,6 @@ import {
   RepositoryConfigResolutionError,
   RepositoryNotFoundError,
   RepositoryResolver,
-  RepositoryResolutionError,
   RepositoryValidationError,
 } from '../services/repository-resolver';
 
@@ -119,37 +118,7 @@ export function createRepositoryResolver(
   readConfig: () => Promise<RepositoryConfigReadResult>,
   validateRepository: RepositoryValidator,
 ): RepositoryResolver {
-  const resolve = async (repoId: string): Promise<RepositoryDescriptor> => {
-    if (!repoId) {
-      throw new RepositoryResolutionError('Repository id is required.');
-    }
-
-    const configResult = await readConfig();
-
-    if (configResult.status === 'missing') {
-      throw new RepositoryResolutionError(
-        `Repository config is missing: ${configResult.configPath}`,
-      );
-    }
-
-    if (configResult.status === 'invalid') {
-      throw new RepositoryResolutionError(`Repository config is invalid: ${configResult.error}`);
-    }
-
-    try {
-      const registry = createRegistry(configResult.config.repositories);
-      return registry.resolve(repoId);
-    } catch (error: unknown) {
-      if (error instanceof RepositoryRegistryError) {
-        throw new RepositoryResolutionError(error.message);
-      }
-
-      throw error;
-    }
-  };
-
   return {
-    resolve,
     resolveRepository: async (repoId: string): Promise<ResolvedRepository> => {
       if (!repoId) {
         throw new RepositoryNotFoundError('Repository id is required.');

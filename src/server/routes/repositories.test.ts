@@ -31,7 +31,6 @@ describe('repositoryRoutes', () => {
   it('returns configured repositories', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn().mockResolvedValue({
         repositories: [
@@ -69,7 +68,6 @@ describe('repositoryRoutes', () => {
   it('returns 404 when config is missing', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi
         .fn()
@@ -96,7 +94,6 @@ describe('repositoryRoutes', () => {
   it('returns 400 when config is invalid', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi
         .fn()
@@ -120,7 +117,6 @@ describe('repositoryRoutes', () => {
   it('returns one configured repository by repoId', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn().mockResolvedValue({
         id: 'my-app',
         name: 'my-app',
@@ -146,7 +142,6 @@ describe('repositoryRoutes', () => {
   it('returns an error by repoId when config is missing', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -173,7 +168,6 @@ describe('repositoryRoutes', () => {
   it('returns an error for an unconfigured repository id', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -195,7 +189,6 @@ describe('repositoryRoutes', () => {
   it('returns an error by repoId when config is invalid', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -228,7 +221,6 @@ describe('repositoryRoutes', () => {
       }),
     };
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn(),
     };
@@ -258,7 +250,6 @@ describe('repositoryRoutes', () => {
       addRepository: vi.fn(),
     };
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn(),
     };
@@ -284,7 +275,6 @@ describe('repositoryRoutes', () => {
       addRepository: vi.fn(),
     };
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn(),
     };
@@ -310,7 +300,6 @@ describe('repositoryRoutes', () => {
       addRepository: vi.fn(),
     };
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn(),
     };
@@ -340,7 +329,6 @@ describe('repositoryRoutes', () => {
         ),
     };
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn(),
     };
@@ -362,7 +350,6 @@ describe('repositoryRoutes', () => {
   it('marks repositories invalid when their paths cannot be used', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi.fn().mockResolvedValue({
         repositories: [{ id: 'sift', name: 'sift', path: '/Users/example/projects/sift' }],
@@ -406,7 +393,6 @@ describe('repositoryRoutes', () => {
   it('marks one configured repository invalid when its path cannot be used', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi
         .fn()
         .mockRejectedValue(
@@ -430,7 +416,6 @@ describe('repositoryRoutes', () => {
   it('returns a validation error when configured repositories cannot build a registry', async () => {
     // Given
     const mockResolver = {
-      resolve: vi.fn(),
       resolveRepository: vi.fn(),
       list: vi
         .fn()
