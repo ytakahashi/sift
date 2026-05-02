@@ -33,22 +33,25 @@ Top-level dependency rules:
 
 ## Dependency Overview
 
-```text
-domain/  <- client/
-domain/  <- server/
-domain/  <- electron/
-local-config/ <- server/
-local-config/ <- cli/
-local-config/ <- electron/
-server/  <- cli/
-server/  <- electron/
+```mermaid
+graph TD
+    domain
+    local-config["local-config"]
+    server
+    client
+    cli
+    electron
 
-client/  !-> server/
-client/  !-> cli/
-client/  !-> electron/
-server/  !-> client/
-electron/ !-> client/
-electron/ !-> cli/
+    local-config --> domain
+    cli --> domain
+    client --> domain
+    server --> domain
+    electron --> domain
+    server --> local-config
+    cli --> local-config
+    electron --> local-config
+    cli --> server
+    electron --> server
 ```
 
 ## Domain Layer
@@ -70,11 +73,7 @@ Allowed dependencies:
 
 Disallowed dependencies:
 
-- React
-- Hono
-- Node.js APIs
-- Browser runtime APIs
-- `server/`, `client/`, or `cli/`
+- Other directories, External modules, Node.js APIs, Browser runtime APIs
 
 ## CLI Layer
 
@@ -83,14 +82,12 @@ browser/server startup wiring.
 
 Allowed dependencies:
 
-- `domain/`
-- `server/`
-- `local-config/`
+- `domain/`, `server/`, `local-config/`
 - Node.js APIs
 
 Disallowed dependencies:
 
-- `client/`
+- `client/`, `electron/`
 
 ## Electron Layer
 
@@ -99,18 +96,14 @@ Disallowed dependencies:
 
 Allowed dependencies:
 
-- `domain/`
-- `server/`
-- `local-config/`
-- Node.js APIs
-- `electron` package
+- `domain/`, `server/`, `local-config/`
+- Electron, Node.js APIs
 
 Disallowed dependencies:
 
-- `client/`
-- `cli/`
+- `client/`, `cli/`
 
-## Client Architecture
+## Client Layer
 
 - `App.tsx` is responsible for **wiring hooks together and rendering JSX only**.
 - Business logic must not be added directly to `App.tsx`; extract it to a hook or a pure function
@@ -146,7 +139,7 @@ Disallowed dependencies:
   - It must not import from `infrastructure/`, `composition/`, or non-colocated `hooks/`.
   - Hooks used only by a component may be colocated inside that component directory.
 
-## Server Architecture
+## Server Layer
 
 ### Server Responsibilities And Import Restrictions
 
