@@ -10,7 +10,13 @@ import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
 import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 import { validateRepositoryPath } from './infrastructure/repository-validator';
-import { buildLocalServerUrl, checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
+import { checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
+
+export interface StartedServer {
+  url: string;
+  owned: boolean;
+  stop: () => Promise<void>;
+}
 
 interface ServerRuntime {
   app: Hono<Env>;
@@ -28,7 +34,11 @@ function isPortInUseError(error: unknown): boolean {
   return code === 'EADDRINUSE';
 }
 
-function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; server: ServerType }> {
+function listenOnPort(
+  app: Hono<Env>,
+  port: number,
+  host = '127.0.0.1',
+): Promise<{ port: number; server: ServerType }> {
   return new Promise((resolve, reject) => {
     const server = createAdaptorServer({ fetch: app.fetch });
 
@@ -38,7 +48,7 @@ function listenOnPort(app: Hono<Env>, port: number): Promise<{ port: number; ser
     };
 
     server.once('error', handleError);
-    server.listen(port, () => {
+    server.listen(port, host, () => {
       server.off('error', handleError);
       const address = server.address();
 
@@ -87,22 +97,15 @@ const defaultRuntime = createServerRuntime();
 
 export default defaultRuntime.app;
 
-// Function called by CLI
-export async function startServer(): Promise<string> {
-  const runtime = createServerRuntime();
-  const cliApp = new Hono<Env>();
-  cliApp.route('/', runtime.app);
-
-  // In production, try to serve built client files.
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = path.dirname(__filename);
-  const clientDir = path.resolve(__dirname, '../../dist/client');
+function buildServerApp(runtime: ServerRuntime, clientDir: string): Hono<Env> {
+  const serverApp = new Hono<Env>();
+  serverApp.route('/', runtime.app);
 
   const relativeClientDir = path.relative(process.cwd(), clientDir);
-  cliApp.use('/assets/*', serveStatic({ root: relativeClientDir }));
-  cliApp.use('/favicon.svg', serveStatic({ root: relativeClientDir }));
+  serverApp.use('/assets/*', serveStatic({ root: relativeClientDir }));
+  serverApp.use('/favicon.svg', serveStatic({ root: relativeClientDir }));
 
-  cliApp.get('*', async (c) => {
+  serverApp.get('*', async (c) => {
     try {
       const { readFile } = await import('node:fs/promises');
       const html = await readFile(path.join(clientDir, 'index.html'), 'utf-8');
@@ -112,34 +115,63 @@ export async function startServer(): Promise<string> {
     }
   });
 
+  return serverApp;
+}
+
+export async function startServerWithHandle(options: {
+  clientDir: string;
+}): Promise<StartedServer> {
   const portEnv = process.env.PORT;
   const port = portEnv ? parseInt(portEnv, 10) : DEFAULT_PORT;
-  const { server } = await listenOnPort(cliApp, port).catch(async (error: unknown) => {
+
+  const runtime = createServerRuntime();
+  const serverApp = buildServerApp(runtime, options.clientDir);
+
+  const listenResult = await listenOnPort(serverApp, port).catch(async (error: unknown) => {
     await runtime.stop();
     if (isPortInUseError(error)) {
       const existingServerStatus = await checkExistingSiftServer(port);
       if (existingServerStatus === 'sift') {
         return { port, server: null };
       }
-
       if (existingServerStatus === 'other') {
         throw new Error(`Port ${port} is already in use by another process.`);
       }
     }
-
     throw error;
   });
 
-  if (!server) {
-    return buildLocalServerUrl(port);
+  const url = `http://127.0.0.1:${port}`;
+
+  if (!listenResult.server) {
+    return { url, owned: false, stop: async () => {} };
   }
 
-  const cleanup = (): void => {
-    server.close();
-    void runtime.stop();
+  const { server } = listenResult;
+  return {
+    url,
+    owned: true,
+    stop: async () => {
+      server.close();
+      await runtime.stop();
+    },
   };
-  process.once('SIGINT', cleanup);
-  process.once('SIGTERM', cleanup);
+}
 
-  return buildLocalServerUrl(port);
+export async function startServer(): Promise<string> {
+  const __filename = fileURLToPath(import.meta.url);
+  const __dirname = path.dirname(__filename);
+  const clientDir = path.resolve(__dirname, '../../dist/client');
+
+  const { url, owned, stop } = await startServerWithHandle({ clientDir });
+
+  if (owned) {
+    const cleanup = (): void => {
+      void stop();
+    };
+    process.once('SIGINT', cleanup);
+    process.once('SIGTERM', cleanup);
+  }
+
+  return url;
 }

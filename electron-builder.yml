@@ -1,0 +1,17 @@
+appId: net.ytakahashi.sift
+productName: Sift
+copyright: Copyright © 2026
+
+extraMetadata:
+  main: dist/electron/main.js
+
+files:
+  - dist/client/**
+  - dist/electron/**
+  - package.json
+
+mac:
+  icon: public/icon.png
+  target:
+    - dmg
+    - zip

@@ -13,6 +13,7 @@ The application consists of:
 ```text
 src/
 ├── cli/          # CLI entry point (commander, repo resolution, browser opener)
+├── electron/     # Electron main process entry point (standalone GUI app)
 ├── server/       # Hono HTTP server (routes, services, watch, infrastructure)
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
 ├── local-config/ # Shared Node-facing local configuration paths
@@ -25,21 +26,32 @@ Top-level dependency rules:
 - `server/` depends on `domain/` and Node.js APIs. It must not import from `client/`.
 - `client/` depends on `domain/` and React. It must not import from `server/` or `cli/`.
 - `cli/` is the entry point. It wires together `server/` and launches the HTTP server.
+- `electron/` is the Electron main process entry point. It wires together `server/` and manages the
+  BrowserWindow lifecycle. Its only external dependency is the `electron` package.
 - `local-config/` contains shared Node-facing local configuration helpers. It may import Node.js
   APIs, but must not import from `server/`, `client/`, or `cli/`.
 
 ## Dependency Overview
 
-```text
-domain/  <- client/
-domain/  <- server/
-local-config/ <- server/
-local-config/ <- cli/
-server/  <- cli/
+```mermaid
+graph TD
+    domain
+    local-config["local-config"]
+    server
+    client
+    cli
+    electron
 
-client/  !-> server/
-client/  !-> cli/
-server/  !-> client/
+    local-config --> domain
+    cli --> domain
+    client --> domain
+    server --> domain
+    electron --> domain
+    server --> local-config
+    cli --> local-config
+    electron --> local-config
+    cli --> server
+    electron --> server
 ```
 
 ## Domain Layer
@@ -61,11 +73,7 @@ Allowed dependencies:
 
 Disallowed dependencies:
 
-- React
-- Hono
-- Node.js APIs
-- Browser runtime APIs
-- `server/`, `client/`, or `cli/`
+- Other directories, External modules, Node.js APIs, Browser runtime APIs
 
 ## CLI Layer
 
@@ -74,16 +82,28 @@ browser/server startup wiring.
 
 Allowed dependencies:
 
-- `domain/`
-- `server/`
-- `local-config/`
+- `domain/`, `server/`, `local-config/`
 - Node.js APIs
 
 Disallowed dependencies:
 
-- `client/`
+- `client/`, `electron/`
 
-## Client Architecture
+## Electron Layer
+
+`electron/` contains the Electron main process entry point. It starts the Hono server via
+`startServerWithHandle` from `server/` and manages the `BrowserWindow` lifecycle.
+
+Allowed dependencies:
+
+- `domain/`, `server/`, `local-config/`
+- Electron, Node.js APIs
+
+Disallowed dependencies:
+
+- `client/`, `cli/`
+
+## Client Layer
 
 - `App.tsx` is responsible for **wiring hooks together and rendering JSX only**.
 - Business logic must not be added directly to `App.tsx`; extract it to a hook or a pure function
@@ -119,7 +139,7 @@ Disallowed dependencies:
   - It must not import from `infrastructure/`, `composition/`, or non-colocated `hooks/`.
   - Hooks used only by a component may be colocated inside that component directory.
 
-## Server Architecture
+## Server Layer
 
 ### Server Responsibilities And Import Restrictions
 
