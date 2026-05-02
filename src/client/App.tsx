@@ -19,7 +19,7 @@ import { useFileNoteEditor } from './hooks/notes/useFileNoteEditor';
 import { useRefreshController } from './hooks/sync/useRefreshController';
 import { useAutoRefresh } from './hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from './hooks/panes/usePaneFileActions';
-import { useRepositoryRoute } from './hooks/routing/useRepositoryRoute';
+import { useAppRoute } from './hooks/routing/useAppRoute';
 import { useDiscardConfirmModal } from './hooks/discard-confirm/useDiscardConfirmModal';
 import { DiscardConfirmModal } from './components/discard-confirm/DiscardConfirmModal';
 import type { AppDependencies } from './composition/dependencies';
@@ -66,9 +66,14 @@ function RepositorySelectionScreen({
 interface RepositoryViewerProps {
   dependencies: AppDependencies;
   repoId: RepositoryId;
+  onNavigateToRoot: () => void;
 }
 
-function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): ReactElement {
+function RepositoryViewer({
+  dependencies,
+  repoId,
+  onNavigateToRoot,
+}: RepositoryViewerProps): ReactElement {
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -164,8 +169,10 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
     <div className="app-container">
       <header className="app-header">
         <div className="app-brand">
-          <img src="/favicon.svg" alt="Sift Logo" style={{ width: '22px', height: '22px' }} />
-          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Sift</h1>
+          <button className="app-brand-home" onClick={onNavigateToRoot} type="button">
+            <img className="app-brand-logo" src="/favicon.svg" alt="" />
+            <h1 className="app-brand-title">Sift</h1>
+          </button>
           {repository && (
             <span className="app-repository-name" title={repository.path}>
               {repository.name}
@@ -371,13 +378,19 @@ function RepositoryViewer({ dependencies, repoId }: RepositoryViewerProps): Reac
 }
 
 function App({ dependencies }: AppProps): ReactElement {
-  const { navigate, route } = useRepositoryRoute();
+  const { navigate, navigateToSelection, route } = useAppRoute();
 
   if (route.type === 'selection') {
     return <RepositorySelectionScreen dependencies={dependencies} onSelectRepository={navigate} />;
   }
 
-  return <RepositoryViewer dependencies={dependencies} repoId={route.repoId} />;
+  return (
+    <RepositoryViewer
+      dependencies={dependencies}
+      repoId={route.repoId}
+      onNavigateToRoot={navigateToSelection}
+    />
+  );
 }
 
 export default App;

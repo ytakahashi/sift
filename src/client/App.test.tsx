@@ -204,6 +204,19 @@ describe('App file list interactions', () => {
     expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
   });
 
+  it('navigates to repository selection from the brand button', async () => {
+    // Given: the viewer is opened for a configured repository route.
+    const user = userEvent.setup();
+    render(<App />);
+
+    // When: the user activates the Sift brand control.
+    await user.click(screen.getByRole('button', { name: 'Sift' }));
+
+    // Then: root route renders the repository selection screen.
+    expect(window.location.pathname).toBe('/');
+    expect(await screen.findByRole('heading', { name: 'Repositories' })).toBeDefined();
+  });
+
   it('passes the repository route id through repository-scoped hooks', async () => {
     // Given
     window.history.pushState(null, '', '/repos/my-app');

@@ -88,8 +88,10 @@ export function RepositorySelection({
     <div className="app-container">
       <header className="app-header">
         <div className="app-brand">
-          <img src="/favicon.svg" alt="Sift Logo" style={{ width: '22px', height: '22px' }} />
-          <h1 style={{ margin: 0, fontSize: '1.25rem' }}>Sift</h1>
+          <div className="app-brand-home">
+            <img className="app-brand-logo" src="/favicon.svg" alt="" />
+            <h1 className="app-brand-title">Sift</h1>
+          </div>
         </div>
         <div className="app-header-actions">
           {/* Fetch errors mean the latest repository list is unknown, so show

@@ -52,6 +52,37 @@ body {
   min-width: 0;
 }
 
+.app-brand-home {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  color: inherit;
+  font: inherit;
+  line-height: 1;
+  min-width: max-content;
+  text-align: left;
+}
+
+button.app-brand-home {
+  appearance: none;
+  background: transparent;
+  border: 0;
+  cursor: pointer;
+  padding: 0;
+}
+
+.app-brand-logo {
+  flex: 0 0 auto;
+  height: 22px;
+  width: 22px;
+}
+
+.app-brand-title {
+  font-size: 1.25rem;
+  line-height: 1;
+  margin: 0;
+}
+
 .app-repository-name {
   color: #8b949e;
   font-size: 0.9rem;
