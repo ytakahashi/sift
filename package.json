@@ -12,10 +12,13 @@
     "dev:cli": "pnpm run build:client && tsx src/cli/index.ts",
     "build:client": "vite build",
     "build:server": "esbuild src/cli/index.ts --bundle --platform=node --format=esm --outdir=dist/cli --packages=external --banner:js=\"#!/usr/bin/env node\"",
-    "build": "pnpm run build:client && pnpm run build:server",
+    "build:electron": "esbuild src/electron/main.ts --bundle --platform=node --format=esm --outdir=dist/electron --external:electron",
+    "build": "pnpm run build:client && pnpm run build:server && pnpm run build:electron",
+    "electron:dev": "pnpm run build:client && pnpm run build:electron && electron dist/electron/main.js",
+    "dist": "pnpm run build && electron-builder",
     "start": "node dist/cli/index.js",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --noEmit --project tsconfig.node.json",
+    "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --noEmit --project tsconfig.node.json && tsc --noEmit --project tsconfig.electron.json",
     "format": "prettier --check \"src/**/*.{ts,tsx,css}\"",
     "format:fix": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "lint": "eslint .",
@@ -29,6 +32,9 @@
   "author": "",
   "license": "MIT",
   "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "onlyBuiltDependencies": ["electron"]
+  },
   "dependencies": {
     "@hono/node-server": "1.19.12",
     "chokidar": "5.0.0",
@@ -39,6 +45,8 @@
     "react-dom": "19.2.4"
   },
   "devDependencies": {
+    "electron": "41.5.0",
+    "electron-builder": "26.8.1",
     "@eslint/js": "10.0.1",
     "@hono/vite-dev-server": "0.25.1",
     "@testing-library/react": "16.3.0",
