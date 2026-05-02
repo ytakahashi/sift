@@ -1,12 +1,12 @@
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
-import { useRepositoryRoute } from './useRepositoryRoute';
+import { useAppRoute } from './useAppRoute';
 
 function setPath(pathname: string): void {
   window.history.pushState(null, '', pathname);
 }
 
-describe('useRepositoryRoute', () => {
+describe('useAppRoute', () => {
   afterEach(() => {
     setPath('/');
   });
@@ -16,7 +16,7 @@ describe('useRepositoryRoute', () => {
     setPath('/repos/my-app');
 
     // When
-    const { result } = renderHook(() => useRepositoryRoute());
+    const { result } = renderHook(() => useAppRoute());
 
     // Then
     expect(result.current.route).toEqual({ repoId: 'my-app', type: 'repository' });
@@ -28,7 +28,7 @@ describe('useRepositoryRoute', () => {
     setPath('/');
 
     // When
-    const { result } = renderHook(() => useRepositoryRoute());
+    const { result } = renderHook(() => useAppRoute());
 
     // Then
     expect(result.current.route).toEqual({ type: 'selection' });
@@ -38,7 +38,7 @@ describe('useRepositoryRoute', () => {
   it('updates the repoId when browser history changes', () => {
     // Given
     setPath('/repos/sift');
-    const { result } = renderHook(() => useRepositoryRoute());
+    const { result } = renderHook(() => useAppRoute());
 
     // When
     act(() => {
@@ -53,7 +53,7 @@ describe('useRepositoryRoute', () => {
   it('pushes and applies repository navigation without waiting for popstate', () => {
     // Given
     setPath('/repos/sift');
-    const { result } = renderHook(() => useRepositoryRoute());
+    const { result } = renderHook(() => useAppRoute());
 
     // When
     act(() => {
@@ -63,5 +63,20 @@ describe('useRepositoryRoute', () => {
     // Then
     expect(window.location.pathname).toBe('/repos/my-app');
     expect(result.current.route).toEqual({ repoId: 'my-app', type: 'repository' });
+  });
+
+  it('pushes and applies selection navigation without waiting for popstate', () => {
+    // Given
+    setPath('/repos/sift');
+    const { result } = renderHook(() => useAppRoute());
+
+    // When
+    act(() => {
+      result.current.navigateToSelection();
+    });
+
+    // Then
+    expect(window.location.pathname).toBe('/');
+    expect(result.current.route).toEqual({ type: 'selection' });
   });
 });

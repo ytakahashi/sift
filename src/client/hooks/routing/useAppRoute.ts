@@ -6,8 +6,9 @@ import {
   parseAppRoute,
 } from '../../presentation/routing/repository-route';
 
-export interface UseRepositoryRouteResult {
+export interface UseAppRouteResult {
   navigate: (repoId: RepositoryId) => void;
+  navigateToSelection: () => void;
   route: AppRoute;
 }
 
@@ -23,7 +24,7 @@ function normalizePathname(pathname: string): string {
   return parseAppRoute(pathname) ? pathname : '/';
 }
 
-export function useRepositoryRoute(): UseRepositoryRouteResult {
+export function useAppRoute(): UseAppRouteResult {
   const [pathname, setPathname] = useState(() => normalizePathname(getCurrentPathname()));
   const route = parseAppRoute(pathname) ?? { type: 'selection' };
 
@@ -36,6 +37,11 @@ export function useRepositoryRoute(): UseRepositoryRouteResult {
     // data loading to the selected repoId.
     window.history.pushState(null, '', nextPathname);
     setPathname(nextPathname);
+  }, []);
+
+  const navigateToSelection = useCallback((): void => {
+    window.history.pushState(null, '', '/');
+    setPathname('/');
   }, []);
 
   useEffect(() => {
@@ -61,6 +67,7 @@ export function useRepositoryRoute(): UseRepositoryRouteResult {
 
   return {
     navigate,
+    navigateToSelection,
     route,
   };
 }
