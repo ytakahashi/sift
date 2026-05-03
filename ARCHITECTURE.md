@@ -97,14 +97,25 @@ Disallowed dependencies:
 
 ## Client Layer
 
-- `App.tsx` is responsible for **wiring hooks together and rendering JSX only**.
-- Business logic must not be added directly to `App.tsx`; extract it to a hook or a pure function
-  instead.
-- `App.tsx` must not import from `infrastructure/`. Runtime dependencies are passed in through props
-  from `main.tsx` or `composition/`.
+- `App.tsx` is responsible for selecting the route-level page and passing application-level
+  dependencies and navigation callbacks.
+- `pages/` contains route-level React components. Pages may compose hooks from multiple feature
+  areas, render page-level JSX, and pass injected dependencies into hooks. Pages must not import
+  from `infrastructure/`; runtime dependencies are passed in through props from `main.tsx` or
+  `composition/`.
+- Business logic must not be added directly to `App.tsx` or page components; extract it to a hook or
+  a pure function instead.
+- `App.tsx` and pages should not own low-level reusable UI details. Extract reusable UI to
+  `components/` and React-independent UI logic to `presentation/`.
 
 ### Client Responsibilities And Import Restrictions
 
+- `pages/` contains route-level React composition for complete screens.
+  - It may import from `hooks/`, `components/`, `presentation/`, `application/`, `composition/`, and
+    `domain/`.
+  - It must not import from `infrastructure/`.
+  - It is the preferred place for cross-feature hook composition that would violate
+    `hooks/<feature>/` boundaries if placed inside a feature hook directory.
 - `application/` defines client-side ports and pure application policies.
   - It may import from `domain/`, but must not import from `hooks/`, `components/`, or
     `infrastructure/` and must not import React or browser runtime APIs.
@@ -121,7 +132,7 @@ Disallowed dependencies:
 - `hooks/<feature>/` contains React hooks for one feature area.
   - A hooks subdirectory may import from itself, `application/`, `presentation/`, and `domain/`.
   - It must not import from another hooks subdirectory, `components/`, or `infrastructure/`.
-    Cross-feature hook composition belongs in `App.tsx` or a top-level composition hook.
+    Cross-feature hook composition belongs in `pages/`, or a top-level composition hook.
 - `components/<name>/` contains React UI components and component-local interaction logic.
   - A component directory may import from itself, `application/`, `presentation/`, and `domain/`.
   - It may import reusable UI components from another `components/<name>/` directory when the
