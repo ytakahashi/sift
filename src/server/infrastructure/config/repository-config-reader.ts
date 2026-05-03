@@ -1,9 +1,6 @@
 import { readFile } from 'node:fs/promises';
-import {
-  parseRepositoryConfig,
-  type RepositoryConfig,
-} from '../../../domain/repository/repository-config';
-import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../../../local-config/repository-config-path';
+import { parseRepositoryConfig, type RepositoryConfig } from './repository-config-schema';
+import { DEFAULT_REPOSITORY_CONFIG_PATH } from './repository-config-store';
 
 export interface FoundRepositoryConfig {
   config: RepositoryConfig;

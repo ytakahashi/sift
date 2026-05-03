@@ -1,15 +1,15 @@
 import path from 'node:path';
-import { RepositoryConfigParseError } from '../../../domain/repository/repository-config';
 import {
-  addRepositoryToConfig,
-  RepositoryAlreadyRegisteredError,
-} from '../../../domain/repository/repository-config-update';
+  deriveRepositoryId,
+  deriveRepositoryName,
+} from '../../../domain/repository/repository-identity';
+import { RepositoryConfigParseError } from './repository-config-schema';
 import {
-  normalizeRepositoryPath,
+  DEFAULT_REPOSITORY_CONFIG_PATH,
+  normalizeConfiguredRepositoryPath,
   readExistingRepositoryConfig,
   writeRepositoryConfig,
-} from '../../../local-config/repository-config-store';
-import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../../../local-config/repository-config-path';
+} from './repository-config-store';
 import type { RepositoryConfigUpdater } from '../../services/repository-config';
 import { RepositoryConfigUpdateError } from '../../services/repository-config';
 import type { RepositoryValidator } from '../repository-validator';
@@ -40,15 +40,12 @@ export function createRepositoryConfigUpdater(
         throw new RepositoryConfigUpdateError('Repository path must be an absolute path.', 400);
       }
 
-      const result = await (async () => {
-        try {
-          const existingConfig = await readExistingRepositoryConfig(configPath);
-          return addRepositoryToConfig(existingConfig, normalizeRepositoryPath(trimmedPath));
-        } catch (error: unknown) {
-          if (error instanceof RepositoryAlreadyRegisteredError) {
-            throw new RepositoryConfigUpdateError(error.message, 409);
-          }
+      const normalizedPath = normalizeConfiguredRepositoryPath(trimmedPath);
 
+      const existingConfig = await (async () => {
+        try {
+          return await readExistingRepositoryConfig(configPath);
+        } catch (error: unknown) {
           if (error instanceof RepositoryConfigParseError) {
             throw new RepositoryConfigUpdateError(error.message, 400);
           }
@@ -57,7 +54,25 @@ export function createRepositoryConfigUpdater(
         }
       })();
 
-      const validation = await validateRepository(result.repository);
+      // Check for duplicate paths after normalization
+      const alreadyRegistered = existingConfig.repositories.some((entry) => {
+        return normalizeConfiguredRepositoryPath(entry.path) === normalizedPath;
+      });
+
+      if (alreadyRegistered) {
+        throw new RepositoryConfigUpdateError(
+          `Repository is already registered: ${normalizedPath}`,
+          409,
+        );
+      }
+
+      // Derive runtime descriptor for validation
+      const descriptor = {
+        id: deriveRepositoryId(normalizedPath),
+        path: normalizedPath,
+      };
+
+      const validation = await validateRepository(descriptor);
       if (!validation.isValid) {
         throw new RepositoryConfigUpdateError(
           validation.error ?? 'Repository path is invalid.',
@@ -65,10 +80,19 @@ export function createRepositoryConfigUpdater(
         );
       }
 
-      await writeRepositoryConfig(result.config, configPath);
+      // Write path-only config entry
+      const newConfig = {
+        repositories: [...existingConfig.repositories, { path: normalizedPath }],
+      };
+
+      await writeRepositoryConfig(newConfig, configPath);
       invalidateConfig();
 
-      return result.repository;
+      return {
+        id: descriptor.id,
+        name: deriveRepositoryName(normalizedPath),
+        path: normalizedPath,
+      };
     },
   };
 }

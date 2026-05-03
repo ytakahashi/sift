@@ -97,6 +97,8 @@ const defaultRuntime = createServerRuntime();
 
 export default defaultRuntime.app;
 
+export { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
+
 function buildServerApp(runtime: ServerRuntime, clientDir: string): Hono<Env> {
   const serverApp = new Hono<Env>();
   serverApp.route('/', runtime.app);

@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { DEFAULT_REPOSITORY_CONFIG_PATH } from '../../../local-config/repository-config-path';
+import { DEFAULT_REPOSITORY_CONFIG_PATH } from './repository-config-store';
 import { readRepositoryConfig } from './repository-config-reader';
 import { readFile } from 'node:fs/promises';
 

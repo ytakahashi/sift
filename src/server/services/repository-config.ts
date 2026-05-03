@@ -1,4 +1,4 @@
-import type { RepositoryDescriptor } from '../../domain/repository/repository';
+import type { ResolvedRepository } from '../../domain/repository/repository';
 
 export class RepositoryConfigUpdateError extends Error {
   constructor(
@@ -11,5 +11,5 @@ export class RepositoryConfigUpdateError extends Error {
 }
 
 export interface RepositoryConfigUpdater {
-  addRepository(repositoryPath: string): Promise<RepositoryDescriptor>;
+  addRepository(repositoryPath: string): Promise<ResolvedRepository>;
 }

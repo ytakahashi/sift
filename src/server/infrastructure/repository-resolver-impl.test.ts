@@ -1,4 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
+import {
+  deriveRepositoryId,
+  deriveRepositoryName,
+} from '../../domain/repository/repository-identity';
 import { createRepositoryResolver } from './repository-resolver-impl';
 import type { RepositoryConfigReadResult } from './config/repository-config-reader';
 import type { RepositoryValidator } from './repository-validator';
@@ -8,13 +12,19 @@ import {
   RepositoryValidationError,
 } from '../services/repository-resolver';
 
+vi.mock('./config/repository-config-store', () => ({
+  normalizeConfiguredRepositoryPath: vi.fn((repositoryPath: string) => repositoryPath),
+}));
+
 describe('createRepositoryResolver', () => {
+  // Pre-derive IDs for test paths so expected values stay in sync with the
+  // runtime derivation logic.
+  const repo1Id = deriveRepositoryId('/path/to/repo1');
+  const repo2Id = deriveRepositoryId('/path/to/repo2');
+
   const validReadConfig = async (): Promise<RepositoryConfigReadResult> => ({
     config: {
-      repositories: [
-        { id: 'repo-1', path: '/path/to/repo1' },
-        { id: 'repo-2', path: '/path/to/repo2' },
-      ],
+      repositories: [{ path: '/path/to/repo1' }, { path: '/path/to/repo2' }],
     },
     status: 'found',
   });
@@ -32,17 +42,15 @@ describe('createRepositoryResolver', () => {
 
   const duplicateReadConfig = async (): Promise<RepositoryConfigReadResult> => ({
     config: {
-      repositories: [
-        { id: 'dup-repo', path: '/path/1' },
-        { id: 'dup-repo', path: '/path/2' },
-      ],
+      // Two entries with the same path produce the same derived ID → duplicate
+      repositories: [{ path: '/path/dup-repo' }, { path: '/path/dup-repo' }],
     },
     status: 'found',
   });
 
-  // repo-2 is treated as an invalid repository (e.g. path does not point to a Git repo)
+  // repo2 is treated as an invalid repository (e.g. path does not point to a Git repo)
   const mockValidator: RepositoryValidator = async (repo) => {
-    if (repo.id === 'repo-2') {
+    if (repo.id === repo2Id) {
       return { isValid: false, error: 'Not a git repo' };
     }
     return { isValid: true };
@@ -54,12 +62,12 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(validReadConfig, mockValidator);
 
       // When
-      const item = await resolver.resolveRepository('repo-1');
+      const item = await resolver.resolveRepository(repo1Id);
 
       // Then
       expect(item).toEqual({
-        id: 'repo-1',
-        name: 'repo1',
+        id: repo1Id,
+        name: deriveRepositoryName('/path/to/repo1'),
         path: '/path/to/repo1',
       });
     });
@@ -69,8 +77,8 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(validReadConfig, mockValidator);
 
       // When / Then
-      await expect(resolver.resolveRepository('repo-2')).rejects.toThrow(RepositoryValidationError);
-      await expect(resolver.resolveRepository('repo-2')).rejects.toThrow('Not a git repo');
+      await expect(resolver.resolveRepository(repo2Id)).rejects.toThrow(RepositoryValidationError);
+      await expect(resolver.resolveRepository(repo2Id)).rejects.toThrow('Not a git repo');
     });
 
     it('throws RepositoryNotFoundError when repoId is not in the registry', async () => {
@@ -91,10 +99,10 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(missingReadConfig, mockValidator);
 
       // When / Then
-      await expect(resolver.resolveRepository('repo-1')).rejects.toThrow(
+      await expect(resolver.resolveRepository(repo1Id)).rejects.toThrow(
         RepositoryConfigResolutionError,
       );
-      await expect(resolver.resolveRepository('repo-1')).rejects.toMatchObject({
+      await expect(resolver.resolveRepository(repo1Id)).rejects.toMatchObject({
         kind: 'missing',
         message: 'Repository config is missing: /missing/config.json',
       });
@@ -105,26 +113,27 @@ describe('createRepositoryResolver', () => {
       const resolver = createRepositoryResolver(invalidReadConfig, mockValidator);
 
       // When / Then
-      await expect(resolver.resolveRepository('repo-1')).rejects.toThrow(
+      await expect(resolver.resolveRepository(repo1Id)).rejects.toThrow(
         RepositoryConfigResolutionError,
       );
-      await expect(resolver.resolveRepository('repo-1')).rejects.toMatchObject({
+      await expect(resolver.resolveRepository(repo1Id)).rejects.toMatchObject({
         kind: 'invalid',
         message: 'Repository config is invalid: Syntax error',
       });
     });
 
     it('throws RepositoryConfigResolutionError when the registry has duplicated ids', async () => {
-      // Given: config contains two entries with the same id, making registry construction fail
+      // Given: config contains two entries with the same path, producing the same derived ID
       const resolver = createRepositoryResolver(duplicateReadConfig, mockValidator);
+      const dupId = deriveRepositoryId('/path/dup-repo');
 
       // When / Then
-      await expect(resolver.resolveRepository('dup-repo')).rejects.toThrow(
+      await expect(resolver.resolveRepository(dupId)).rejects.toThrow(
         RepositoryConfigResolutionError,
       );
-      await expect(resolver.resolveRepository('dup-repo')).rejects.toMatchObject({
+      await expect(resolver.resolveRepository(dupId)).rejects.toMatchObject({
         kind: 'invalid',
-        message: 'Repository id "dup-repo" is duplicated.',
+        message: `Repository id "${dupId}" is duplicated.`,
       });
     });
   });
@@ -141,15 +150,15 @@ describe('createRepositoryResolver', () => {
       expect(result).toEqual({
         repositories: [
           {
-            id: 'repo-1',
-            name: 'repo1',
+            id: repo1Id,
+            name: deriveRepositoryName('/path/to/repo1'),
             path: '/path/to/repo1',
           },
         ],
         invalidRepositories: [
           {
-            id: 'repo-2',
-            name: 'repo2',
+            id: repo2Id,
+            name: deriveRepositoryName('/path/to/repo2'),
             path: '/path/to/repo2',
             reason: 'Not a git repo',
           },
@@ -182,14 +191,15 @@ describe('createRepositoryResolver', () => {
     });
 
     it('throws when the registry rejects duplicated ids', async () => {
-      // Given: config has two entries sharing the same id; registry construction will fail
+      // Given: config has two entries with the same path; derived IDs will collide
       const resolver = createRepositoryResolver(duplicateReadConfig, mockValidator);
+      const dupId = deriveRepositoryId('/path/dup-repo');
 
       // When / Then
       await expect(resolver.listRepositories()).rejects.toThrow(RepositoryConfigResolutionError);
       await expect(resolver.listRepositories()).rejects.toMatchObject({
         kind: 'invalid',
-        message: 'Repository id "dup-repo" is duplicated.',
+        message: `Repository id "${dupId}" is duplicated.`,
       });
     });
   });

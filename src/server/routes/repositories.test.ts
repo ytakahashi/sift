@@ -212,11 +212,12 @@ describe('repositoryRoutes', () => {
     });
   });
 
-  it('adds a repository and returns the added descriptor', async () => {
+  it('adds a repository and returns the added repository', async () => {
     // Given
     const mockUpdater = {
       addRepository: vi.fn().mockResolvedValue({
         id: 'sift',
+        name: 'sift',
         path: '/Users/example/projects/sift',
       }),
     };
@@ -240,6 +241,7 @@ describe('repositoryRoutes', () => {
     expect(mockResolver.resolveRepository).not.toHaveBeenCalled();
     expect(data).toEqual({
       id: 'sift',
+      name: 'sift',
       path: '/Users/example/projects/sift',
     });
   });

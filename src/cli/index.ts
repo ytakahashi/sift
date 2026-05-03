@@ -1,8 +1,7 @@
 import { Command } from 'commander';
 import { resolveRepoRoot } from './resolve-repo';
 import { openBrowser } from './open-browser';
-import { addRepositoryConfigEntry } from '../local-config/repository-config-store';
-import { startServer } from '../server/index';
+import { createRepositoryConfigUpdater, startServer } from '../server/index';
 
 const program = new Command();
 
@@ -25,7 +24,8 @@ program
         console.log(`Resolving repository at: ${addTargetPath}`);
         const repoRoot = resolveRepoRoot(addTargetPath);
         console.log(`Repository root identified: ${repoRoot}`);
-        const addedRepository = await addRepositoryConfigEntry(repoRoot);
+        const updater = createRepositoryConfigUpdater();
+        const addedRepository = await updater.addRepository(repoRoot);
         console.log(`Repository registered as "${addedRepository.id}".`);
       }
 
