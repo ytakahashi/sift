@@ -20,6 +20,15 @@ export interface RepositoryList {
   repositories: ResolvedRepository[];
 }
 
+/**
+ * A runtime-derived pair of repository ID and path.
+ *
+ * The ID is derived deterministically from the normalized path at runtime
+ * (see `deriveRepositoryId` in `repository-identity.ts`). It is not stored
+ * in the configuration file. The config file stores only the repository path;
+ * the descriptor is constructed by the server infrastructure layer when
+ * reading the configuration.
+ */
 export interface RepositoryDescriptor {
   id: RepositoryId;
   path: string;

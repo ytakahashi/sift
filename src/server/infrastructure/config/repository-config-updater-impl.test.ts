@@ -1,15 +1,19 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { RepositoryConfigParseError } from '../../../domain/repository/repository-config';
-import { RepositoryAlreadyRegisteredError } from '../../../domain/repository/repository-config-update';
 import {
-  normalizeRepositoryPath,
+  deriveRepositoryId,
+  deriveRepositoryName,
+} from '../../../domain/repository/repository-identity';
+import { RepositoryConfigParseError } from './repository-config-schema';
+import {
+  normalizeConfiguredRepositoryPath,
   readExistingRepositoryConfig,
   writeRepositoryConfig,
-} from '../../../local-config/repository-config-store';
+} from './repository-config-store';
 import { createRepositoryConfigUpdater } from './repository-config-updater-impl';
 
-vi.mock('../../../local-config/repository-config-store', () => ({
-  normalizeRepositoryPath: vi.fn((repositoryPath: string) => repositoryPath),
+vi.mock('./repository-config-store', () => ({
+  DEFAULT_REPOSITORY_CONFIG_PATH: '/default/config.json',
+  normalizeConfiguredRepositoryPath: vi.fn((repositoryPath: string) => repositoryPath),
   readExistingRepositoryConfig: vi.fn(),
   writeRepositoryConfig: vi.fn(),
 }));
@@ -17,7 +21,9 @@ vi.mock('../../../local-config/repository-config-store', () => ({
 describe('createRepositoryConfigUpdater', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(normalizeRepositoryPath).mockImplementation((repositoryPath) => repositoryPath);
+    vi.mocked(normalizeConfiguredRepositoryPath).mockImplementation(
+      (repositoryPath) => repositoryPath,
+    );
   });
 
   it('adds a valid repository to the config and invalidates the cache', async () => {
@@ -37,13 +43,16 @@ describe('createRepositoryConfigUpdater', () => {
     // When
     const repository = await updater.addRepository('/repo/sift');
 
-    // Then
-    expect(repository).toEqual({ id: 'sift', path: '/repo/sift' });
+    // Then — the returned repository uses the runtime-derived ID and name
+    const expectedId = deriveRepositoryId('/repo/sift');
+    const expectedName = deriveRepositoryName('/repo/sift');
+    expect(repository).toEqual({ id: expectedId, name: expectedName, path: '/repo/sift' });
     expect(readExistingRepositoryConfig).toHaveBeenCalledWith('/config/sift.json');
-    expect(validateRepository).toHaveBeenCalledWith({ id: 'sift', path: '/repo/sift' });
+    expect(validateRepository).toHaveBeenCalledWith({ id: expectedId, path: '/repo/sift' });
+    // Config file should contain path-only entries
     expect(writeRepositoryConfig).toHaveBeenCalledWith(
       {
-        repositories: [{ id: 'sift', path: '/repo/sift' }],
+        repositories: [{ path: '/repo/sift' }],
       },
       '/config/sift.json',
     );
@@ -67,7 +76,7 @@ describe('createRepositoryConfigUpdater', () => {
   it('maps duplicate paths to a conflict error without writing', async () => {
     // Given
     vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
-      repositories: [{ id: 'sift', path: '/repo/sift' }],
+      repositories: [{ path: '/repo/sift' }],
     });
     const updater = createRepositoryConfigUpdater({
       configPath: '/config/sift.json',
@@ -76,7 +85,7 @@ describe('createRepositoryConfigUpdater', () => {
 
     // When / Then
     await expect(updater.addRepository('/repo/sift')).rejects.toMatchObject({
-      message: new RepositoryAlreadyRegisteredError('/repo/sift').message,
+      message: 'Repository is already registered: /repo/sift',
       statusCode: 409,
     });
     expect(writeRepositoryConfig).not.toHaveBeenCalled();

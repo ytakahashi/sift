@@ -16,7 +16,6 @@ src/
 ├── electron/     # Electron main process entry point (standalone GUI app)
 ├── server/       # Hono HTTP server (routes, services, watch, infrastructure)
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
-├── local-config/ # Shared Node-facing local configuration paths
 └── domain/       # Pure business logic and models shared across server and client
 ```
 
@@ -28,28 +27,21 @@ Top-level dependency rules:
 - `cli/` is the entry point. It wires together `server/` and launches the HTTP server.
 - `electron/` is the Electron main process entry point. It wires together `server/` and manages the
   BrowserWindow lifecycle. Its only external dependency is the `electron` package.
-- `local-config/` contains shared Node-facing local configuration helpers. It may import Node.js
-  APIs, but must not import from `server/`, `client/`, or `cli/`.
 
 ## Dependency Overview
 
 ```mermaid
 graph TD
     domain
-    local-config["local-config"]
     server
     client
     cli
     electron
 
-    local-config --> domain
     cli --> domain
     client --> domain
     server --> domain
     electron --> domain
-    server --> local-config
-    cli --> local-config
-    electron --> local-config
     cli --> server
     electron --> server
 ```
@@ -82,7 +74,7 @@ browser/server startup wiring.
 
 Allowed dependencies:
 
-- `domain/`, `server/`, `local-config/`
+- `domain/`, `server/`
 - Node.js APIs
 
 Disallowed dependencies:
@@ -96,7 +88,7 @@ Disallowed dependencies:
 
 Allowed dependencies:
 
-- `domain/`, `server/`, `local-config/`
+- `domain/`, `server/`
 - Electron, Node.js APIs
 
 Disallowed dependencies:
@@ -158,6 +150,8 @@ Disallowed dependencies:
   - Concrete watcher creation is injected through `CreateRepoWatchManagerOptions`.
 - `infrastructure/` implements server ports and runtime adapters.
   - It is the place for accessing Node.js APIs, Git, filesystem, etc.
+  - Config file I/O, schema parsing, path normalization, and the default config path live in
+    `infrastructure/config/`.
   - It may import from `domain/`, `services/`, and `watch/`.
   - It must not import from `routes/` or `create-app.ts`.
 - `create-app.ts` is the route-level composition root.

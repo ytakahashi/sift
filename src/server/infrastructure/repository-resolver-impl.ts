@@ -1,11 +1,16 @@
-import path from 'node:path';
 import type {
   InvalidRepository,
   RepositoryDescriptor,
   RepositoryList,
   ResolvedRepository,
 } from '../../domain/repository/repository';
+import {
+  deriveRepositoryId,
+  deriveRepositoryName,
+} from '../../domain/repository/repository-identity';
+import type { RepositoryConfigEntry } from './config/repository-config-schema';
 import type { RepositoryConfigReadResult } from './config/repository-config-reader';
+import { normalizeConfiguredRepositoryPath } from './config/repository-config-store';
 import type { RepositoryValidator } from './repository-validator';
 import {
   RepositoryConfigResolutionError,
@@ -24,13 +29,25 @@ class RepositoryRegistryError extends Error {
   }
 }
 
-function createRegistry(repositories: RepositoryDescriptor[]): {
+/**
+ * Converts a path-only config entry into a runtime RepositoryDescriptor
+ * by normalizing the path and deriving the ID deterministically.
+ */
+function toDescriptor(entry: RepositoryConfigEntry): RepositoryDescriptor {
+  const normalizedPath = normalizeConfiguredRepositoryPath(entry.path);
+  return {
+    id: deriveRepositoryId(normalizedPath),
+    path: normalizedPath,
+  };
+}
+
+function createRegistry(descriptors: RepositoryDescriptor[]): {
   list: () => RepositoryDescriptor[];
   resolve: (repoId: string) => RepositoryDescriptor;
 } {
   const repositoriesById = new Map<string, RepositoryDescriptor>();
 
-  for (const repository of repositories) {
+  for (const repository of descriptors) {
     if (repositoriesById.has(repository.id)) {
       throw new RepositoryRegistryError(
         `Repository id "${repository.id}" is duplicated.`,
@@ -55,10 +72,6 @@ function createRegistry(repositories: RepositoryDescriptor[]): {
       return repository;
     },
   };
-}
-
-function deriveRepositoryName(repositoryPath: string): string {
-  return path.basename(repositoryPath) || repositoryPath;
 }
 
 function toResolvedRepository(repository: RepositoryDescriptor): ResolvedRepository {
@@ -141,7 +154,8 @@ export function createRepositoryResolver(
       }
 
       try {
-        const registry = createRegistry(configResult.config.repositories);
+        const descriptors = configResult.config.repositories.map(toDescriptor);
+        const registry = createRegistry(descriptors);
         return await validateResolvedRepository(registry.resolve(repoId), validateRepository);
       } catch (error: unknown) {
         if (error instanceof RepositoryRegistryError) {
@@ -170,7 +184,8 @@ export function createRepositoryResolver(
       }
 
       try {
-        const registry = createRegistry(configResult.config.repositories);
+        const descriptors = configResult.config.repositories.map(toDescriptor);
+        const registry = createRegistry(descriptors);
         const entries = await Promise.all(
           registry
             .list()
