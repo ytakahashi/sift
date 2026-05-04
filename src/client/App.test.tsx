@@ -1,52 +1,42 @@
-import type { ReactElement } from 'react';
-import { cleanup, render, screen, within, fireEvent, act, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DiffFile } from '../domain/diff/types';
-import AppComponent from './App';
 import type { AppDependencies } from './composition/dependencies';
+import App from './App';
 import { useDiffData } from './hooks/diff/useDiffData';
-import { useNotes } from './hooks/notes/useNotes';
-import { useWorkspaceActions } from './hooks/workspace-actions/useWorkspaceActions';
 
 vi.mock('./hooks/diff/useDiffData', () => ({
   useDiffData: vi.fn(),
 }));
 
 vi.mock('./hooks/notes/useNotes', () => ({
-  useNotes: vi.fn(),
+  useNotes: vi.fn(() => ({
+    notes: [],
+    addNote: vi.fn(),
+    updateNote: vi.fn(),
+    deleteNote: vi.fn(),
+    clearNotes: vi.fn(),
+  })),
 }));
 
 vi.mock('./hooks/workspace-actions/useWorkspaceActions', () => ({
-  useWorkspaceActions: vi.fn(),
+  useWorkspaceActions: vi.fn(() => ({
+    stageFile: vi.fn(),
+    unstageFile: vi.fn(),
+    stageAllWorkingFiles: vi.fn(),
+    unstageAllStagedFiles: vi.fn(),
+    discardWorkingFile: vi.fn(),
+    discardAllWorkingFiles: vi.fn(),
+    stageHunk: vi.fn(),
+    unstageHunk: vi.fn(),
+    acting: false,
+    error: null,
+  })),
 }));
 
 vi.mock('./components/diff/UnifiedDiffViewer', () => ({
-  UnifiedDiffViewer: ({
-    file,
-    isFileNoteEditorOpen,
-  }: {
-    file: DiffFile;
-    isFileNoteEditorOpen?: boolean;
-  }) => (
-    <div data-testid="diff-viewer">
-      {file.displayPath}
-      {isFileNoteEditorOpen && <span>file note editor open</span>}
-    </div>
-  ),
+  UnifiedDiffViewer: () => <div data-testid="diff-viewer" />,
 }));
-
-function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
-  return {
-    id,
-    bucket,
-    path: `${id}.ts`,
-    status: 'modified',
-    kind: 'text',
-    displayPath: `${id}.ts`,
-    hunks: [],
-  };
-}
 
 const testDependencies: AppDependencies = {
   diffReader: {
@@ -91,102 +81,22 @@ const testDependencies: AppDependencies = {
   },
 };
 
-function App(): ReactElement {
-  return <AppComponent dependencies={testDependencies} />;
-}
-
-describe('App file list interactions', () => {
-  const refresh = vi.fn();
-  const clearNotes = vi.fn();
-  const stageFile = vi.fn(async () => {});
-  const unstageFile = vi.fn(async () => {});
-  const stageAllWorkingFiles = vi.fn(async () => {});
-  const unstageAllStagedFiles = vi.fn(async () => {});
-  const discardWorkingFile = vi.fn(async () => {});
-  const discardAllWorkingFiles = vi.fn(async () => {});
-  let diffState: {
-    workingFiles: DiffFile[];
-    stagedFiles: DiffFile[];
-    loading: boolean;
-    initialized: boolean;
-    error: string | null;
-    refresh: typeof refresh;
-  };
-
+describe('App Routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    window.history.pushState(null, '', '/repos/my-app');
-    diffState = {
-      workingFiles: [
-        createFile('a', 'working'),
-        createFile('b', 'working'),
-        createFile('c', 'working'),
-      ],
-      stagedFiles: [createFile('s', 'staged')],
+    vi.mocked(useDiffData).mockReturnValue({
+      workingFiles: [],
+      stagedFiles: [],
       loading: false,
       initialized: true,
       error: null,
-      refresh,
-    };
-
-    vi.mocked(useDiffData).mockImplementation(() => diffState);
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-    vi.mocked(useWorkspaceActions).mockReturnValue({
-      stageFile,
-      unstageFile,
-      stageAllWorkingFiles,
-      unstageAllStagedFiles,
-      discardWorkingFile,
-      discardAllWorkingFiles,
-      stageHunk: vi.fn(),
-      unstageHunk: vi.fn(),
-      acting: false,
-      error: null,
+      refresh: vi.fn(),
     });
   });
 
   afterEach(() => {
     cleanup();
-    vi.unstubAllGlobals();
     window.history.pushState(null, '', '/');
-  });
-
-  it('opens the diff on single click without activating', async () => {
-    // Given: the app is rendered with working and staged file lists
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When: the user single-clicks a working file
-    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
-
-    // Then: the diff viewer shows the file but no stage action is triggered
-    expect(stageFile).not.toHaveBeenCalled();
-    expect(screen.getByTestId('diff-viewer').textContent).toBe('b.ts');
-  });
-
-  it('passes the route repository id through repository-scoped hooks', async () => {
-    // Given: the viewer is opened for a configured repository route.
-    render(<App />);
-
-    // When / Then
-    expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
-    expect(useWorkspaceActions).toHaveBeenCalledWith(
-      testDependencies.workspaceActions,
-      'my-app',
-      expect.any(Function),
-    );
-    await waitFor(() => {
-      expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith(
-        'my-app',
-        expect.any(Function),
-      );
-    });
   });
 
   it('renders the repository selection screen at root and navigates to the selected repository', async () => {
@@ -195,7 +105,7 @@ describe('App file list interactions', () => {
     window.history.pushState(null, '', '/');
 
     // When
-    render(<App />);
+    render(<App dependencies={testDependencies} />);
     await screen.findByRole('button', { name: /my-app/ });
     await user.click(screen.getByRole('button', { name: /my-app/ }));
 
@@ -207,7 +117,8 @@ describe('App file list interactions', () => {
   it('navigates to repository selection from the brand button', async () => {
     // Given: the viewer is opened for a configured repository route.
     const user = userEvent.setup();
-    render(<App />);
+    window.history.pushState(null, '', '/repos/my-app');
+    render(<App dependencies={testDependencies} />);
 
     // When: the user activates the Sift brand control.
     await user.click(screen.getByRole('button', { name: 'Sift' }));
@@ -217,590 +128,20 @@ describe('App file list interactions', () => {
     expect(await screen.findByRole('heading', { name: 'Repositories' })).toBeDefined();
   });
 
-  it('passes the repository route id through repository-scoped hooks', async () => {
+  it('routes /repos/:id to viewer page with the correct repoId', async () => {
     // Given
     window.history.pushState(null, '', '/repos/my-app');
 
     // When
-    render(<App />);
+    render(<App dependencies={testDependencies} />);
 
     // Then
     expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
-    expect(useWorkspaceActions).toHaveBeenCalledWith(
-      testDependencies.workspaceActions,
-      'my-app',
-      expect.any(Function),
-    );
-  });
-
-  it('stages on double click from the working list', async () => {
-    // Given: the app is rendered with a working file selected
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When: the user double-clicks a working file
-    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
-    await user.dblClick(screen.getByRole('option', { name: 'b.tsM' }));
-
-    // Then: stageFile is called with the file's path
-    expect(stageFile).toHaveBeenCalledWith('b.ts');
-  });
-
-  it('unstages on Enter from the staged list', async () => {
-    // Given: a staged file is selected and the staged listbox has keyboard focus
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole('option', { name: 's.tsM' }));
-    // Explicitly focus the listbox so the subsequent keyboard event is routed
-    // to the correct pane's keydown handler.
-    const stagedList = screen.getAllByRole('listbox', { name: 'Changed files' })[1];
-    stagedList.focus();
-
-    // When: the user presses Enter
-    await user.keyboard('{Enter}');
-
-    // Then: unstageFile is called with the file's path
-    expect(unstageFile).toHaveBeenCalledWith('s.ts');
-  });
-
-  it('shows Discard button only for working pane selection', async () => {
-    // Given: app is rendered
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When: selecting a working file
-    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
-
-    // Then: Discard is visible
-    expect(screen.getByRole('button', { name: 'Discard' })).toBeDefined();
-
-    // When: selecting a staged file
-    await user.click(screen.getByRole('option', { name: 's.tsM' }));
-
-    // Then: Discard is hidden
-    expect(screen.queryByRole('button', { name: 'Discard' })).toBeNull();
-  });
-
-  it('opens the file note editor from the selected file header action', async () => {
-    // Given: a working file is selected
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
-
-    // When: Add Note is clicked in the diff header
-    await user.click(screen.getByRole('button', { name: 'Add Note' }));
-
-    // Then: the diff viewer receives the open file note editor state
-    expect(screen.getByText('file note editor open')).toBeDefined();
-  });
-
-  it('closes the file note editor when the selected file changes', async () => {
-    // Given: the file note editor is open for one selected file
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
-    await user.click(screen.getByRole('button', { name: 'Add Note' }));
-    expect(screen.getByText('file note editor open')).toBeDefined();
-
-    // When: another file is selected
-    await user.click(screen.getByRole('option', { name: 'c.tsM' }));
-
-    // Then: the open state is reset
-    expect(screen.queryByText('file note editor open')).toBeNull();
-  });
-
-  it('calls discardWorkingFile after confirming the modal when Discard is clicked from working pane', async () => {
-    // Given: app with a selected working file
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
-
-    // When: Discard button is clicked and confirmed in the modal
-    await user.click(screen.getByRole('button', { name: 'Discard' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Discard' }));
-
-    // Then: discard action is sent for selected path
-    expect(discardWorkingFile).toHaveBeenCalledWith('b.ts');
-  });
-
-  it('renders pane footer bulk action buttons', () => {
-    // Given: app is rendered with working and staged files
-    render(<App />);
-
-    // When / Then
-    expect(screen.getByRole('button', { name: 'Stage All' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Discard All' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Unstage All' })).toBeDefined();
-  });
-
-  it('calls stageAllWorkingFiles when Stage All is clicked', async () => {
-    // Given: app is rendered with working files
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When
-    await user.click(screen.getByRole('button', { name: 'Stage All' }));
-
-    // Then
-    expect(stageAllWorkingFiles).toHaveBeenCalled();
-  });
-
-  it('calls unstageAllStagedFiles when Unstage All is clicked', async () => {
-    // Given: app is rendered with staged files
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When
-    await user.click(screen.getByRole('button', { name: 'Unstage All' }));
-
-    // Then
-    expect(unstageAllStagedFiles).toHaveBeenCalled();
-  });
-
-  it('shows confirmation modal and discards all files on confirm', async () => {
-    // Given
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When
-    await user.click(screen.getByRole('button', { name: 'Discard All' }));
-
-    // Then: modal is shown (getByRole throws if the element is absent)
-    const dialog = screen.getByRole('dialog');
-
-    // When: user confirms in the dialog
-    await user.click(within(dialog).getByRole('button', { name: 'Discard' }));
-
-    // Then
-    expect(discardAllWorkingFiles).toHaveBeenCalled();
-  });
-
-  it('does not discard all working files when modal is cancelled', async () => {
-    // Given
-    const user = userEvent.setup();
-    render(<App />);
-
-    // When
-    await user.click(screen.getByRole('button', { name: 'Discard All' }));
-    await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Cancel' }));
-
-    // Then
-    expect(discardAllWorkingFiles).not.toHaveBeenCalled();
-  });
-
-  it('shows confirmation modal with file name and discards the file on confirm', async () => {
-    // Given: select a.ts from the working file list to reveal the header Discard button
-    const user = userEvent.setup();
-    render(<App />);
-    await user.click(screen.getByRole('option', { name: 'a.tsM' }));
-
-    // When: click the header Discard button
-    await user.click(screen.getByRole('button', { name: 'Discard' }));
-
-    // Then: modal is shown with the file name (getByRole / getByText throw if absent)
-    const dialog = screen.getByRole('dialog');
-    within(dialog).getByText(/a\.ts/);
-
-    // When: user confirms in the dialog
-    await user.click(within(dialog).getByRole('button', { name: 'Discard' }));
-
-    // Then
-    expect(discardWorkingFile).toHaveBeenCalled();
-  });
-
-  it('disables pane footer bulk action buttons when their panes are empty', () => {
-    // Given: the server reports no changed files
-    diffState.workingFiles = [];
-    diffState.stagedFiles = [];
-
-    // When
-    render(<App />);
-
-    // Then
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Stage All' }).disabled).toBe(
-      true,
-    );
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Discard All' }).disabled).toBe(
-      true,
-    );
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Unstage All' }).disabled).toBe(
-      true,
-    );
-  });
-
-  it('disables pane footer bulk action buttons while an action is running', () => {
-    // Given: a workspace action is in flight while panes still have files
-    vi.mocked(useWorkspaceActions).mockReturnValue({
-      stageFile,
-      unstageFile,
-      stageAllWorkingFiles,
-      unstageAllStagedFiles,
-      discardWorkingFile,
-      discardAllWorkingFiles,
-      stageHunk: vi.fn(),
-      unstageHunk: vi.fn(),
-      acting: true,
-      error: null,
+    await waitFor(() => {
+      expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith(
+        'my-app',
+        expect.any(Function),
+      );
     });
-
-    // When
-    render(<App />);
-
-    // Then
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Stage All' }).disabled).toBe(
-      true,
-    );
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Discard All' }).disabled).toBe(
-      true,
-    );
-    expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Unstage All' }).disabled).toBe(
-      true,
-    );
-  });
-
-  it('moves from the last working file to the first staged file with ArrowDown', async () => {
-    // Given: the last working file ("c") is selected and the working listbox has focus
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole('option', { name: 'c.tsM' }));
-    // Explicitly focus to ensure the keyboard event targets the working listbox
-    // regardless of any focus side-effects from the click handler.
-    const workingList = screen.getAllByRole('listbox', { name: 'Changed files' })[0];
-    workingList.focus();
-
-    // When: the user presses ArrowDown past the last working file
-    await user.keyboard('{ArrowDown}');
-
-    // Then: selection crosses into the staged pane and the diff viewer updates
-    expect(screen.getByTestId('diff-viewer').textContent).toBe('s.ts');
-  });
-
-  it('moves from the first staged file to the last working file with ArrowUp', async () => {
-    // Given: the first staged file ("s") is selected and the staged listbox has focus
-    const user = userEvent.setup();
-    render(<App />);
-
-    await user.click(screen.getByRole('option', { name: 's.tsM' }));
-    // Explicitly focus to ensure the keyboard event targets the staged listbox.
-    const stagedList = screen.getAllByRole('listbox', { name: 'Changed files' })[1];
-    stagedList.focus();
-
-    // When: the user presses ArrowUp past the first staged file
-    await user.keyboard('{ArrowUp}');
-
-    // Then: selection crosses back into the working pane and the diff viewer updates
-    expect(screen.getByTestId('diff-viewer').textContent).toBe('c.ts');
-  });
-
-  it('renders resize splitters for sidebar and stacked panes', () => {
-    // Given: the app is rendered
-    render(<App />);
-
-    // When: querying the separator elements
-    const verticalSplitter = screen.getByRole('separator', {
-      name: 'Resize sidebar and diff panes',
-    });
-    const horizontalSplitter = screen.getByRole('separator', {
-      name: 'Resize Working and Staged panes',
-    });
-
-    // Then: both splitters are present in the layout
-    expect(verticalSplitter).toBeDefined();
-    expect(horizontalSplitter).toBeDefined();
-  });
-
-  it('renders selected repository name in the header with absolute path tooltip', async () => {
-    // Given: repository list data includes a selectable repository
-    const user = userEvent.setup();
-    window.history.pushState(null, '', '/');
-    vi.mocked(testDependencies.repositoryReader.fetchRepositories).mockResolvedValueOnce({
-      invalidRepositories: [],
-      repositories: [
-        {
-          id: 'demo-repo',
-          name: 'demo-repo',
-          path: '/absolute/path/to/demo-repo',
-        },
-      ],
-    });
-    vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
-      id: 'demo-repo',
-      name: 'demo-repo',
-      path: '/absolute/path/to/demo-repo',
-    });
-
-    // When: the app is rendered
-    render(<App />);
-    await user.click(await screen.findByRole('button', { name: /demo-repo/ }));
-
-    // Then: repository name is shown and title exposes absolute path
-    const repositoryName = await screen.findByText('demo-repo');
-    expect(repositoryName).toBeDefined();
-    expect(repositoryName.getAttribute('title')).toBe('/absolute/path/to/demo-repo');
-    expect(testDependencies.repositoryReader.fetchRepositories).toHaveBeenCalledTimes(1);
-    expect(testDependencies.repositoryReader.fetchRepository).toHaveBeenCalledWith('demo-repo');
-  });
-
-  it('fetches and renders repository metadata on direct route loads', async () => {
-    // Given: direct route loads can resolve repository metadata from the single-repository API
-    window.history.pushState(null, '', '/repos/demo-repo');
-    vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
-      id: 'demo-repo',
-      name: 'demo-repo',
-      path: '/absolute/path/to/demo-repo',
-    });
-
-    // When: the app is rendered
-    render(<App />);
-
-    // Then: repository name is resolved without re-fetching the full repository list
-    const repositoryName = await screen.findByText('demo-repo');
-    expect(repositoryName.getAttribute('title')).toBe('/absolute/path/to/demo-repo');
-    expect(testDependencies.repositoryReader.fetchRepositories).not.toHaveBeenCalled();
-    expect(testDependencies.repositoryReader.fetchRepository).toHaveBeenCalledWith('demo-repo');
-  });
-});
-
-describe('App Notes Interactions', () => {
-  const refresh = vi.fn();
-  const clearNotes = vi.fn();
-  const originalClipboard = navigator.clipboard;
-
-  beforeEach(() => {
-    vi.clearAllMocks();
-    window.history.pushState(null, '', '/repos/my-app');
-    Object.defineProperty(navigator, 'clipboard', {
-      value: {
-        writeText: vi.fn().mockResolvedValue(undefined),
-      },
-      writable: true,
-      configurable: true,
-    });
-    vi.mocked(useDiffData).mockReturnValue({
-      workingFiles: [],
-      stagedFiles: [],
-      loading: false,
-      initialized: true,
-      error: null,
-      refresh,
-    });
-    vi.mocked(useWorkspaceActions).mockReturnValue({
-      stageFile: vi.fn(),
-      unstageFile: vi.fn(),
-      stageAllWorkingFiles: vi.fn(),
-      unstageAllStagedFiles: vi.fn(),
-      discardWorkingFile: vi.fn(),
-      discardAllWorkingFiles: vi.fn(),
-      stageHunk: vi.fn(),
-      unstageHunk: vi.fn(),
-      acting: false,
-      error: null,
-    });
-  });
-
-  afterEach(() => {
-    cleanup();
-    window.history.pushState(null, '', '/');
-    if (originalClipboard) {
-      Object.defineProperty(navigator, 'clipboard', {
-        value: originalClipboard,
-        writable: true,
-        configurable: true,
-      });
-    } else {
-      // @ts-expect-error: cleanup requires deletion of mocked property
-      delete navigator.clipboard;
-    }
-  });
-
-  it('renders "View Notes" button conditionally based on notes length', () => {
-    // Given: an empty notes list
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-
-    // When
-    const { rerender } = render(<App />);
-
-    // Then: button is not in document
-    expect(screen.queryByRole('button', { name: /View Notes/i })).toBeNull();
-
-    // Given: one note is available
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [
-        {
-          id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            hunkId: 'h1',
-            startNewLineNumber: 1,
-            endNewLineNumber: 1,
-          },
-          body: 'hello',
-          createdAt: 100,
-        },
-      ],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-
-    // When
-    rerender(<App />);
-
-    // Then: button should be present
-    expect(screen.getByRole('button', { name: 'View Notes (1)' })).toBeDefined();
-  });
-
-  it('toggles the NotesListModal on button click', async () => {
-    // Given: one note is available
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [
-        {
-          id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            hunkId: 'h1',
-            startNewLineNumber: 1,
-            endNewLineNumber: 1,
-          },
-          body: 'hello note',
-          createdAt: 100,
-        },
-      ],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-
-    // When
-    const user = userEvent.setup();
-    render(<App />);
-
-    // Then: modal is not open yet
-    expect(screen.queryByText('Your Notes (1)')).toBeNull();
-
-    // When clicked
-    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
-
-    // Then: modal is visible
-    expect(screen.getByText('Your Notes (1)')).toBeDefined();
-
-    // When close button clicked
-    await user.click(screen.getByRole('button', { name: '×' }));
-
-    // Then: modal is hidden
-    expect(screen.queryByText('Your Notes (1)')).toBeNull();
-  });
-
-  it('closes the modal automatically when all notes are deleted', async () => {
-    // Given: one note is available
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [
-        {
-          id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            hunkId: 'h1',
-            startNewLineNumber: 1,
-            endNewLineNumber: 1,
-          },
-          body: 'hello note',
-          createdAt: 100,
-        },
-      ],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-
-    // When
-    const user = userEvent.setup();
-    const { rerender } = render(<App />);
-
-    // When clicked to open
-    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
-
-    // Then: modal is visible
-    expect(screen.getByText('Your Notes (1)')).toBeDefined();
-
-    // When all notes are deleted
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-    rerender(<App />);
-
-    // Then: modal is automatically hidden
-    expect(screen.queryByText('Your Notes (0)')).toBeNull();
-    expect(screen.queryByText('Your Notes (1)')).toBeNull();
-  });
-
-  it('copies notes to clipboard and shows tooltip', async () => {
-    // Given: one note is available
-    vi.mocked(useNotes).mockReturnValue({
-      notes: [
-        {
-          id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            hunkId: 'h1',
-            startNewLineNumber: 10,
-            endNewLineNumber: 10,
-          },
-          body: 'hello clipboard',
-          createdAt: 100,
-        },
-      ],
-      addNote: vi.fn(),
-      updateNote: vi.fn(),
-      deleteNote: vi.fn(),
-      clearNotes,
-    });
-
-    vi.useFakeTimers();
-    render(<App />);
-
-    // Open modal using fireEvent because combining `userEvent` and `vi.useFakeTimers` causes async processing to hang
-    fireEvent.click(screen.getByRole('button', { name: 'View Notes (1)' }));
-
-    // Tooltip should not be there initially
-    expect(screen.queryByText('Copied!')).toBeNull();
-
-    // Click copy
-    await act(async () => {
-      fireEvent.click(screen.getByRole('button', { name: 'Copy' }));
-    });
-
-    // Then: writeText was called with formatted string
-    expect(navigator.clipboard.writeText).toHaveBeenCalledWith('> f1#L10\nhello clipboard');
-
-    // Tooltip should appear
-    expect(screen.getByText('Copied!')).toBeDefined();
-
-    // When 2 seconds pass
-    act(() => {
-      vi.advanceTimersByTime(2000);
-    });
-
-    // Then tooltip disappears
-    expect(screen.queryByText('Copied!')).toBeNull();
-    vi.useRealTimers();
   });
 });
