@@ -20,6 +20,7 @@ function App({ dependencies }: AppProps): ReactElement {
       dependencies={dependencies}
       repoId={route.repoId}
       onNavigateToRoot={navigateToSelection}
+      onSelectRepository={navigate}
     />
   );
 }

@@ -1,16 +1,19 @@
-import type { ReactElement } from 'react';
-import type { RepositoryId } from '../../domain/repository/repository';
+import { useMemo, useState, type ReactElement } from 'react';
+import { ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
+import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
 import { FileList } from '../components/file-list/FileList';
 import { PaneBulkActions } from '../components/file-list/PaneBulkActions';
 import { UnifiedDiffViewer } from '../components/diff/UnifiedDiffViewer';
+import { RepositorySidebar } from '../components/repository-sidebar/RepositorySidebar';
 import { useWorkspaceActions } from '../hooks/workspace-actions/useWorkspaceActions';
 import { useWorkingPane } from '../hooks/panes/useWorkingPane';
 import { useStagedPane } from '../hooks/panes/useStagedPane';
 import { useFileSelection } from '../hooks/panes/useFileSelection';
 import { NotesListModal } from '../components/notes/NotesListModal';
 import { useRepository } from '../hooks/repositories/useRepository';
+import { useRepositoryList } from '../hooks/repositories/useRepositoryList';
 import { usePaneResize } from '../hooks/layout/usePaneResize';
 import { useNotesPanel } from '../hooks/notes/useNotesPanel';
 import { useFileNoteEditor } from '../hooks/notes/useFileNoteEditor';
@@ -25,13 +28,95 @@ export interface RepositoryViewerPageProps {
   dependencies: AppDependencies;
   repoId: RepositoryId;
   onNavigateToRoot: () => void;
+  onSelectRepository: (repoId: RepositoryId) => void;
 }
 
 export function RepositoryViewerPage({
   dependencies,
   repoId,
   onNavigateToRoot,
+  onSelectRepository,
 }: RepositoryViewerPageProps): ReactElement {
+  const [isRepositorySidebarOpen, setIsRepositorySidebarOpen] = useState(false);
+  const repositoryList = useRepositoryList(dependencies.repositoryReader, {
+    enabled: isRepositorySidebarOpen,
+  });
+
+  const handleSelectRepository = (selectedRepoId: RepositoryId): void => {
+    // Defensive guard: `RepositorySidebarRow` already prevents clicks on the
+    // current repository, but we double-check here so future callers cannot
+    // accidentally trigger a no-op navigation that would still close the sidebar.
+    if (selectedRepoId === repoId) {
+      return;
+    }
+
+    setIsRepositorySidebarOpen(false);
+    onSelectRepository(selectedRepoId);
+  };
+
+  return (
+    <RepositoryWorkspace
+      key={repoId}
+      dependencies={dependencies}
+      isRepositorySidebarOpen={isRepositorySidebarOpen}
+      onNavigateToRoot={onNavigateToRoot}
+      onSelectRepository={handleSelectRepository}
+      onToggleRepositorySidebar={() => setIsRepositorySidebarOpen((isOpen) => !isOpen)}
+      repoId={repoId}
+      repositoryList={repositoryList.repositories}
+      repositoryListConfigMissingError={repositoryList.configMissingError}
+      repositoryListError={repositoryList.error}
+      repositoryListLoading={repositoryList.loading}
+    />
+  );
+}
+
+interface RepositoryWorkspaceProps {
+  dependencies: AppDependencies;
+  isRepositorySidebarOpen: boolean;
+  onNavigateToRoot: () => void;
+  onSelectRepository: (repoId: RepositoryId) => void;
+  onToggleRepositorySidebar: () => void;
+  repoId: RepositoryId;
+  repositoryList: RepositoryList | null;
+  repositoryListConfigMissingError: string | null;
+  repositoryListError: string | null;
+  repositoryListLoading: boolean;
+}
+
+const DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX = 280;
+
+function resolveRepositorySidebarWidthPx(): number {
+  if (typeof window === 'undefined') {
+    return DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX;
+  }
+
+  const width = Number.parseFloat(
+    window
+      .getComputedStyle(document.documentElement)
+      .getPropertyValue('--repository-sidebar-width')
+      .trim(),
+  );
+
+  return Number.isFinite(width) ? width : DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX;
+}
+
+function RepositoryWorkspace({
+  dependencies,
+  isRepositorySidebarOpen,
+  onNavigateToRoot,
+  onSelectRepository,
+  onToggleRepositorySidebar,
+  repoId,
+  repositoryList,
+  repositoryListConfigMissingError,
+  repositoryListError,
+  repositoryListLoading,
+}: RepositoryWorkspaceProps): ReactElement {
+  // Read `--repository-sidebar-width` once at mount. The CSS variable is a fixed
+  // value today, so this skips re-reading `getComputedStyle` on every render.
+  // Revisit if the variable becomes responsive (e.g., changes via media query).
+  const repositorySidebarWidthPx = useMemo(() => resolveRepositorySidebarWidthPx(), []);
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -121,7 +206,13 @@ export function RepositoryViewerPage({
     workingPaneStyle,
     sidebarSplitterProps,
     paneSplitterProps,
-  } = usePaneResize();
+  } = usePaneResize({
+    reservedRightWidthPx: isRepositorySidebarOpen ? repositorySidebarWidthPx : 0,
+  });
+  const repositorySidebarToggleLabel = isRepositorySidebarOpen
+    ? 'Close repository sidebar'
+    : 'Open repository sidebar';
+  const RepositorySidebarToggleIcon = isRepositorySidebarOpen ? ArrowRightToLine : ArrowLeftToLine;
 
   return (
     <div className="app-container">
@@ -143,19 +234,6 @@ export function RepositoryViewerPage({
           {(repositoryError || diffError || actionError) && (
             <span style={{ color: '#f85149' }}>{repositoryError || diffError || actionError}</span>
           )}
-          <button
-            onClick={refreshAll}
-            style={{
-              background: 'transparent',
-              border: '1px solid #30363d',
-              color: '#c9d1d9',
-              padding: '0.2rem 0.5rem',
-              borderRadius: '4px',
-              cursor: 'pointer',
-            }}
-          >
-            Refresh
-          </button>
           {notesPanel.canOpen && (
             <button
               onClick={notesPanel.toggle}
@@ -171,6 +249,19 @@ export function RepositoryViewerPage({
               View Notes ({notes.length})
             </button>
           )}
+          <button className="secondary-button" onClick={refreshAll} type="button">
+            Refresh
+          </button>
+          <button
+            aria-label={repositorySidebarToggleLabel}
+            aria-pressed={isRepositorySidebarOpen}
+            className="secondary-button repository-sidebar-toggle-button"
+            onClick={onToggleRepositorySidebar}
+            title={repositorySidebarToggleLabel}
+            type="button"
+          >
+            <RepositorySidebarToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
+          </button>
         </div>
       </header>
       <div style={{ position: 'relative' }}>
@@ -323,6 +414,16 @@ export function RepositoryViewerPage({
             )}
           </div>
         </div>
+        {isRepositorySidebarOpen && (
+          <RepositorySidebar
+            configMissingError={repositoryListConfigMissingError}
+            currentRepositoryId={repoId}
+            error={repositoryListError}
+            loading={repositoryListLoading}
+            onSelectRepository={onSelectRepository}
+            repositories={repositoryList}
+          />
+        )}
       </main>
       {pendingRequest && (
         <DiscardConfirmModal
