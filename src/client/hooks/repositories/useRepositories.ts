@@ -1,10 +1,7 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { RepositoryList } from '../../../domain/repository/repository';
-import {
-  RepositoryFetchError,
-  type RepositoryReader,
-  type RepositoryWriter,
-} from '../../application/ports';
+import type { RepositoryReader, RepositoryWriter } from '../../application/ports';
+import { useRepositoryList } from './useRepositoryList';
 
 export interface UseRepositoriesResult {
   addError: string | null;
@@ -21,32 +18,10 @@ export function useRepositories(
   repositoryReader: RepositoryReader,
   repositoryWriter: RepositoryWriter,
 ): UseRepositoriesResult {
-  const [repositories, setRepositories] = useState<RepositoryList | null>(null);
-  const [loading, setLoading] = useState(true);
   const [adding, setAdding] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [addError, setAddError] = useState<string | null>(null);
-  const [configMissingError, setConfigMissingError] = useState<string | null>(null);
-
-  const refresh = useCallback(async (): Promise<void> => {
-    setLoading(true);
-    setError(null);
-    setConfigMissingError(null);
-
-    try {
-      setRepositories(await repositoryReader.fetchRepositories());
-    } catch (err: unknown) {
-      setRepositories(null);
-      if (err instanceof RepositoryFetchError && err.statusCode === 404) {
-        setConfigMissingError(err.message);
-        return;
-      }
-
-      setError(err instanceof Error ? err.message : String(err));
-    } finally {
-      setLoading(false);
-    }
-  }, [repositoryReader]);
+  const { configMissingError, error, loading, repositories, refresh } =
+    useRepositoryList(repositoryReader);
 
   const addRepository = useCallback(
     async (path: string): Promise<boolean> => {
@@ -66,11 +41,6 @@ export function useRepositories(
     },
     [refresh, repositoryWriter],
   );
-
-  useEffect(() => {
-    void refresh();
-  }, [refresh]);
-
   return {
     addError,
     addRepository,

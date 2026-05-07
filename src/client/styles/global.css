@@ -6,6 +6,7 @@
   --pane-bg: #0d1117;
   --accent-color: #c93245;
   --sidebar-default-width: 300px;
+  --repository-sidebar-width: 280px;
   --font-family:
     -apple-system, BlinkMacSystemFont, 'Segoe UI', Helvetica, Arial, sans-serif,
     'Apple Color Emoji', 'Segoe UI Emoji';
@@ -112,6 +113,15 @@ button.app-brand-home {
   border-color: var(--accent-color);
 }
 
+.repository-sidebar-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 28px;
+  width: 32px;
+  padding: 0;
+}
+
 .app-main {
   display: flex;
   flex: 1;
@@ -144,6 +154,92 @@ button.app-brand-home {
   flex: 1;
   border-right: none;
   min-width: 0;
+}
+
+.repository-sidebar {
+  display: flex;
+  flex: 0 0 var(--repository-sidebar-width);
+  flex-direction: column;
+  width: var(--repository-sidebar-width);
+  min-width: var(--repository-sidebar-width);
+  overflow-y: auto;
+  background: #010409;
+  border-left: 1px solid var(--border-color);
+}
+
+.repository-sidebar-header {
+  flex: 0 0 auto;
+  padding: 0.5rem 1rem;
+  background: #010409;
+  border-bottom: 1px solid var(--border-color);
+  color: #f0f6fc;
+  font-size: 0.85rem;
+  font-weight: 650;
+}
+
+.repository-sidebar-list {
+  display: grid;
+  list-style: none;
+}
+
+.repository-sidebar-row {
+  display: grid;
+  width: 100%;
+  min-height: 82px;
+  gap: 0.15rem;
+  padding: 0.85rem 1rem;
+  color: var(--text-color);
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-bottom: 1px solid var(--border-color);
+  border-left: 3px solid transparent;
+  cursor: pointer;
+}
+
+.repository-sidebar-row:hover,
+.repository-sidebar-row:focus-visible {
+  background: #0d1117;
+  border-left-color: var(--accent-color);
+  outline: none;
+}
+
+.repository-sidebar-row-current {
+  background: rgba(201, 50, 69, 0.12);
+  border-left-color: var(--accent-color);
+}
+
+.repository-sidebar-name {
+  overflow: hidden;
+  color: #f0f6fc;
+  font-size: 0.95rem;
+  font-weight: 650;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-sidebar-path {
+  overflow: hidden;
+  color: #c9d1d9;
+  font-size: 0.84rem;
+  line-height: 1.25;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.repository-sidebar-empty,
+.repository-sidebar-error {
+  padding: 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.85rem;
+}
+
+.repository-sidebar-empty {
+  color: #8b949e;
+}
+
+.repository-sidebar-error {
+  color: #f85149;
 }
 
 .pane-splitter {

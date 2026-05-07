@@ -91,12 +91,19 @@ const testDependencies: AppDependencies = {
   },
 };
 
-function Page({ repoId = 'my-app' } = {}): ReactElement {
+function Page({
+  onSelectRepository = vi.fn(),
+  repoId = 'my-app',
+}: {
+  onSelectRepository?: (repoId: string) => void;
+  repoId?: string;
+} = {}): ReactElement {
   return (
     <RepositoryViewerPage
       dependencies={testDependencies}
       repoId={repoId}
       onNavigateToRoot={vi.fn()}
+      onSelectRepository={onSelectRepository}
     />
   );
 }
@@ -485,6 +492,75 @@ describe('RepositoryViewerPage interactions', () => {
     expect(repositoryName.getAttribute('title')).toBe('/absolute/path/to/demo-repo');
     expect(testDependencies.repositoryReader.fetchRepositories).not.toHaveBeenCalled();
     expect(testDependencies.repositoryReader.fetchRepository).toHaveBeenCalledWith('demo-repo');
+  });
+
+  it('keeps the repository sidebar closed on initial render', () => {
+    // Given / When
+    render(<Page />);
+
+    // Then
+    expect(screen.queryByRole('complementary', { name: 'Repository list' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Open repository sidebar' })).toBeDefined();
+    expect(testDependencies.repositoryReader.fetchRepositories).not.toHaveBeenCalled();
+  });
+
+  it('opens and closes the repository sidebar from the header toggle', async () => {
+    // Given
+    const user = userEvent.setup();
+    render(<Page />);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+
+    // Then
+    expect(await screen.findByRole('complementary', { name: 'Repository list' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Close repository sidebar' })).toBeDefined();
+    expect(testDependencies.repositoryReader.fetchRepositories).toHaveBeenCalled();
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Close repository sidebar' }));
+
+    // Then
+    expect(screen.queryByRole('complementary', { name: 'Repository list' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Open repository sidebar' })).toBeDefined();
+  });
+
+  it('selects another repository from the sidebar and closes it', async () => {
+    // Given
+    const user = userEvent.setup();
+    const onSelectRepository = vi.fn();
+    vi.mocked(testDependencies.repositoryReader.fetchRepositories).mockResolvedValueOnce({
+      invalidRepositories: [
+        {
+          id: 'invalid-repo',
+          name: 'invalid-repo',
+          path: '/Users/dev/projects/invalid-repo',
+          reason: 'Repository path does not exist.',
+        },
+      ],
+      repositories: [
+        {
+          id: 'my-app',
+          name: 'my-app',
+          path: '/Users/dev/projects/my-app',
+        },
+        {
+          id: 'other-app',
+          name: 'other-app',
+          path: '/Users/dev/projects/other-app',
+        },
+      ],
+    });
+    render(<Page onSelectRepository={onSelectRepository} />);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+    await user.click(await screen.findByRole('button', { name: /other-app/ }));
+
+    // Then
+    expect(onSelectRepository).toHaveBeenCalledWith('other-app');
+    expect(screen.queryByRole('complementary', { name: 'Repository list' })).toBeNull();
+    expect(screen.queryByText('invalid-repo')).toBeNull();
   });
 });
 

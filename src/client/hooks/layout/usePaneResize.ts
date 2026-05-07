@@ -19,6 +19,10 @@ interface SplitterProps {
   onPointerDown: (event: ReactPointerEvent<HTMLDivElement>) => void;
 }
 
+export interface UsePaneResizeOptions {
+  reservedRightWidthPx?: number;
+}
+
 interface UsePaneResizeResult {
   appMainRef: RefObject<HTMLElement | null>;
   sidebarRef: RefObject<HTMLDivElement | null>;
@@ -28,7 +32,9 @@ interface UsePaneResizeResult {
   paneSplitterProps: SplitterProps;
 }
 
-export function usePaneResize(): UsePaneResizeResult {
+export function usePaneResize({
+  reservedRightWidthPx = 0,
+}: UsePaneResizeOptions = {}): UsePaneResizeResult {
   const [sidebarWidthPx, setSidebarWidthPx] = useState<number | null>(null);
   const [workingPaneHeightPx, setWorkingPaneHeightPx] = useState<number | null>(null);
   const [dragTarget, setDragTarget] = useState<DragTarget | null>(null);
@@ -57,7 +63,7 @@ export function usePaneResize(): UsePaneResizeResult {
         }
         const appRect = appMain.getBoundingClientRect();
         const widthPx = event.clientX - appRect.left;
-        setSidebarWidthPx(clampSidebarWidth(widthPx, appRect.width));
+        setSidebarWidthPx(clampSidebarWidth(widthPx, appRect.width - reservedRightWidthPx));
         return;
       }
 
@@ -85,7 +91,7 @@ export function usePaneResize(): UsePaneResizeResult {
       window.removeEventListener('pointerup', handlePointerEnd);
       window.removeEventListener('pointercancel', handlePointerEnd);
     };
-  }, [stopDrag]);
+  }, [reservedRightWidthPx, stopDrag]);
 
   // Keep pane sizes valid if the app is resized after the user has dragged splitters.
   useEffect(() => {
@@ -94,7 +100,9 @@ export function usePaneResize(): UsePaneResizeResult {
       if (appMain) {
         const appRect = appMain.getBoundingClientRect();
         setSidebarWidthPx((currentWidthPx) =>
-          currentWidthPx === null ? null : clampSidebarWidth(currentWidthPx, appRect.width),
+          currentWidthPx === null
+            ? null
+            : clampSidebarWidth(currentWidthPx, appRect.width - reservedRightWidthPx),
         );
       }
 
@@ -114,7 +122,7 @@ export function usePaneResize(): UsePaneResizeResult {
     return () => {
       window.removeEventListener('resize', clampCurrentLayout);
     };
-  }, []);
+  }, [reservedRightWidthPx]);
 
   useEffect(() => {
     return () => {

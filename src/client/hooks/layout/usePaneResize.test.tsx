@@ -3,7 +3,9 @@ import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it } from 'vitest';
 import { usePaneResize } from './usePaneResize';
 
-function ResizeHarness(): ReactElement {
+function ResizeHarness({
+  reservedRightWidthPx = 0,
+}: { reservedRightWidthPx?: number } = {}): ReactElement {
   const {
     appMainRef,
     sidebarRef,
@@ -11,7 +13,7 @@ function ResizeHarness(): ReactElement {
     workingPaneStyle,
     sidebarSplitterProps,
     paneSplitterProps,
-  } = usePaneResize();
+  } = usePaneResize({ reservedRightWidthPx });
 
   return (
     <main ref={appMainRef} data-testid="app-main">
@@ -79,6 +81,24 @@ describe('usePaneResize', () => {
     expect(shrunkWidth).toBe('300px');
     // 4. the sidebar min width (180px)
     expect(shrunkWidth2).toBe('180px');
+  });
+
+  it('keeps reserved right-side space when clamping sidebar width', () => {
+    // Given: a right repository sidebar is open and reserves fixed width
+    render(<ResizeHarness reservedRightWidthPx={280} />);
+    const appMain = screen.getByTestId('app-main') as HTMLElement;
+    const sidebar = screen.getByTestId('sidebar') as HTMLElement;
+    const splitter = screen.getByRole('separator', { name: 'Resize sidebar and diff panes' });
+    mockRect(appMain, 1200, 800);
+    mockRect(sidebar, 300, 800);
+
+    // When: the user drags the file sidebar beyond the available width
+    fireEvent.pointerDown(splitter, { clientX: 300 });
+    fireEvent.pointerMove(window, { clientX: 1000 });
+    fireEvent.pointerUp(window);
+
+    // Then: max width leaves space for both diff view and repository sidebar
+    expect(sidebar.style.width).toBe('560px');
   });
 
   it('resizes working pane height by dragging the horizontal splitter', () => {
