@@ -54,6 +54,9 @@ export function useRepositoryList(
   return {
     configMissingError,
     error,
+    // `loading` tracks in-flight fetches. The second clause covers the window
+    // right after `enabled` becomes true: the effect had not run `refresh()` yet,
+    // so `setLoading(true)` has not fired, but we still have no data or errors.
     loading:
       loading ||
       (enabled && repositories === null && error === null && configMissingError === null),

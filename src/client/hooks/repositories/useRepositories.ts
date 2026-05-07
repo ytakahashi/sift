@@ -20,6 +20,9 @@ export function useRepositories(
 ): UseRepositoriesResult {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  // Selection page always needs the list on mount, so `enabled` stays the
+  // default `true`. The Sidebar caller in RepositoryViewerPage opts out by
+  // passing `enabled: false` until the user opens it.
   const { configMissingError, error, loading, repositories, refresh } =
     useRepositoryList(repositoryReader);
 

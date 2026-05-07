@@ -62,7 +62,7 @@ export function RepositorySidebar({
     <aside aria-label="Repository list" className="repository-sidebar">
       <div className="repository-sidebar-header">Repositories</div>
       {statusMessage ? <div className="repository-sidebar-error">{statusMessage}</div> : null}
-      {loading && items.length === 0 ? (
+      {loading && !statusMessage && items.length === 0 ? (
         <div className="repository-sidebar-empty">Loading repositories...</div>
       ) : null}
       {!loading && !statusMessage && items.length === 0 ? (

@@ -43,6 +43,9 @@ export function RepositoryViewerPage({
   });
 
   const handleSelectRepository = (selectedRepoId: RepositoryId): void => {
+    // Defensive guard: `RepositorySidebarRow` already prevents clicks on the
+    // current repository, but we double-check here so future callers cannot
+    // accidentally trigger a no-op navigation that would still close the sidebar.
     if (selectedRepoId === repoId) {
       return;
     }
@@ -110,6 +113,9 @@ function RepositoryWorkspace({
   repositoryListError,
   repositoryListLoading,
 }: RepositoryWorkspaceProps): ReactElement {
+  // Read `--repository-sidebar-width` once at mount. The CSS variable is a fixed
+  // value today, so this skips re-reading `getComputedStyle` on every render.
+  // Revisit if the variable becomes responsive (e.g., changes via media query).
   const repositorySidebarWidthPx = useMemo(() => resolveRepositorySidebarWidthPx(), []);
   const {
     workingFiles: serverWorkingFiles,
@@ -228,19 +234,6 @@ function RepositoryWorkspace({
           {(repositoryError || diffError || actionError) && (
             <span style={{ color: '#f85149' }}>{repositoryError || diffError || actionError}</span>
           )}
-          <button className="secondary-button" onClick={refreshAll} type="button">
-            Refresh
-          </button>
-          <button
-            aria-label={repositorySidebarToggleLabel}
-            aria-pressed={isRepositorySidebarOpen}
-            className="secondary-button repository-sidebar-toggle-button"
-            onClick={onToggleRepositorySidebar}
-            title={repositorySidebarToggleLabel}
-            type="button"
-          >
-            <RepositorySidebarToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
-          </button>
           {notesPanel.canOpen && (
             <button
               onClick={notesPanel.toggle}
@@ -256,6 +249,19 @@ function RepositoryWorkspace({
               View Notes ({notes.length})
             </button>
           )}
+          <button className="secondary-button" onClick={refreshAll} type="button">
+            Refresh
+          </button>
+          <button
+            aria-label={repositorySidebarToggleLabel}
+            aria-pressed={isRepositorySidebarOpen}
+            className="secondary-button repository-sidebar-toggle-button"
+            onClick={onToggleRepositorySidebar}
+            title={repositorySidebarToggleLabel}
+            type="button"
+          >
+            <RepositorySidebarToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
+          </button>
         </div>
       </header>
       <div style={{ position: 'relative' }}>
