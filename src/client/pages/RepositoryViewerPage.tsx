@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useMemo, useState, type ReactElement } from 'react';
 import { ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
 import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
 import { useDiffData } from '../hooks/diff/useDiffData';
@@ -81,7 +81,22 @@ interface RepositoryWorkspaceProps {
   repositoryListLoading: boolean;
 }
 
-const REPOSITORY_SIDEBAR_WIDTH_PX = 280;
+const DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX = 280;
+
+function resolveRepositorySidebarWidthPx(): number {
+  if (typeof window === 'undefined') {
+    return DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX;
+  }
+
+  const width = Number.parseFloat(
+    window
+      .getComputedStyle(document.documentElement)
+      .getPropertyValue('--repository-sidebar-width')
+      .trim(),
+  );
+
+  return Number.isFinite(width) ? width : DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX;
+}
 
 function RepositoryWorkspace({
   dependencies,
@@ -95,6 +110,7 @@ function RepositoryWorkspace({
   repositoryListError,
   repositoryListLoading,
 }: RepositoryWorkspaceProps): ReactElement {
+  const repositorySidebarWidthPx = useMemo(() => resolveRepositorySidebarWidthPx(), []);
   const {
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
@@ -185,7 +201,7 @@ function RepositoryWorkspace({
     sidebarSplitterProps,
     paneSplitterProps,
   } = usePaneResize({
-    reservedRightWidthPx: isRepositorySidebarOpen ? REPOSITORY_SIDEBAR_WIDTH_PX : 0,
+    reservedRightWidthPx: isRepositorySidebarOpen ? repositorySidebarWidthPx : 0,
   });
   const repositorySidebarToggleLabel = isRepositorySidebarOpen
     ? 'Close repository sidebar'
