@@ -1,5 +1,5 @@
 import { useMemo, useState, type ReactElement } from 'react';
-import { ArrowLeftToLine, ArrowRightToLine } from 'lucide-react';
+import { ArrowLeftToLine, ArrowRightFromLine, ArrowRightToLine } from 'lucide-react';
 import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
@@ -113,6 +113,7 @@ function RepositoryWorkspace({
   repositoryListError,
   repositoryListLoading,
 }: RepositoryWorkspaceProps): ReactElement {
+  const [isFileListOpen, setIsFileListOpen] = useState(true);
   // Read `--repository-sidebar-width` once at mount. The CSS variable is a fixed
   // value today, so this skips re-reading `getComputedStyle` on every render.
   // Revisit if the variable becomes responsive (e.g., changes via media query).
@@ -213,6 +214,8 @@ function RepositoryWorkspace({
     ? 'Close repository sidebar'
     : 'Open repository sidebar';
   const RepositorySidebarToggleIcon = isRepositorySidebarOpen ? ArrowRightToLine : ArrowLeftToLine;
+  const fileListToggleLabel = isFileListOpen ? 'Hide file list' : 'Show file list';
+  const FileListToggleIcon = isFileListOpen ? ArrowLeftToLine : ArrowRightFromLine;
 
   return (
     <div className="app-container">
@@ -275,74 +278,94 @@ function RepositoryWorkspace({
         )}
       </div>
       <main className="app-main" ref={appMainRef}>
-        <div className="pane sidebar-container" ref={sidebarRef} style={sidebarStyle}>
-          <div className="sidebar-panel" style={workingPaneStyle}>
-            <div className="pane-header">Working Directory ({workingFiles.length})</div>
-            <div className="pane-content" style={{ padding: 0 }}>
-              {loading && workingFiles.length === 0 ? (
-                <div style={{ padding: '1rem' }}>Loading...</div>
-              ) : (
-                <FileList
-                  files={workingFiles}
-                  selectedFileId={paneMode === 'working' ? (selectedFile?.id ?? null) : null}
-                  disabled={acting}
-                  isActive={paneMode === 'working'}
-                  onSelect={(file) => select(file, 'working')}
-                  onActivate={(file) => void paneFileActions.stageFile(file)}
-                  onBoundaryNavigate={(direction) => handleBoundaryNavigate('working', direction)}
+        {isFileListOpen && (
+          <>
+            <div className="pane sidebar-container" ref={sidebarRef} style={sidebarStyle}>
+              <div className="sidebar-panel" style={workingPaneStyle}>
+                <div className="pane-header">Working Directory ({workingFiles.length})</div>
+                <div className="pane-content" style={{ padding: 0 }}>
+                  {loading && workingFiles.length === 0 ? (
+                    <div style={{ padding: '1rem' }}>Loading...</div>
+                  ) : (
+                    <FileList
+                      files={workingFiles}
+                      selectedFileId={paneMode === 'working' ? (selectedFile?.id ?? null) : null}
+                      disabled={acting}
+                      isActive={paneMode === 'working'}
+                      onSelect={(file) => select(file, 'working')}
+                      onActivate={(file) => void paneFileActions.stageFile(file)}
+                      onBoundaryNavigate={(direction) =>
+                        handleBoundaryNavigate('working', direction)
+                      }
+                    />
+                  )}
+                </div>
+                <PaneBulkActions
+                  actions={[
+                    {
+                      label: 'Stage All',
+                      tone: 'success',
+                      onClick: () => void paneFileActions.stageAllWorkingFiles(),
+                    },
+                    {
+                      label: 'Discard All',
+                      tone: 'danger',
+                      onClick: () => void paneFileActions.discardAllWorkingFiles(),
+                    },
+                  ]}
+                  disabled={acting || workingFiles.length === 0}
                 />
-              )}
-            </div>
-            <PaneBulkActions
-              actions={[
-                {
-                  label: 'Stage All',
-                  tone: 'success',
-                  onClick: () => void paneFileActions.stageAllWorkingFiles(),
-                },
-                {
-                  label: 'Discard All',
-                  tone: 'danger',
-                  onClick: () => void paneFileActions.discardAllWorkingFiles(),
-                },
-              ]}
-              disabled={acting || workingFiles.length === 0}
-            />
-          </div>
-          <div {...paneSplitterProps} />
-          <div className="sidebar-panel">
-            <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
-            <div className="pane-content" style={{ padding: 0 }}>
-              {loading && stagedFiles.length === 0 ? (
-                <div style={{ padding: '1rem' }}>Loading...</div>
-              ) : (
-                <FileList
-                  files={stagedFiles}
-                  selectedFileId={paneMode === 'staged' ? (selectedFile?.id ?? null) : null}
-                  disabled={acting}
-                  isActive={paneMode === 'staged'}
-                  onSelect={(file) => select(file, 'staged')}
-                  onActivate={(file) => void paneFileActions.unstageFile(file)}
-                  onBoundaryNavigate={(direction) => handleBoundaryNavigate('staged', direction)}
+              </div>
+              <div {...paneSplitterProps} />
+              <div className="sidebar-panel">
+                <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
+                <div className="pane-content" style={{ padding: 0 }}>
+                  {loading && stagedFiles.length === 0 ? (
+                    <div style={{ padding: '1rem' }}>Loading...</div>
+                  ) : (
+                    <FileList
+                      files={stagedFiles}
+                      selectedFileId={paneMode === 'staged' ? (selectedFile?.id ?? null) : null}
+                      disabled={acting}
+                      isActive={paneMode === 'staged'}
+                      onSelect={(file) => select(file, 'staged')}
+                      onActivate={(file) => void paneFileActions.unstageFile(file)}
+                      onBoundaryNavigate={(direction) =>
+                        handleBoundaryNavigate('staged', direction)
+                      }
+                    />
+                  )}
+                </div>
+                <PaneBulkActions
+                  actions={[
+                    {
+                      label: 'Unstage All',
+                      tone: 'danger',
+                      onClick: () => void paneFileActions.unstageAllStagedFiles(),
+                    },
+                  ]}
+                  disabled={acting || stagedFiles.length === 0}
                 />
-              )}
+              </div>
             </div>
-            <PaneBulkActions
-              actions={[
-                {
-                  label: 'Unstage All',
-                  tone: 'danger',
-                  onClick: () => void paneFileActions.unstageAllStagedFiles(),
-                },
-              ]}
-              disabled={acting || stagedFiles.length === 0}
-            />
-          </div>
-        </div>
-        <div {...sidebarSplitterProps} />
+            <div {...sidebarSplitterProps} />
+          </>
+        )}
         <div className="pane main-diff">
           <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
-            <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
+            <div className="diff-header-title-group">
+              <button
+                aria-expanded={isFileListOpen}
+                aria-label={fileListToggleLabel}
+                className="secondary-button file-list-toggle-button"
+                onClick={() => setIsFileListOpen((isOpen) => !isOpen)}
+                title={fileListToggleLabel}
+                type="button"
+              >
+                <FileListToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
+              </button>
+              <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
+            </div>
             {selectedFile && (
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button

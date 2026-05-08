@@ -458,6 +458,35 @@ describe('RepositoryViewerPage interactions', () => {
     expect(horizontalSplitter).toBeDefined();
   });
 
+  it('toggles the file list pane from the diff header', async () => {
+    // Given: the app is rendered with a selected file
+    const user = userEvent.setup();
+    render(<Page />);
+    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
+
+    // Then: the file list pane and hide action are visible
+    expect(screen.getAllByRole('listbox', { name: 'Changed files' })).toHaveLength(2);
+    expect(screen.getByRole('button', { name: 'Hide file list' })).toBeDefined();
+    expect(screen.getByRole('separator', { name: 'Resize sidebar and diff panes' })).toBeDefined();
+
+    // When: the file list is hidden
+    await user.click(screen.getByRole('button', { name: 'Hide file list' }));
+
+    // Then: the left pane is removed, the selected diff remains, and the show action appears
+    expect(screen.queryAllByRole('listbox', { name: 'Changed files' })).toHaveLength(0);
+    expect(screen.queryByRole('separator', { name: 'Resize sidebar and diff panes' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Show file list' })).toBeDefined();
+    expect(screen.getByTestId('diff-viewer').textContent).toBe('b.ts');
+
+    // When: the file list is shown again
+    await user.click(screen.getByRole('button', { name: 'Show file list' }));
+
+    // Then: the left pane and splitter return
+    expect(screen.getAllByRole('listbox', { name: 'Changed files' })).toHaveLength(2);
+    expect(screen.getByRole('separator', { name: 'Resize sidebar and diff panes' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Hide file list' })).toBeDefined();
+  });
+
   it('renders selected repository name in the header with absolute path tooltip', async () => {
     // Given: repository list data
     vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
