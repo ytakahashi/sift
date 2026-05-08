@@ -122,6 +122,16 @@ button.app-brand-home {
   padding: 0;
 }
 
+.file-list-toggle-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  height: 26px;
+  width: 30px;
+  padding: 0;
+}
+
 .app-main {
   display: flex;
   flex: 1;
@@ -290,6 +300,19 @@ button.app-brand-home {
   border-bottom: 1px solid var(--border-color);
   font-weight: 600;
   font-size: 0.85rem;
+}
+
+.diff-header-title-group {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 0.5rem;
+}
+
+.diff-header-title-group span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .pane-content {
