@@ -1,14 +1,15 @@
 import { Command } from 'commander';
 import { resolveRepoRoot } from './resolve-repo';
 import { openBrowser } from './open-browser';
+import { APP_INFO } from '../server/app-info';
 import { createRepositoryConfigUpdater, startServer } from '../server/index';
 
 const program = new Command();
 
 program
-  .name('sift')
-  .description('Sift before you commit. A lightweight local diff viewer.')
-  .version('1.0.0')
+  .name(APP_INFO.name)
+  .description(APP_INFO.description)
+  .version(APP_INFO.version)
   .argument('[path]', 'Repository path used with --add (defaults to current directory)')
   .option('--add [path]', 'Add a repository to the local Sift config before starting')
   .option('-o, --open', 'Open the browser automatically')

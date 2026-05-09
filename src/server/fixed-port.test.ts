@@ -11,8 +11,9 @@ describe('buildLocalServerUrl', () => {
 describe('checkExistingSiftServer', () => {
   it('detects an existing Sift server from the health marker', async () => {
     // Given
+    // The version field is irrelevant to the marker check; any string suffices.
     const fetchHealth = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue({ product: 'sift', version: '1.0.0' }),
+      json: vi.fn().mockResolvedValue({ product: 'sift', version: '0.0.0' }),
       ok: true,
     });
 
