@@ -42,6 +42,8 @@ export class GitClient {
   }
 
   async restoreWorktree(paths: string[]): Promise<void> {
-    await this.runGitCommand(['restore', '--worktree', '--source=HEAD', '--', ...paths]);
+    // Omitting --source defaults to the index, which discards only unstaged changes
+    // in the working tree while preserving any changes already added to the index.
+    await this.runGitCommand(['restore', '--worktree', '--', ...paths]);
   }
 }
