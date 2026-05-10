@@ -117,6 +117,9 @@ export function DiscardConfirmModal(props: DiscardConfirmModalProps): ReactEleme
         {/* Body */}
         <div style={{ padding: '1.2rem 1rem', color: '#c9d1d9', fontSize: '0.9rem' }}>
           <p style={{ margin: '0 0 0.6rem' }}>{message}</p>
+          <p style={{ margin: '0 0 0.6rem', color: '#8b949e', fontSize: '0.85rem' }}>
+            Only unstaged changes will be discarded. Staged changes will remain intact.
+          </p>
           <p style={{ margin: 0, color: '#8b949e', fontSize: '0.85rem' }}>
             This action cannot be undone.
           </p>

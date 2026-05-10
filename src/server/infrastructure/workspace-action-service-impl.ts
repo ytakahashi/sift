@@ -88,7 +88,7 @@ export class WorkspaceActionServiceImpl implements WorkspaceActionService {
     }
 
     // For tracked working-tree changes (`modified`, `deleted`, `binary`),
-    // restore the file content from HEAD.
+    // restore the file content from the index to discard unstaged changes.
     await this.git.restoreWorktree([safePath]);
   }
 

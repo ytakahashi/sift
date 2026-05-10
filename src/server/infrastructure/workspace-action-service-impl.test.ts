@@ -52,7 +52,7 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     expect(gitMock.restoreWorktree).not.toHaveBeenCalled();
   });
 
-  it('restores modified files from HEAD', async () => {
+  it('restores modified files from the index', async () => {
     // Given: target file is modified in the working tree
     providerMock.getFiles.mockResolvedValue([createWorkingFile('a.ts', 'modified')]);
 
@@ -64,7 +64,7 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     expect(gitMock.cleanPath).not.toHaveBeenCalled();
   });
 
-  it('restores deleted files from HEAD', async () => {
+  it('restores deleted files from the index', async () => {
     // Given: target file is deleted in the working tree
     providerMock.getFiles.mockResolvedValue([createWorkingFile('deleted.ts', 'deleted')]);
 
@@ -76,7 +76,7 @@ describe('WorkspaceActionServiceImpl.discardWorkingFile', () => {
     expect(gitMock.cleanPath).not.toHaveBeenCalled();
   });
 
-  it('restores binary files from HEAD', async () => {
+  it('restores binary files from the index', async () => {
     // Given: target file is a binary diff in the working tree
     providerMock.getFiles.mockResolvedValue([createWorkingFile('image.png', 'binary')]);
 
