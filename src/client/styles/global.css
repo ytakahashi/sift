@@ -5,8 +5,8 @@
   --header-bg: #161b22;
   --pane-bg: #0d1117;
   --accent-color: #c93245;
-  --success-color: #238636;
-  --danger-color: #da3633;
+  --success-color: #3ca251;
+  --danger-color: #fd4845;
   --sidebar-default-width: 300px;
   --repository-sidebar-width: 280px;
   --font-family:
@@ -153,32 +153,28 @@ button.app-brand-home {
 
 .button-primary {
   background: var(--success-color);
-  border-color: var(--success-color);
   color: #fff;
 }
 
 .button-primary:hover {
   border-color: var(--success-color);
-  opacity: 0.88;
 }
 
 .button-danger {
   background: var(--danger-color);
-  border-color: var(--danger-color);
   color: #fff;
 }
 
 .button-danger:hover {
   border-color: var(--danger-color);
-  opacity: 0.88;
 }
 
 .repository-sidebar-toggle-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  width: 32px;
+  height: 26px;
+  width: 26px;
   padding: 0;
 }
 
@@ -188,7 +184,7 @@ button.app-brand-home {
   justify-content: center;
   flex: 0 0 auto;
   height: 26px;
-  width: 30px;
+  width: 26px;
   padding: 0;
 }
 

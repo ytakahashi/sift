@@ -130,6 +130,7 @@ export function DiscardConfirmModal(props: DiscardConfirmModalProps): ReactEleme
             padding: '0.8rem 1rem',
             borderTop: '1px solid #30363d',
             display: 'flex',
+            fontSize: '0.9rem' ,
             justifyContent: 'flex-end',
             gap: '0.5rem',
           }}
