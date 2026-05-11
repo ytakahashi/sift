@@ -2,7 +2,6 @@ import type { ReactElement } from 'react';
 
 interface PaneBulkAction {
   label: string;
-  tone: 'success' | 'danger';
   onClick: () => void;
 }
 
@@ -17,7 +16,7 @@ export function PaneBulkActions({ actions, disabled }: PaneBulkActionsProps): Re
       {actions.map((action) => (
         <button
           key={action.label}
-          className={`bulk-action-button bulk-action-button-${action.tone}`}
+          className="button pane-bulk-action-button"
           disabled={disabled}
           onClick={action.onClick}
           type="button"

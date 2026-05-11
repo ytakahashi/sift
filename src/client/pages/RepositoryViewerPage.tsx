@@ -238,27 +238,17 @@ function RepositoryWorkspace({
             <span style={{ color: '#f85149' }}>{repositoryError || diffError || actionError}</span>
           )}
           {notesPanel.canOpen && (
-            <button
-              onClick={notesPanel.toggle}
-              style={{
-                background: '#238636',
-                color: '#fff',
-                border: 'none',
-                padding: '0.2rem 0.6rem',
-                borderRadius: '4px',
-                cursor: 'pointer',
-              }}
-            >
+            <button className="button" onClick={notesPanel.toggle} type="button">
               View Notes ({notes.length})
             </button>
           )}
-          <button className="secondary-button" onClick={refreshAll} type="button">
+          <button className="button" onClick={refreshAll} type="button">
             Refresh
           </button>
           <button
             aria-label={repositorySidebarToggleLabel}
             aria-pressed={isRepositorySidebarOpen}
-            className="secondary-button repository-sidebar-toggle-button"
+            className="button repository-sidebar-toggle-button"
             onClick={onToggleRepositorySidebar}
             title={repositorySidebarToggleLabel}
             type="button"
@@ -304,12 +294,10 @@ function RepositoryWorkspace({
                   actions={[
                     {
                       label: 'Stage All',
-                      tone: 'success',
                       onClick: () => void paneFileActions.stageAllWorkingFiles(),
                     },
                     {
                       label: 'Discard All',
-                      tone: 'danger',
                       onClick: () => void paneFileActions.discardAllWorkingFiles(),
                     },
                   ]}
@@ -340,7 +328,6 @@ function RepositoryWorkspace({
                   actions={[
                     {
                       label: 'Unstage All',
-                      tone: 'danger',
                       onClick: () => void paneFileActions.unstageAllStagedFiles(),
                     },
                   ]}
@@ -357,7 +344,7 @@ function RepositoryWorkspace({
               <button
                 aria-expanded={isFileListOpen}
                 aria-label={fileListToggleLabel}
-                className="secondary-button file-list-toggle-button"
+                className="button file-list-toggle-button"
                 onClick={() => setIsFileListOpen((isOpen) => !isOpen)}
                 title={fileListToggleLabel}
                 type="button"
@@ -369,46 +356,25 @@ function RepositoryWorkspace({
             {selectedFile && (
               <div style={{ display: 'flex', gap: '0.5rem' }}>
                 <button
+                  className="button diff-file-action-button"
                   onClick={paneFileActions.toggleSelectedFileStage}
-                  style={{
-                    background: paneMode === 'working' ? '#238636' : '#da3633',
-                    color: '#fff',
-                    border: '1px solid rgba(240,246,252,0.1)',
-                    borderRadius: '4px',
-                    padding: '0.1rem 0.6rem',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                  }}
+                  type="button"
                 >
                   {paneMode === 'working' ? 'Stage file' : 'Unstage file'}
                 </button>
                 {paneMode === 'working' && (
                   <button
+                    className="button diff-file-action-button"
                     onClick={() => void paneFileActions.discardFile(selectedFile)}
-                    style={{
-                      background: '#f85149',
-                      color: '#fff',
-                      border: '1px solid rgba(240,246,252,0.1)',
-                      borderRadius: '4px',
-                      padding: '0.1rem 0.6rem',
-                      cursor: 'pointer',
-                      fontSize: '0.8rem',
-                    }}
+                    type="button"
                   >
                     Discard
                   </button>
                 )}
                 <button
+                  className="button diff-file-action-button"
                   onClick={fileNoteEditor.open}
-                  style={{
-                    background: 'transparent',
-                    color: '#c9d1d9',
-                    border: '1px solid #30363d',
-                    borderRadius: '4px',
-                    padding: '0.1rem 0.6rem',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                  }}
+                  type="button"
                 >
                   Add Note
                 </button>

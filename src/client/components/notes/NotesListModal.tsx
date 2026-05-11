@@ -173,16 +173,9 @@ export function NotesListModal({
               </span>
             )}
             <button
+              className="button button-primary"
               onClick={() => void handleCopy()}
-              style={{
-                background: '#238636',
-                color: '#fff',
-                border: 'none',
-                padding: '0.3rem 0.8rem',
-                borderRadius: '4px',
-                cursor: 'pointer',
-                fontSize: '0.85rem',
-              }}
+              type="button"
             >
               Copy
             </button>
