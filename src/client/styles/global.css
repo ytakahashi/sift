@@ -5,6 +5,8 @@
   --header-bg: #161b22;
   --pane-bg: #0d1117;
   --accent-color: #c93245;
+  --success-color: #3ca251;
+  --danger-color: #fd4845;
   --sidebar-default-width: 300px;
   --repository-sidebar-width: 280px;
   --font-family:
@@ -113,12 +115,66 @@ button.app-brand-home {
   border-color: var(--accent-color);
 }
 
+.secondary-button:focus-visible {
+  outline: 1px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.secondary-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+/* Shared button classes used across toolbar, pane footer, and modal actions */
+.button {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-color);
+  padding: 0.2rem 0.5rem;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: inherit;
+  font-family: inherit;
+}
+
+.button:hover {
+  border-color: var(--accent-color);
+}
+
+.button:focus-visible {
+  outline: 1px solid var(--accent-color);
+  outline-offset: 2px;
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.button-primary {
+  background: var(--success-color);
+  color: #fff;
+}
+
+.button-primary:hover {
+  border-color: var(--success-color);
+}
+
+.button-danger {
+  background: var(--danger-color);
+  color: #fff;
+}
+
+.button-danger:hover {
+  border-color: var(--danger-color);
+}
+
 .repository-sidebar-toggle-button {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  height: 28px;
-  width: 32px;
+  height: 26px;
+  width: 26px;
   padding: 0;
 }
 
@@ -128,7 +184,7 @@ button.app-brand-home {
   justify-content: center;
   flex: 0 0 auto;
   height: 26px;
-  width: 30px;
+  width: 26px;
   padding: 0;
 }
 
@@ -331,28 +387,9 @@ button.app-brand-home {
   border-top: 1px solid var(--border-color);
 }
 
-.bulk-action-button {
+.pane-bulk-action-button {
   min-width: 5rem;
-  border: 1px solid rgba(240, 246, 252, 0.1);
-  border-radius: 4px;
-  color: #fff;
-  cursor: pointer;
   font-size: 0.8rem;
-  line-height: 0.5;
-  padding: 0.4rem 0.5rem;
-}
-
-.bulk-action-button:disabled {
-  cursor: not-allowed;
-  opacity: 0.55;
-}
-
-.bulk-action-button-success {
-  background: #238636;
-}
-
-.bulk-action-button-danger {
-  background: #f85149;
 }
 
 .file-list:focus-visible {

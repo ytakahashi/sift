@@ -130,37 +130,15 @@ export function DiscardConfirmModal(props: DiscardConfirmModalProps): ReactEleme
             padding: '0.8rem 1rem',
             borderTop: '1px solid #30363d',
             display: 'flex',
+            fontSize: '0.9rem',
             justifyContent: 'flex-end',
             gap: '0.5rem',
           }}
         >
-          <button
-            ref={cancelButtonRef}
-            onClick={onCancel}
-            style={{
-              background: 'transparent',
-              color: '#c9d1d9',
-              border: '1px solid #30363d',
-              borderRadius: '4px',
-              padding: '0.3rem 0.8rem',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
+          <button ref={cancelButtonRef} className="button" onClick={onCancel} type="button">
             Cancel
           </button>
-          <button
-            onClick={() => void onConfirm()}
-            style={{
-              background: '#da3633',
-              color: '#fff',
-              border: 'none',
-              borderRadius: '4px',
-              padding: '0.3rem 0.8rem',
-              cursor: 'pointer',
-              fontSize: '0.85rem',
-            }}
-          >
+          <button className="button button-danger" onClick={() => void onConfirm()} type="button">
             Discard
           </button>
         </div>

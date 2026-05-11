@@ -39,30 +39,10 @@ export function NoteEditor({ initialValue = '', onSave, onCancel }: NoteEditorPr
       <div
         style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end', marginTop: '0.5rem' }}
       >
-        <button
-          onClick={onCancel}
-          style={{
-            background: 'transparent',
-            color: '#c9d1d9',
-            border: '1px solid #30363d',
-            padding: '0.2rem 0.6rem',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
+        <button className="button" onClick={onCancel} type="button">
           Cancel
         </button>
-        <button
-          onClick={() => onSave(val)}
-          style={{
-            background: '#238636',
-            color: '#fff',
-            border: 'none',
-            padding: '0.2rem 0.6rem',
-            borderRadius: '4px',
-            cursor: 'pointer',
-          }}
-        >
+        <button className="button button-primary" onClick={() => onSave(val)} type="button">
           Save
         </button>
       </div>
