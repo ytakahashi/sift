@@ -10,44 +10,105 @@ export interface RepositorySelectionProps {
   addError: string | null;
   adding: boolean;
   configMissingError: string | null;
+  deleteError: string | null;
+  deletingRepositoryId: RepositoryId | null;
   error: string | null;
   loading: boolean;
   onAddRepository: (path: string) => Promise<boolean>;
+  onDeleteRepository: (repoId: RepositoryId) => Promise<boolean>;
   onRefresh: () => void;
   onSelectRepository: (repoId: RepositoryId) => void;
   repositories: RepositoryList | null;
+  clearDeleteError: () => void;
 }
 
 function RepositoryRow({
-  repository,
+  deleting,
+  isEditing,
+  onDeleteRepository,
   onSelectRepository,
+  repository,
 }: {
+  deleting: boolean;
+  isEditing: boolean;
+  onDeleteRepository: (repoId: RepositoryId) => void;
   onSelectRepository: (repoId: RepositoryId) => void;
   repository: ResolvedRepository;
 }): ReactElement {
+  const content = (
+    <button
+      className="repository-button"
+      disabled={isEditing}
+      onClick={() => {
+        if (!isEditing) {
+          onSelectRepository(repository.id);
+        }
+      }}
+      title={repository.path}
+      type="button"
+    >
+      <span className="repository-name">{repository.name}</span>
+      <span className="repository-path">{repository.path}</span>
+    </button>
+  );
+
+  if (!isEditing) {
+    return <li className="repository-item">{content}</li>;
+  }
+
   return (
-    <li className="repository-item">
+    <li className="repository-item repository-editing-item">
+      {content}
       <button
-        className="repository-button"
-        onClick={() => onSelectRepository(repository.id)}
-        title={repository.path}
+        aria-label={`Remove ${repository.name}`}
+        className="repository-delete-button"
+        disabled={deleting}
+        onClick={() => void onDeleteRepository(repository.id)}
+        title={`Remove ${repository.path}`}
         type="button"
       >
-        <span className="repository-name">{repository.name}</span>
-        <span className="repository-path">{repository.path}</span>
+        x
       </button>
     </li>
   );
 }
 
-function InvalidRepositoryRow({ repository }: { repository: InvalidRepository }): ReactElement {
+function InvalidRepositoryRow({
+  deleting,
+  isEditing,
+  onDeleteRepository,
+  repository,
+}: {
+  deleting: boolean;
+  isEditing: boolean;
+  onDeleteRepository: (repoId: RepositoryId) => void;
+  repository: InvalidRepository;
+}): ReactElement {
+  const content = (
+    <div className="repository-item-content" title={repository.path}>
+      <span className="repository-name">{repository.name}</span>
+      <span className="repository-path">{repository.path}</span>
+      <span className="repository-error">{repository.reason}</span>
+    </div>
+  );
+
+  if (!isEditing) {
+    return <li className="repository-item repository-item-invalid">{content}</li>;
+  }
+
   return (
-    <li className="repository-item repository-item-invalid">
-      <div className="repository-item-content" title={repository.path}>
-        <span className="repository-name">{repository.name}</span>
-        <span className="repository-path">{repository.path}</span>
-        <span className="repository-error">{repository.reason}</span>
-      </div>
+    <li className="repository-item repository-item-invalid repository-editing-item">
+      {content}
+      <button
+        aria-label={`Remove ${repository.name}`}
+        className="repository-delete-button"
+        disabled={deleting}
+        onClick={() => void onDeleteRepository(repository.id)}
+        title={`Remove ${repository.path}`}
+        type="button"
+      >
+        x
+      </button>
     </li>
   );
 }
@@ -56,14 +117,19 @@ export function RepositorySelection({
   addError,
   adding,
   configMissingError,
+  deleteError,
+  deletingRepositoryId,
   error,
   loading,
   onAddRepository,
+  onDeleteRepository,
   onRefresh,
   onSelectRepository,
   repositories,
+  clearDeleteError,
 }: RepositorySelectionProps): ReactElement {
   const [isAddingRepository, setIsAddingRepository] = useState(false);
+  const [isEditingRepositoryList, setIsEditingRepositoryList] = useState(false);
   const [repositoryPath, setRepositoryPath] = useState('');
   const items = repositories?.repositories ?? [];
   const invalidItems = repositories?.invalidRepositories ?? [];
@@ -99,7 +165,12 @@ export function RepositorySelection({
           {(error || configMissingError) && (
             <span className="repository-selection-status">{error || configMissingError}</span>
           )}
-          <button className="secondary-button" onClick={onRefresh} type="button">
+          <button
+            className="secondary-button"
+            disabled={deletingRepositoryId !== null}
+            onClick={onRefresh}
+            type="button"
+          >
             Refresh
           </button>
         </div>
@@ -114,13 +185,22 @@ export function RepositorySelection({
             <ul className="repository-list">
               {items.map((repository) => (
                 <RepositoryRow
+                  deleting={deletingRepositoryId !== null}
+                  isEditing={isEditingRepositoryList}
                   key={repository.id}
+                  onDeleteRepository={onDeleteRepository}
                   onSelectRepository={onSelectRepository}
                   repository={repository}
                 />
               ))}
               {invalidItems.map((repository) => (
-                <InvalidRepositoryRow key={repository.id} repository={repository} />
+                <InvalidRepositoryRow
+                  deleting={deletingRepositoryId !== null}
+                  isEditing={isEditingRepositoryList}
+                  key={repository.id}
+                  onDeleteRepository={onDeleteRepository}
+                  repository={repository}
+                />
               ))}
             </ul>
           ) : (
@@ -128,8 +208,35 @@ export function RepositorySelection({
               {loading ? 'Loading repositories...' : 'No repositories available.'}
             </div>
           )}
-          <div className="repository-add">
-            {isAddingRepository ? (
+          <div className="repository-actions">
+            {!isAddingRepository && (
+              <>
+                <button
+                  className="secondary-button"
+                  disabled={loading || isEditingRepositoryList || deletingRepositoryId !== null}
+                  onClick={() => setIsAddingRepository(true)}
+                  type="button"
+                >
+                  Add Repository
+                </button>
+                {(itemCount > 0 || isEditingRepositoryList) && (
+                  <button
+                    className="secondary-button"
+                    disabled={loading || deletingRepositoryId !== null}
+                    onClick={() => {
+                      if (isEditingRepositoryList) {
+                        clearDeleteError();
+                      }
+                      setIsEditingRepositoryList(!isEditingRepositoryList);
+                    }}
+                    type="button"
+                  >
+                    {isEditingRepositoryList ? 'Done' : 'Edit Repository List'}
+                  </button>
+                )}
+              </>
+            )}
+            {isAddingRepository && (
               <form className="repository-add-form" onSubmit={(event) => void handleSubmit(event)}>
                 <input
                   aria-label="Repository path"
@@ -156,17 +263,9 @@ export function RepositorySelection({
                 </button>
                 {addError && <div className="repository-add-error">{addError}</div>}
               </form>
-            ) : (
-              <button
-                className="secondary-button"
-                disabled={loading}
-                onClick={() => setIsAddingRepository(true)}
-                type="button"
-              >
-                Add Repository
-              </button>
             )}
           </div>
+          {deleteError && <div className="repository-delete-error">{deleteError}</div>}
         </section>
       </main>
     </div>

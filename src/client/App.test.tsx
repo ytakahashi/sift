@@ -65,6 +65,7 @@ const testDependencies: AppDependencies = {
   },
   repositoryWriter: {
     addRepository: vi.fn(async () => {}),
+    removeRepository: vi.fn(async () => {}),
   },
   workspaceActions: {
     stageFile: vi.fn(async () => {}),

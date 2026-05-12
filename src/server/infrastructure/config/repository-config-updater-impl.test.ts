@@ -130,4 +130,92 @@ describe('createRepositoryConfigUpdater', () => {
     });
     expect(writeRepositoryConfig).not.toHaveBeenCalled();
   });
+
+  describe('removeRepository', () => {
+    it('removes the repository and invalidates the cache', async () => {
+      // Given
+      const invalidateConfig = vi.fn();
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/b' }],
+      });
+      vi.mocked(writeRepositoryConfig).mockResolvedValue(undefined);
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        invalidateConfig,
+      });
+
+      // When
+      await updater.removeRepository(deriveRepositoryId('/repo/a'));
+
+      // Then
+      expect(readExistingRepositoryConfig).toHaveBeenCalledWith('/config/sift.json');
+      expect(writeRepositoryConfig).toHaveBeenCalledWith(
+        { repositories: [{ path: '/repo/b' }] },
+        '/config/sift.json',
+      );
+      expect(invalidateConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it('throws 404 when repository ID is not found', async () => {
+      // Given
+      const invalidateConfig = vi.fn();
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/b' }],
+      });
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        invalidateConfig,
+      });
+
+      // When / Then
+      const repoId = deriveRepositoryId('/repo/a');
+      await expect(updater.removeRepository(repoId)).rejects.toMatchObject({
+        message: `Repository id "${repoId}" is not configured.`,
+        statusCode: 404,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+      expect(invalidateConfig).not.toHaveBeenCalled();
+    });
+
+    it('throws 409 when multiple repositories match the ID', async () => {
+      // Given
+      const invalidateConfig = vi.fn();
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/a' }],
+      });
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        invalidateConfig,
+      });
+
+      // When / Then
+      const repoId = deriveRepositoryId('/repo/a');
+      await expect(updater.removeRepository(repoId)).rejects.toMatchObject({
+        message: `Repository id "${repoId}" is duplicated.`,
+        statusCode: 409,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+      expect(invalidateConfig).not.toHaveBeenCalled();
+    });
+
+    it('maps malformed existing config to a validation error without writing', async () => {
+      // Given
+      const invalidateConfig = vi.fn();
+      vi.mocked(readExistingRepositoryConfig).mockRejectedValue(
+        new RepositoryConfigParseError('Invalid JSON config'),
+      );
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        invalidateConfig,
+      });
+
+      // When / Then
+      await expect(updater.removeRepository(deriveRepositoryId('/repo/a'))).rejects.toMatchObject({
+        message: 'Invalid JSON config',
+        statusCode: 400,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+      expect(invalidateConfig).not.toHaveBeenCalled();
+    });
+  });
 });

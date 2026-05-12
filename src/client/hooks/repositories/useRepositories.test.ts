@@ -19,6 +19,7 @@ describe('useRepositories', () => {
     };
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
+      removeRepository: vi.fn(),
     };
 
     // When
@@ -42,6 +43,7 @@ describe('useRepositories', () => {
     };
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
+      removeRepository: vi.fn(),
     };
 
     // When
@@ -69,6 +71,7 @@ describe('useRepositories', () => {
     };
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
+      removeRepository: vi.fn(),
     };
 
     // When
@@ -102,6 +105,7 @@ describe('useRepositories', () => {
     };
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn().mockResolvedValue(undefined),
+      removeRepository: vi.fn(),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -134,6 +138,7 @@ describe('useRepositories', () => {
     };
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn().mockRejectedValue(new Error('Repository path is not a directory.')),
+      removeRepository: vi.fn(),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -151,6 +156,79 @@ describe('useRepositories', () => {
     expect(added).toBe(false);
     expect(result.current.error).toBeNull();
     expect(result.current.addError).toBe('Repository path is not a directory.');
+    expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(1);
+  });
+
+  it('removes a repository and refreshes the list', async () => {
+    // Given
+    const repositoryReader: RepositoryReader = {
+      fetchRepository: vi.fn(),
+      fetchRepositories: vi
+        .fn()
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+        })
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [],
+        }),
+    };
+    const repositoryWriter: RepositoryWriter = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // When
+    let removed = false;
+    await act(async () => {
+      removed = await result.current.deleteRepository('sift');
+    });
+
+    // Then
+    expect(removed).toBe(true);
+    expect(repositoryWriter.removeRepository).toHaveBeenCalledWith('sift');
+    expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(2);
+    expect(result.current.repositories?.repositories).toHaveLength(0);
+    expect(result.current.deleteError).toBeNull();
+    expect(result.current.deletingRepositoryId).toBeNull();
+  });
+
+  it('stores remove errors and returns false', async () => {
+    // Given
+    const repositoryReader: RepositoryReader = {
+      fetchRepository: vi.fn(),
+      fetchRepositories: vi.fn().mockResolvedValue({
+        invalidRepositories: [],
+        repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+      }),
+    };
+    const repositoryWriter: RepositoryWriter = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn().mockRejectedValue(new Error('Repository not found.')),
+    };
+
+    const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // When
+    let removed = true;
+    await act(async () => {
+      removed = await result.current.deleteRepository('sift');
+    });
+
+    // Then
+    expect(removed).toBe(false);
+    expect(result.current.error).toBeNull();
+    expect(result.current.deleteError).toBe('Repository not found.');
+    expect(result.current.deletingRepositoryId).toBeNull();
     expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(1);
   });
 });
