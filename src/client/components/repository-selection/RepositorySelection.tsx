@@ -19,6 +19,7 @@ export interface RepositorySelectionProps {
   onRefresh: () => void;
   onSelectRepository: (repoId: RepositoryId) => void;
   repositories: RepositoryList | null;
+  clearDeleteError: () => void;
 }
 
 function RepositoryRow({
@@ -125,6 +126,7 @@ export function RepositorySelection({
   onRefresh,
   onSelectRepository,
   repositories,
+  clearDeleteError,
 }: RepositorySelectionProps): ReactElement {
   const [isAddingRepository, setIsAddingRepository] = useState(false);
   const [isEditingRepositoryList, setIsEditingRepositoryList] = useState(false);
@@ -163,7 +165,12 @@ export function RepositorySelection({
           {(error || configMissingError) && (
             <span className="repository-selection-status">{error || configMissingError}</span>
           )}
-          <button className="secondary-button" onClick={onRefresh} type="button">
+          <button
+            className="secondary-button"
+            disabled={deletingRepositoryId !== null}
+            onClick={onRefresh}
+            type="button"
+          >
             Refresh
           </button>
         </div>
@@ -178,7 +185,7 @@ export function RepositorySelection({
             <ul className="repository-list">
               {items.map((repository) => (
                 <RepositoryRow
-                  deleting={deletingRepositoryId === repository.id}
+                  deleting={deletingRepositoryId !== null}
                   isEditing={isEditingRepositoryList}
                   key={repository.id}
                   onDeleteRepository={onDeleteRepository}
@@ -188,7 +195,7 @@ export function RepositorySelection({
               ))}
               {invalidItems.map((repository) => (
                 <InvalidRepositoryRow
-                  deleting={deletingRepositoryId === repository.id}
+                  deleting={deletingRepositoryId !== null}
                   isEditing={isEditingRepositoryList}
                   key={repository.id}
                   onDeleteRepository={onDeleteRepository}
@@ -206,7 +213,7 @@ export function RepositorySelection({
               <>
                 <button
                   className="secondary-button"
-                  disabled={loading || isEditingRepositoryList}
+                  disabled={loading || isEditingRepositoryList || deletingRepositoryId !== null}
                   onClick={() => setIsAddingRepository(true)}
                   type="button"
                 >
@@ -215,8 +222,13 @@ export function RepositorySelection({
                 {(itemCount > 0 || isEditingRepositoryList) && (
                   <button
                     className="secondary-button"
-                    disabled={loading}
-                    onClick={() => setIsEditingRepositoryList(!isEditingRepositoryList)}
+                    disabled={loading || deletingRepositoryId !== null}
+                    onClick={() => {
+                      if (isEditingRepositoryList) {
+                        clearDeleteError();
+                      }
+                      setIsEditingRepositoryList(!isEditingRepositoryList);
+                    }}
                     type="button"
                   >
                     {isEditingRepositoryList ? 'Done' : 'Edit Repository List'}

@@ -25,6 +25,7 @@ export function RepositorySelectionPage({
     refresh,
     addRepository,
     deleteRepository,
+    clearDeleteError,
   } = useRepositories(dependencies.repositoryReader, dependencies.repositoryWriter);
 
   return (
@@ -41,6 +42,7 @@ export function RepositorySelectionPage({
       onRefresh={() => void refresh()}
       onSelectRepository={onSelectRepository}
       repositories={repositories}
+      clearDeleteError={clearDeleteError}
     />
   );
 }

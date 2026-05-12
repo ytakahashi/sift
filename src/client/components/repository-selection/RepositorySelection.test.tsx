@@ -27,6 +27,7 @@ function renderRepositorySelection(repositories: RepositoryList): {
       onRefresh={vi.fn()}
       onSelectRepository={onSelectRepository}
       repositories={repositories}
+      clearDeleteError={vi.fn()}
     />,
   );
 
@@ -96,6 +97,7 @@ describe('RepositorySelection', () => {
         onRefresh={vi.fn()}
         onSelectRepository={vi.fn()}
         repositories={null}
+        clearDeleteError={vi.fn()}
       />,
     );
 
@@ -144,6 +146,7 @@ describe('RepositorySelection', () => {
           invalidRepositories: [],
           repositories: [],
         }}
+        clearDeleteError={vi.fn()}
       />,
     );
 
@@ -179,6 +182,7 @@ describe('RepositorySelection', () => {
           invalidRepositories: [],
           repositories: [],
         }}
+        clearDeleteError={vi.fn()}
       />,
     );
 
@@ -266,6 +270,7 @@ describe('RepositorySelection', () => {
         onRefresh={vi.fn()}
         onSelectRepository={vi.fn()}
         repositories={null}
+        clearDeleteError={vi.fn()}
       />,
     );
 
@@ -293,6 +298,7 @@ describe('RepositorySelection', () => {
           invalidRepositories: [],
           repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
         }}
+        clearDeleteError={vi.fn()}
       />,
     );
 
@@ -317,6 +323,7 @@ describe('RepositorySelection', () => {
           invalidRepositories: [],
           repositories: [],
         }}
+        clearDeleteError={vi.fn()}
       />,
     );
 
@@ -324,10 +331,38 @@ describe('RepositorySelection', () => {
     expect(screen.getByRole('button', { name: 'Done' })).toBeDefined();
   });
 
-  it('disables the remove button when deletingRepositoryId matches the repository id', async () => {
+  it('disables all remove buttons and actions while a deletion is in progress', async () => {
     // Given
     const user = userEvent.setup();
-    render(
+    const { rerender } = render(
+      <RepositorySelection
+        addError={null}
+        adding={false}
+        configMissingError={null}
+        deleteError={null}
+        deletingRepositoryId={null}
+        error={null}
+        loading={false}
+        onAddRepository={vi.fn()}
+        onDeleteRepository={vi.fn()}
+        onRefresh={vi.fn()}
+        onSelectRepository={vi.fn()}
+        repositories={{
+          invalidRepositories: [],
+          repositories: [
+            { id: 'sift', name: 'sift', path: '/repo/sift' },
+            { id: 'other-repo', name: 'other-repo', path: '/repo/other-repo' },
+          ],
+        }}
+        clearDeleteError={vi.fn()}
+      />,
+    );
+
+    // When: enter edit mode
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+
+    // Simulate starting a deletion
+    rerender(
       <RepositorySelection
         addError={null}
         adding={false}
@@ -342,15 +377,20 @@ describe('RepositorySelection', () => {
         onSelectRepository={vi.fn()}
         repositories={{
           invalidRepositories: [],
-          repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+          repositories: [
+            { id: 'sift', name: 'sift', path: '/repo/sift' },
+            { id: 'other-repo', name: 'other-repo', path: '/repo/other-repo' },
+          ],
         }}
+        clearDeleteError={vi.fn()}
       />,
     );
 
-    // When
-    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
-
-    // Then
+    // Then: all actions should be disabled
     expect(screen.getByRole('button', { name: 'Remove sift' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Remove other-repo' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Done' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Add Repository' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Refresh' })).toHaveProperty('disabled', true);
   });
 });

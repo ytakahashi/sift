@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import type { RepositoryId, RepositoryList } from '../../../domain/repository/repository';
 import type { RepositoryReader, RepositoryWriter } from '../../application/ports';
 import { useRepositoryList } from './useRepositoryList';
@@ -15,6 +15,7 @@ export interface UseRepositoriesResult {
   loading: boolean;
   repositories: RepositoryList | null;
   refresh: () => Promise<void>;
+  clearDeleteError: () => void;
 }
 
 export function useRepositories(
@@ -25,16 +26,25 @@ export function useRepositories(
   const [addError, setAddError] = useState<string | null>(null);
   const [deletingRepositoryId, setDeletingRepositoryId] = useState<RepositoryId | null>(null);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const isDeletingRef = useRef(false);
+
   // Selection page always needs the list on mount, so `enabled` stays the
   // default `true`. The Sidebar caller in RepositoryViewerPage opts out by
   // passing `enabled: false` until the user opens it.
   const { configMissingError, error, loading, repositories, refresh } =
     useRepositoryList(repositoryReader);
 
+  const handleRefresh = useCallback(async () => {
+    setDeleteError(null);
+    setAddError(null);
+    await refresh();
+  }, [refresh]);
+
   const addRepository = useCallback(
     async (path: string): Promise<boolean> => {
       setAdding(true);
       setAddError(null);
+      setDeleteError(null);
 
       try {
         await repositoryWriter.addRepository(path);
@@ -51,6 +61,8 @@ export function useRepositories(
   );
   const deleteRepository = useCallback(
     async (repoId: RepositoryId): Promise<boolean> => {
+      if (isDeletingRef.current) return false;
+      isDeletingRef.current = true;
       setDeletingRepositoryId(repoId);
       setDeleteError(null);
 
@@ -63,10 +75,15 @@ export function useRepositories(
         return false;
       } finally {
         setDeletingRepositoryId(null);
+        isDeletingRef.current = false;
       }
     },
     [refresh, repositoryWriter],
   );
+
+  const clearDeleteError = useCallback(() => {
+    setDeleteError(null);
+  }, []);
 
   return {
     addError,
@@ -79,6 +96,7 @@ export function useRepositories(
     error,
     loading,
     repositories,
-    refresh,
+    refresh: handleRefresh,
+    clearDeleteError,
   };
 }

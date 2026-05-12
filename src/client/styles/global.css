@@ -523,6 +523,7 @@ button.app-brand-home {
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 0.5rem;
+  width: 100%;
 }
 
 .repository-add-input {
