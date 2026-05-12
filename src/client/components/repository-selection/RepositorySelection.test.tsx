@@ -388,7 +388,10 @@ describe('RepositorySelection', () => {
 
     // Then: all actions should be disabled
     expect(screen.getByRole('button', { name: 'Remove sift' })).toHaveProperty('disabled', true);
-    expect(screen.getByRole('button', { name: 'Remove other-repo' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Remove other-repo' })).toHaveProperty(
+      'disabled',
+      true,
+    );
     expect(screen.getByRole('button', { name: 'Done' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Add Repository' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveProperty('disabled', true);
