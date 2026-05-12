@@ -46,6 +46,7 @@ export interface RepositoryReader {
 
 export interface RepositoryWriter {
   addRepository(path: string): Promise<void>;
+  removeRepository(repoId: RepositoryId): Promise<void>;
 }
 
 export interface WorkspaceActions {

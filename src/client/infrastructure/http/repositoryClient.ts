@@ -47,4 +47,15 @@ export const httpRepositoryWriter: RepositoryWriter = {
       throw new Error(await readErrorMessage(res, `Failed to add repository: ${res.statusText}`));
     }
   },
+  async removeRepository(repoId: RepositoryId): Promise<void> {
+    const res = await fetch(`/api/repositories/${encodeURIComponent(repoId)}`, {
+      method: 'DELETE',
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        await readErrorMessage(res, `Failed to remove repository: ${res.statusText}`),
+      );
+    }
+  },
 };

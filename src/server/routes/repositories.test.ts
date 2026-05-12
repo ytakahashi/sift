@@ -17,6 +17,7 @@ function createApp(
   repositoryResolver: RepositoryResolver,
   repositoryConfigUpdater: RepositoryConfigUpdater = {
     addRepository: vi.fn(),
+    removeRepository: vi.fn(),
   },
 ): Hono<Env> {
   const app = new Hono<Env>();
@@ -220,6 +221,7 @@ describe('repositoryRoutes', () => {
         name: 'sift',
         path: '/Users/example/projects/sift',
       }),
+      removeRepository: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -250,6 +252,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockUpdater = {
       addRepository: vi.fn(),
+      removeRepository: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -275,6 +278,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockUpdater = {
       addRepository: vi.fn(),
+      removeRepository: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -300,6 +304,7 @@ describe('repositoryRoutes', () => {
     // Given
     const mockUpdater = {
       addRepository: vi.fn(),
+      removeRepository: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -329,6 +334,7 @@ describe('repositoryRoutes', () => {
         .mockRejectedValue(
           new RepositoryConfigUpdateError('Repository is already registered: /repo/sift', 409),
         ),
+      removeRepository: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -436,5 +442,81 @@ describe('repositoryRoutes', () => {
     expect(data).toEqual({
       error: 'Repository id "sift" is duplicated.',
     });
+  });
+
+  it('removes a repository and returns 204 No Content', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/my-app', {
+      method: 'DELETE',
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    expect(mockUpdater.removeRepository).toHaveBeenCalledWith('my-app');
+  });
+
+  it('returns 404 when removing an unconfigured repository', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigUpdateError('Repository id "missing" is not configured.', 404),
+        ),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/missing', {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(404);
+    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+  });
+
+  it('returns 409 when removing a duplicated repository', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi
+        .fn()
+        .mockRejectedValue(
+          new RepositoryConfigUpdateError('Repository id "duplicate" is duplicated.', 409),
+        ),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/duplicate', {
+      method: 'DELETE',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(409);
+    expect(data).toEqual({ error: 'Repository id "duplicate" is duplicated.' });
   });
 });

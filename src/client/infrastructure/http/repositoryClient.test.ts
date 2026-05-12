@@ -91,6 +91,27 @@ describe('httpRepositoryReader', () => {
     expect(repository).toEqual(response);
   });
 
+  it('fetches one configured repository by id with URI encoding', async () => {
+    // Given
+    const response = {
+      id: 'my repo/100%',
+      name: 'my repo',
+      path: '/repo/my repo/100%',
+    };
+    const fetchMock = vi.fn().mockResolvedValue({
+      json: vi.fn().mockResolvedValue(response),
+      ok: true,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When
+    const repository = await httpRepositoryReader.fetchRepository('my repo/100%');
+
+    // Then
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/my%20repo%2F100%25');
+    expect(repository).toEqual(response);
+  });
+
   it('throws when one configured repository cannot be fetched', async () => {
     // Given
     vi.stubGlobal(
@@ -152,6 +173,55 @@ describe('httpRepositoryWriter', () => {
     // When / Then
     await expect(httpRepositoryWriter.addRepository('/repo/sift')).rejects.toThrow(
       'Repository path is not a directory.',
+    );
+  });
+
+  it('sends DELETE request to the repository endpoint', async () => {
+    // Given
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When
+    await httpRepositoryWriter.removeRepository('my-app');
+
+    // Then
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/my-app', {
+      method: 'DELETE',
+    });
+  });
+
+  it('sends DELETE request to the repository endpoint with a URI-encoded repository id', async () => {
+    // Given
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When
+    await httpRepositoryWriter.removeRepository('my repo/100%');
+
+    // Then
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/my%20repo%2F100%25', {
+      method: 'DELETE',
+    });
+  });
+
+  it('throws the server error message when removing a repository fails', async () => {
+    // Given
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: vi.fn().mockResolvedValue({ error: 'Repository id "my-app" is not configured.' }),
+        ok: false,
+        statusText: 'Not Found',
+      }),
+    );
+
+    // When / Then
+    await expect(httpRepositoryWriter.removeRepository('my-app')).rejects.toThrow(
+      'Repository id "my-app" is not configured.',
     );
   });
 });

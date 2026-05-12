@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import type { RepositoryList } from '../../../domain/repository/repository';
+import type { RepositoryId, RepositoryList } from '../../../domain/repository/repository';
 import type { RepositoryReader, RepositoryWriter } from '../../application/ports';
 import { useRepositoryList } from './useRepositoryList';
 
@@ -8,6 +8,9 @@ export interface UseRepositoriesResult {
   addRepository: (path: string) => Promise<boolean>;
   adding: boolean;
   configMissingError: string | null;
+  deleteError: string | null;
+  deleteRepository: (repoId: RepositoryId) => Promise<boolean>;
+  deletingRepositoryId: RepositoryId | null;
   error: string | null;
   loading: boolean;
   repositories: RepositoryList | null;
@@ -20,6 +23,8 @@ export function useRepositories(
 ): UseRepositoriesResult {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
+  const [deletingRepositoryId, setDeletingRepositoryId] = useState<RepositoryId | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   // Selection page always needs the list on mount, so `enabled` stays the
   // default `true`. The Sidebar caller in RepositoryViewerPage opts out by
   // passing `enabled: false` until the user opens it.
@@ -44,11 +49,33 @@ export function useRepositories(
     },
     [refresh, repositoryWriter],
   );
+  const deleteRepository = useCallback(
+    async (repoId: RepositoryId): Promise<boolean> => {
+      setDeletingRepositoryId(repoId);
+      setDeleteError(null);
+
+      try {
+        await repositoryWriter.removeRepository(repoId);
+        await refresh();
+        return true;
+      } catch (err: unknown) {
+        setDeleteError(err instanceof Error ? err.message : String(err));
+        return false;
+      } finally {
+        setDeletingRepositoryId(null);
+      }
+    },
+    [refresh, repositoryWriter],
+  );
+
   return {
     addError,
     addRepository,
     adding,
     configMissingError,
+    deleteError,
+    deleteRepository,
+    deletingRepositoryId,
     error,
     loading,
     repositories,
