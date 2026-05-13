@@ -109,7 +109,7 @@ export function createRepositoryConfigUpdater(
         .filter((entry) => entry.id === repoId);
 
       if (matches.length === 0) {
-        throw new RepositoryConfigUpdateError(`Repository id "${repoId}" is not configured.`, 404);
+        return;
       }
 
       if (matches.length > 1) {
