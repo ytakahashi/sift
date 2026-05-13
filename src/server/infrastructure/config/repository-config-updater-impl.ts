@@ -101,22 +101,28 @@ export function createRepositoryConfigUpdater(
     removeRepository: async (repoId: RepositoryId): Promise<void> => {
       const existingConfig = await readConfigForUpdate(configPath);
 
-      const matches = existingConfig.repositories
-        .map((entry, index) => ({
-          id: deriveRepositoryId(normalizeConfiguredRepositoryPath(entry.path)),
-          index,
-        }))
-        .filter((entry) => entry.id === repoId);
-
-      if (matches.length === 0) {
-        throw new RepositoryConfigUpdateError(`Repository id "${repoId}" is not configured.`, 404);
+      // Walk entries once and collect indices that derive to the requested id.
+      // Stop early after the second match because two are enough to flag a
+      // duplicated id; we don't need to scan the rest of the list.
+      const matchingIndices: number[] = [];
+      for (let index = 0; index < existingConfig.repositories.length; index += 1) {
+        const entry = existingConfig.repositories[index];
+        const id = deriveRepositoryId(normalizeConfiguredRepositoryPath(entry.path));
+        if (id === repoId) {
+          matchingIndices.push(index);
+          if (matchingIndices.length > 1) break;
+        }
       }
 
-      if (matches.length > 1) {
+      if (matchingIndices.length === 0) {
+        return;
+      }
+
+      if (matchingIndices.length > 1) {
         throw new RepositoryConfigUpdateError(`Repository id "${repoId}" is duplicated.`, 409);
       }
 
-      const removeIndex = matches[0].index;
+      const removeIndex = matchingIndices[0];
       const newConfig = {
         repositories: existingConfig.repositories.filter((_, index) => index !== removeIndex),
       };

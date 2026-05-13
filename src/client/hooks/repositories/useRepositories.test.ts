@@ -33,6 +33,7 @@ describe('useRepositories', () => {
     expect(result.current.error).toBeNull();
     expect(result.current.configMissingError).toBeNull();
     expect(result.current.addError).toBeNull();
+    expect(result.current.editError).toBeNull();
   });
 
   it('stores fetch errors', async () => {
@@ -159,7 +160,7 @@ describe('useRepositories', () => {
     expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(1);
   });
 
-  it('removes a repository and refreshes the list', async () => {
+  it('removes repositories in order and refreshes the list once after the commit', async () => {
     // Given
     const repositoryReader: RepositoryReader = {
       fetchRepository: vi.fn(),
@@ -167,7 +168,10 @@ describe('useRepositories', () => {
         .fn()
         .mockResolvedValueOnce({
           invalidRepositories: [],
-          repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+          repositories: [
+            { id: 'sift', name: 'sift', path: '/repo/sift' },
+            { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+          ],
         })
         .mockResolvedValueOnce({
           invalidRepositories: [],
@@ -187,30 +191,43 @@ describe('useRepositories', () => {
     // When
     let removed = false;
     await act(async () => {
-      removed = await result.current.deleteRepository('sift');
+      removed = await result.current.deleteRepositories(['sift', 'my-app']);
     });
 
     // Then
     expect(removed).toBe(true);
-    expect(repositoryWriter.removeRepository).toHaveBeenCalledWith('sift');
+    expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(1, 'sift');
+    expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(2, 'my-app');
     expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(2);
     expect(result.current.repositories?.repositories).toHaveLength(0);
-    expect(result.current.deleteError).toBeNull();
-    expect(result.current.deletingRepositoryId).toBeNull();
+    expect(result.current.editError).toBeNull();
+    expect(result.current.saving).toBe(false);
   });
 
-  it('stores remove errors and returns false', async () => {
+  it('stops on remove errors, refreshes the list, and returns false', async () => {
     // Given
     const repositoryReader: RepositoryReader = {
       fetchRepository: vi.fn(),
-      fetchRepositories: vi.fn().mockResolvedValue({
-        invalidRepositories: [],
-        repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
-      }),
+      fetchRepositories: vi
+        .fn()
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [
+            { id: 'sift', name: 'sift', path: '/repo/sift' },
+            { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [{ id: 'my-app', name: 'my-app', path: '/repo/my-app' }],
+        }),
     };
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
-      removeRepository: vi.fn().mockRejectedValue(new Error('Repository not found.')),
+      removeRepository: vi
+        .fn()
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('Repository not found.')),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -221,14 +238,20 @@ describe('useRepositories', () => {
     // When
     let removed = true;
     await act(async () => {
-      removed = await result.current.deleteRepository('sift');
+      removed = await result.current.deleteRepositories(['sift', 'missing', 'my-app']);
     });
 
     // Then
     expect(removed).toBe(false);
+    expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(1, 'sift');
+    expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(2, 'missing');
+    expect(repositoryWriter.removeRepository).toHaveBeenCalledTimes(2);
     expect(result.current.error).toBeNull();
-    expect(result.current.deleteError).toBe('Repository not found.');
-    expect(result.current.deletingRepositoryId).toBeNull();
-    expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(1);
+    expect(result.current.editError).toBe('Repository not found.');
+    expect(result.current.saving).toBe(false);
+    expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(2);
+    expect(result.current.repositories?.repositories).toEqual([
+      { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+    ]);
   });
 });

@@ -466,15 +466,11 @@ describe('repositoryRoutes', () => {
     expect(mockUpdater.removeRepository).toHaveBeenCalledWith('my-app');
   });
 
-  it('returns 404 when removing an unconfigured repository', async () => {
+  it('returns 204 when removing an unconfigured repository', async () => {
     // Given
     const mockUpdater = {
       addRepository: vi.fn(),
-      removeRepository: vi
-        .fn()
-        .mockRejectedValue(
-          new RepositoryConfigUpdateError('Repository id "missing" is not configured.', 404),
-        ),
+      removeRepository: vi.fn().mockResolvedValue(undefined),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -486,11 +482,10 @@ describe('repositoryRoutes', () => {
     const response = await app.request('/api/repositories/missing', {
       method: 'DELETE',
     });
-    const data = await response.json();
 
     // Then
-    expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+    expect(response.status).toBe(204);
+    expect(mockUpdater.removeRepository).toHaveBeenCalledWith('missing');
   });
 
   it('returns 409 when removing a duplicated repository', async () => {

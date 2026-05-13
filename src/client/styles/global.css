@@ -557,6 +557,16 @@ button.app-brand-home {
   align-items: stretch;
 }
 
+.repository-item-pending-delete .repository-button,
+.repository-item-pending-delete .repository-item-content {
+  opacity: 0.55;
+}
+
+.repository-item-pending-delete .repository-name,
+.repository-item-pending-delete .repository-path {
+  text-decoration: line-through;
+}
+
 .repository-delete-button {
   width: 32px;
   height: 32px;
@@ -582,7 +592,7 @@ button.app-brand-home {
   opacity: 0.5;
 }
 
-.repository-delete-error {
+.repository-edit-error {
   margin-top: 0.5rem;
   color: #f85149;
   font-size: 0.82rem;

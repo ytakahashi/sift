@@ -8,14 +8,14 @@ export interface UseRepositoriesResult {
   addRepository: (path: string) => Promise<boolean>;
   adding: boolean;
   configMissingError: string | null;
-  deleteError: string | null;
-  deleteRepository: (repoId: RepositoryId) => Promise<boolean>;
-  deletingRepositoryId: RepositoryId | null;
+  deleteRepositories: (repoIds: RepositoryId[]) => Promise<boolean>;
+  editError: string | null;
   error: string | null;
   loading: boolean;
   repositories: RepositoryList | null;
   refresh: () => Promise<void>;
-  clearDeleteError: () => void;
+  saving: boolean;
+  clearEditError: () => void;
 }
 
 export function useRepositories(
@@ -24,9 +24,9 @@ export function useRepositories(
 ): UseRepositoriesResult {
   const [adding, setAdding] = useState(false);
   const [addError, setAddError] = useState<string | null>(null);
-  const [deletingRepositoryId, setDeletingRepositoryId] = useState<RepositoryId | null>(null);
-  const [deleteError, setDeleteError] = useState<string | null>(null);
-  const isDeletingRef = useRef(false);
+  const [saving, setSaving] = useState(false);
+  const [editError, setEditError] = useState<string | null>(null);
+  const isSavingRef = useRef(false);
 
   // Selection page always needs the list on mount, so `enabled` stays the
   // default `true`. The Sidebar caller in RepositoryViewerPage opts out by
@@ -34,8 +34,12 @@ export function useRepositories(
   const { configMissingError, error, loading, repositories, refresh } =
     useRepositoryList(repositoryReader);
 
+  // User-initiated Refresh clears stale add/edit errors so the surfaced state
+  // reflects the freshly fetched list. In-flight commit paths (addRepository /
+  // deleteRepositories) call the underlying `refresh` directly instead so they
+  // can preserve the error they just set.
   const handleRefresh = useCallback(async () => {
-    setDeleteError(null);
+    setEditError(null);
     setAddError(null);
     await refresh();
   }, [refresh]);
@@ -44,7 +48,6 @@ export function useRepositories(
     async (path: string): Promise<boolean> => {
       setAdding(true);
       setAddError(null);
-      setDeleteError(null);
 
       try {
         await repositoryWriter.addRepository(path);
@@ -59,30 +62,36 @@ export function useRepositories(
     },
     [refresh, repositoryWriter],
   );
-  const deleteRepository = useCallback(
-    async (repoId: RepositoryId): Promise<boolean> => {
-      if (isDeletingRef.current) return false;
-      isDeletingRef.current = true;
-      setDeletingRepositoryId(repoId);
-      setDeleteError(null);
+  const deleteRepositories = useCallback(
+    async (repoIds: RepositoryId[]): Promise<boolean> => {
+      if (isSavingRef.current) return false;
+      isSavingRef.current = true;
+      setSaving(true);
+      setEditError(null);
 
       try {
-        await repositoryWriter.removeRepository(repoId);
+        // Done starts the commit phase: successful deletions are not rolled back.
+        // If a later deletion fails, refresh the list so Edit mode can continue
+        // against the latest config state.
+        for (const repoId of repoIds) {
+          await repositoryWriter.removeRepository(repoId);
+        }
         await refresh();
         return true;
       } catch (err: unknown) {
-        setDeleteError(err instanceof Error ? err.message : String(err));
+        await refresh();
+        setEditError(err instanceof Error ? err.message : String(err));
         return false;
       } finally {
-        setDeletingRepositoryId(null);
-        isDeletingRef.current = false;
+        setSaving(false);
+        isSavingRef.current = false;
       }
     },
     [refresh, repositoryWriter],
   );
 
-  const clearDeleteError = useCallback(() => {
-    setDeleteError(null);
+  const clearEditError = useCallback(() => {
+    setEditError(null);
   }, []);
 
   return {
@@ -90,13 +99,13 @@ export function useRepositories(
     addRepository,
     adding,
     configMissingError,
-    deleteError,
-    deleteRepository,
-    deletingRepositoryId,
+    deleteRepositories,
+    editError,
     error,
     loading,
     repositories,
     refresh: handleRefresh,
-    clearDeleteError,
+    saving,
+    clearEditError,
   };
 }

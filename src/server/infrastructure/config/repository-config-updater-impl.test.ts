@@ -156,7 +156,7 @@ describe('createRepositoryConfigUpdater', () => {
       expect(invalidateConfig).toHaveBeenCalledTimes(1);
     });
 
-    it('throws 404 when repository ID is not found', async () => {
+    it('does nothing when repository ID is not found', async () => {
       // Given
       const invalidateConfig = vi.fn();
       vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
@@ -167,12 +167,12 @@ describe('createRepositoryConfigUpdater', () => {
         invalidateConfig,
       });
 
-      // When / Then
+      // When
       const repoId = deriveRepositoryId('/repo/a');
-      await expect(updater.removeRepository(repoId)).rejects.toMatchObject({
-        message: `Repository id "${repoId}" is not configured.`,
-        statusCode: 404,
-      });
+
+      await updater.removeRepository(repoId);
+
+      // Then
       expect(writeRepositoryConfig).not.toHaveBeenCalled();
       expect(invalidateConfig).not.toHaveBeenCalled();
     });

@@ -20,12 +20,12 @@ export function RepositorySelectionPage({
     configMissingError,
     error,
     addError,
-    deleteError,
-    deletingRepositoryId,
+    editError,
     refresh,
     addRepository,
-    deleteRepository,
-    clearDeleteError,
+    deleteRepositories,
+    saving,
+    clearEditError,
   } = useRepositories(dependencies.repositoryReader, dependencies.repositoryWriter);
 
   return (
@@ -33,16 +33,16 @@ export function RepositorySelectionPage({
       adding={adding}
       addError={addError}
       configMissingError={configMissingError}
-      deleteError={deleteError}
-      deletingRepositoryId={deletingRepositoryId}
+      editError={editError}
       error={error}
       loading={loading}
       onAddRepository={addRepository}
-      onDeleteRepository={deleteRepository}
+      onDeleteRepositories={deleteRepositories}
       onRefresh={() => void refresh()}
       onSelectRepository={onSelectRepository}
       repositories={repositories}
-      clearDeleteError={clearDeleteError}
+      saving={saving}
+      clearEditError={clearEditError}
     />
   );
 }
