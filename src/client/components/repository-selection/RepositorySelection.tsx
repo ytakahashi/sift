@@ -1,4 +1,5 @@
 import { useState, type FormEvent, type ReactElement } from 'react';
+import { X } from 'lucide-react';
 import type {
   InvalidRepository,
   RepositoryId,
@@ -74,7 +75,7 @@ function RepositoryRow({
         title={`${pendingDelete ? 'Undo remove' : 'Remove'} ${repository.path}`}
         type="button"
       >
-        x
+        <X size={16} />
       </button>
     </li>
   );
@@ -121,7 +122,7 @@ function InvalidRepositoryRow({
         title={`${pendingDelete ? 'Undo remove' : 'Remove'} ${repository.path}`}
         type="button"
       >
-        x
+        <X size={16} />
       </button>
     </li>
   );
@@ -193,6 +194,11 @@ export function RepositorySelection({
 
     const deleteIds = [...pendingDeleteIds];
     const deleted = await onDeleteRepositories(deleteIds);
+    // Drop the pending marks regardless of outcome: the hook has already
+    // refreshed the list against the latest config, so successfully removed
+    // entries are gone and any remaining ones should appear unmarked. Keeping
+    // the old pending state would show stale strike-through on rows that no
+    // longer exist or that the user may have changed their mind about.
     setPendingDeleteIds(new Set());
 
     if (!deleted) {
@@ -281,7 +287,11 @@ export function RepositorySelection({
                     onClick={() => void handleEditAction()}
                     type="button"
                   >
-                    {isEditingRepositoryList ? 'Done' : 'Edit Repository List'}
+                    {isEditingRepositoryList
+                      ? saving
+                        ? 'Saving...'
+                        : 'Done'
+                      : 'Edit Repository List'}
                   </button>
                 )}
                 {isEditingRepositoryList && (
@@ -291,7 +301,7 @@ export function RepositorySelection({
                     onClick={handleCancelEdit}
                     type="button"
                   >
-                    Cancel
+                    Cancel edit
                   </button>
                 )}
               </>

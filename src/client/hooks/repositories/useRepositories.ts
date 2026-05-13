@@ -34,6 +34,10 @@ export function useRepositories(
   const { configMissingError, error, loading, repositories, refresh } =
     useRepositoryList(repositoryReader);
 
+  // User-initiated Refresh clears stale add/edit errors so the surfaced state
+  // reflects the freshly fetched list. In-flight commit paths (addRepository /
+  // deleteRepositories) call the underlying `refresh` directly instead so they
+  // can preserve the error they just set.
   const handleRefresh = useCallback(async () => {
     setEditError(null);
     setAddError(null);
@@ -44,7 +48,6 @@ export function useRepositories(
     async (path: string): Promise<boolean> => {
       setAdding(true);
       setAddError(null);
-      setEditError(null);
 
       try {
         await repositoryWriter.addRepository(path);

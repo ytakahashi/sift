@@ -57,7 +57,7 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
 
   repositoryRoutes.delete('/:repoId', async (c) => {
     try {
-      await updater.removeRepository(c.req.param('repoId') as string);
+      await updater.removeRepository(c.req.param('repoId'));
       return c.body(null, 204);
     } catch (error: unknown) {
       return handleRouteError(c, error);

@@ -190,7 +190,7 @@ describe('RepositorySelection', () => {
 
     // Then
     expect(screen.getByRole('button', { name: 'Done' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Cancel edit' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Remove sift' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Remove my-app' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Add Repository' })).toHaveProperty('disabled', true);
@@ -262,7 +262,7 @@ describe('RepositorySelection', () => {
     // When
     await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
     await user.click(screen.getByRole('button', { name: 'Remove sift' }));
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
 
     // Then
     expect(onDeleteRepositories).not.toHaveBeenCalled();
@@ -331,7 +331,7 @@ describe('RepositorySelection', () => {
     // When
     await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
     clearEditError.mockClear();
-    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+    await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
 
     // Then
     expect(clearEditError).toHaveBeenCalledTimes(1);
@@ -376,7 +376,7 @@ describe('RepositorySelection', () => {
 
     // Then
     expect(screen.getByRole('button', { name: 'Done' })).toBeDefined();
-    expect(screen.getByRole('button', { name: 'Cancel' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Cancel edit' })).toBeDefined();
   });
 
   it('disables edit actions including Cancel while saving', async () => {
@@ -401,8 +401,11 @@ describe('RepositorySelection', () => {
       'disabled',
       true,
     );
-    expect(screen.getByRole('button', { name: 'Done' })).toHaveProperty('disabled', true);
-    expect(screen.getByRole('button', { name: 'Cancel' })).toHaveProperty('disabled', true);
+    // Done is relabeled "Saving..." while a commit is in flight to give the
+    // user feedback during the (potentially multi-request) deletion sequence.
+    expect(screen.queryByRole('button', { name: 'Done' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Saving...' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('button', { name: 'Cancel edit' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Add Repository' })).toHaveProperty('disabled', true);
     expect(screen.getByRole('button', { name: 'Refresh' })).toHaveProperty('disabled', true);
   });
