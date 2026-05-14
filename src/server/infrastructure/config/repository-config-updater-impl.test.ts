@@ -218,4 +218,159 @@ describe('createRepositoryConfigUpdater', () => {
       expect(invalidateConfig).not.toHaveBeenCalled();
     });
   });
+
+  describe('reorderRepositories', () => {
+    it('writes resolved repositories in the requested order and invalidates the cache', async () => {
+      // Given
+      const invalidateConfig = vi.fn();
+      const validateRepository = vi.fn().mockResolvedValue({ isValid: true });
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/b' }, { path: '/repo/c' }],
+      });
+      vi.mocked(writeRepositoryConfig).mockResolvedValue(undefined);
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        invalidateConfig,
+        validateRepository,
+      });
+
+      // When
+      await updater.reorderRepositories([
+        deriveRepositoryId('/repo/c'),
+        deriveRepositoryId('/repo/a'),
+        deriveRepositoryId('/repo/b'),
+      ]);
+
+      // Then
+      expect(writeRepositoryConfig).toHaveBeenCalledWith(
+        {
+          repositories: [{ path: '/repo/c' }, { path: '/repo/a' }, { path: '/repo/b' }],
+        },
+        '/config/sift.json',
+      );
+      expect(invalidateConfig).toHaveBeenCalledTimes(1);
+    });
+
+    it('keeps invalid repositories after reordered resolved repositories', async () => {
+      // Given
+      const validateRepository = vi.fn().mockImplementation(({ path: repositoryPath }) =>
+        Promise.resolve({
+          isValid: repositoryPath !== '/repo/missing-a' && repositoryPath !== '/repo/missing-b',
+        }),
+      );
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [
+          { path: '/repo/a' },
+          { path: '/repo/missing-a' },
+          { path: '/repo/b' },
+          { path: '/repo/missing-b' },
+        ],
+      });
+      vi.mocked(writeRepositoryConfig).mockResolvedValue(undefined);
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        validateRepository,
+      });
+
+      // When
+      await updater.reorderRepositories([
+        deriveRepositoryId('/repo/b'),
+        deriveRepositoryId('/repo/a'),
+      ]);
+
+      // Then
+      expect(writeRepositoryConfig).toHaveBeenCalledWith(
+        {
+          repositories: [
+            { path: '/repo/b' },
+            { path: '/repo/a' },
+            { path: '/repo/missing-a' },
+            { path: '/repo/missing-b' },
+          ],
+        },
+        '/config/sift.json',
+      );
+    });
+
+    it('throws 409 when configured repository IDs are duplicated', async () => {
+      // Given
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/a' }],
+      });
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        validateRepository: vi.fn(),
+      });
+
+      // When / Then
+      const repoId = deriveRepositoryId('/repo/a');
+      await expect(updater.reorderRepositories([repoId])).rejects.toMatchObject({
+        message: `Repository id "${repoId}" is duplicated.`,
+        statusCode: 409,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when the reorder request contains duplicate IDs', async () => {
+      // Given
+      const validateRepository = vi.fn().mockResolvedValue({ isValid: true });
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/b' }],
+      });
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        validateRepository,
+      });
+
+      // When / Then
+      const repoId = deriveRepositoryId('/repo/a');
+      await expect(updater.reorderRepositories([repoId, repoId])).rejects.toMatchObject({
+        message: 'Reorder request contains duplicate IDs.',
+        statusCode: 400,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when the reorder request omits resolved repository IDs', async () => {
+      // Given
+      const validateRepository = vi.fn().mockResolvedValue({ isValid: true });
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/b' }],
+      });
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        validateRepository,
+      });
+
+      // When / Then
+      await expect(
+        updater.reorderRepositories([deriveRepositoryId('/repo/a')]),
+      ).rejects.toMatchObject({
+        message: 'Reorder request must include all resolved repository IDs.',
+        statusCode: 400,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+    });
+
+    it('throws 400 when the reorder request contains an unknown repository ID', async () => {
+      // Given
+      const validateRepository = vi.fn().mockResolvedValue({ isValid: true });
+      vi.mocked(readExistingRepositoryConfig).mockResolvedValue({
+        repositories: [{ path: '/repo/a' }, { path: '/repo/b' }],
+      });
+      const updater = createRepositoryConfigUpdater({
+        configPath: '/config/sift.json',
+        validateRepository,
+      });
+
+      // When / Then
+      await expect(
+        updater.reorderRepositories([deriveRepositoryId('/repo/a'), deriveRepositoryId('/repo/c')]),
+      ).rejects.toMatchObject({
+        message: `Repository id "${deriveRepositoryId('/repo/c')}" is not configured.`,
+        statusCode: 400,
+      });
+      expect(writeRepositoryConfig).not.toHaveBeenCalled();
+    });
+  });
 });

@@ -557,6 +557,10 @@ button.app-brand-home {
   align-items: stretch;
 }
 
+.repository-reorderable-item {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+}
+
 .repository-item-pending-delete .repository-button,
 .repository-item-pending-delete .repository-item-content {
   opacity: 0.55;
@@ -565,6 +569,34 @@ button.app-brand-home {
 .repository-item-pending-delete .repository-name,
 .repository-item-pending-delete .repository-path {
   text-decoration: line-through;
+}
+
+.repository-item-dragging {
+  opacity: 0.65;
+}
+
+.repository-item-drag-over .repository-button {
+  border-color: var(--accent-color);
+}
+
+.repository-drag-handle {
+  width: 32px;
+  /* Match the repository row's current minimum height so the handle fills the
+  stretched grid cell and stays easy to grab beside the full row content. */
+  min-height: 74px;
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: #8b949e;
+  border-radius: 4px;
+  cursor: grab;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.repository-drag-handle:disabled {
+  cursor: not-allowed;
+  opacity: 0.45;
 }
 
 .repository-delete-button {

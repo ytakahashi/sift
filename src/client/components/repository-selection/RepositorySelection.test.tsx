@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -19,7 +19,7 @@ function createRepositorySelectionProps(
     error: null,
     loading: false,
     onAddRepository: vi.fn().mockResolvedValue(true),
-    onDeleteRepositories: vi.fn().mockResolvedValue(true),
+    onCommitRepositoryListEdits: vi.fn().mockResolvedValue(true),
     onRefresh: vi.fn(),
     onSelectRepository: vi.fn(),
     repositories,
@@ -36,6 +36,18 @@ function renderRepositorySelection(
   const props = createRepositorySelectionProps(repositories, overrides);
   render(<RepositorySelection {...props} />);
   return props;
+}
+
+function createDataTransfer(): DataTransfer {
+  const data = new Map<string, string>();
+  return {
+    dropEffect: 'move',
+    effectAllowed: 'move',
+    getData: vi.fn((type: string) => data.get(type) ?? ''),
+    setData: vi.fn((type: string, value: string) => {
+      data.set(type, value);
+    }),
+  } as unknown as DataTransfer;
 }
 
 describe('RepositorySelection', () => {
@@ -213,10 +225,68 @@ describe('RepositorySelection', () => {
     expect(screen.getByRole('button', { name: 'sift/repo/sift' })).toHaveProperty('disabled', true);
   });
 
+  it('shows drag handles only for resolved repositories while editing', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [
+        { id: 'invalid-repo', name: 'invalid-repo', path: '/repo/invalid', reason: 'Missing' },
+      ],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Drag sift' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Drag invalid-repo' })).toBeNull();
+  });
+
+  it('commits a reordered resolved repository list after drag and drop', async () => {
+    // Given
+    const user = userEvent.setup();
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+      ],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+    const rows = screen.getAllByRole('listitem');
+    const dataTransfer = createDataTransfer();
+    fireEvent.dragStart(rows[1], { dataTransfer });
+    fireEvent.dragOver(rows[0], { dataTransfer });
+    fireEvent.drop(rows[0], { dataTransfer });
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    // Then
+    expect(onCommitRepositoryListEdits).toHaveBeenCalledWith([], ['my-app', 'sift']);
+  });
+
+  it('disables dragging for pending delete rows', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+    await user.click(screen.getByRole('button', { name: 'Remove sift' }));
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Drag sift' })).toHaveProperty('disabled', true);
+  });
+
   it('marks a repository as pending delete without committing immediately', async () => {
     // Given
     const user = userEvent.setup();
-    const { onDeleteRepositories } = renderRepositorySelection({
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
       invalidRepositories: [
         { id: 'invalid-repo', name: 'invalid-repo', path: '/repo/invalid', reason: 'Missing' },
       ],
@@ -229,13 +299,13 @@ describe('RepositorySelection', () => {
 
     // Then
     expect(screen.getByRole('button', { name: 'Undo remove invalid-repo' })).toBeDefined();
-    expect(onDeleteRepositories).not.toHaveBeenCalled();
+    expect(onCommitRepositoryListEdits).not.toHaveBeenCalled();
   });
 
   it('toggles a pending delete off and exits without calling the API when no rows are pending', async () => {
     // Given
     const user = userEvent.setup();
-    const { onDeleteRepositories } = renderRepositorySelection({
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
       invalidRepositories: [],
       repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
     });
@@ -247,14 +317,14 @@ describe('RepositorySelection', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }));
 
     // Then
-    expect(onDeleteRepositories).not.toHaveBeenCalled();
+    expect(onCommitRepositoryListEdits).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Edit Repository List' })).toBeDefined();
   });
 
   it('cancels pending deletes without calling the API', async () => {
     // Given
     const user = userEvent.setup();
-    const { onDeleteRepositories } = renderRepositorySelection({
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
       invalidRepositories: [],
       repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
     });
@@ -265,14 +335,14 @@ describe('RepositorySelection', () => {
     await user.click(screen.getByRole('button', { name: 'Cancel edit' }));
 
     // Then
-    expect(onDeleteRepositories).not.toHaveBeenCalled();
+    expect(onCommitRepositoryListEdits).not.toHaveBeenCalled();
     expect(screen.getByRole('button', { name: 'Edit Repository List' })).toBeDefined();
   });
 
   it('commits pending deletes on Done', async () => {
     // Given
     const user = userEvent.setup();
-    const { onDeleteRepositories } = renderRepositorySelection({
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
       invalidRepositories: [
         { id: 'invalid-repo', name: 'invalid-repo', path: '/repo/invalid', reason: 'Missing' },
       ],
@@ -285,20 +355,46 @@ describe('RepositorySelection', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }));
 
     // Then
-    expect(onDeleteRepositories).toHaveBeenCalledWith(['invalid-repo']);
+    expect(onCommitRepositoryListEdits).toHaveBeenCalledWith(['invalid-repo'], []);
     expect(screen.getByRole('button', { name: 'Edit Repository List' })).toBeDefined();
+  });
+
+  it('commits pending deletes and remaining order together on Done', async () => {
+    // Given
+    const user = userEvent.setup();
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+        { id: 'other-repo', name: 'other-repo', path: '/repo/other-repo' },
+      ],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+    const rows = screen.getAllByRole('listitem');
+    const dataTransfer = createDataTransfer();
+    fireEvent.dragStart(rows[2], { dataTransfer });
+    fireEvent.dragOver(rows[0], { dataTransfer });
+    fireEvent.drop(rows[0], { dataTransfer });
+    await user.click(screen.getByRole('button', { name: 'Remove my-app' }));
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    // Then
+    expect(onCommitRepositoryListEdits).toHaveBeenCalledWith(['my-app'], ['other-repo', 'sift']);
   });
 
   it('keeps edit mode and clears pending state when committing deletes fails', async () => {
     // Given
     const user = userEvent.setup();
-    const onDeleteRepositories = vi.fn().mockResolvedValue(false);
+    const onCommitRepositoryListEdits = vi.fn().mockResolvedValue(false);
     renderRepositorySelection(
       {
         invalidRepositories: [],
         repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
       },
-      { onDeleteRepositories },
+      { onCommitRepositoryListEdits },
     );
 
     // When
@@ -307,7 +403,7 @@ describe('RepositorySelection', () => {
     await user.click(screen.getByRole('button', { name: 'Done' }));
 
     // Then
-    expect(onDeleteRepositories).toHaveBeenCalledWith(['sift']);
+    expect(onCommitRepositoryListEdits).toHaveBeenCalledWith(['sift'], []);
     expect(screen.getByRole('button', { name: 'Done' })).toBeDefined();
     expect(screen.queryByRole('button', { name: 'Undo remove sift' })).toBeNull();
     expect(screen.getByRole('button', { name: 'Remove sift' })).toBeDefined();

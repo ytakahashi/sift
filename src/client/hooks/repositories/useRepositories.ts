@@ -8,7 +8,10 @@ export interface UseRepositoriesResult {
   addRepository: (path: string) => Promise<boolean>;
   adding: boolean;
   configMissingError: string | null;
-  deleteRepositories: (repoIds: RepositoryId[]) => Promise<boolean>;
+  commitRepositoryListEdits: (
+    deleteIds: RepositoryId[],
+    orderedIds: RepositoryId[],
+  ) => Promise<boolean>;
   editError: string | null;
   error: string | null;
   loading: boolean;
@@ -36,8 +39,8 @@ export function useRepositories(
 
   // User-initiated Refresh clears stale add/edit errors so the surfaced state
   // reflects the freshly fetched list. In-flight commit paths (addRepository /
-  // deleteRepositories) call the underlying `refresh` directly instead so they
-  // can preserve the error they just set.
+  // commitRepositoryListEdits) call the underlying `refresh` directly instead
+  // so they can preserve the error they just set.
   const handleRefresh = useCallback(async () => {
     setEditError(null);
     setAddError(null);
@@ -62,8 +65,8 @@ export function useRepositories(
     },
     [refresh, repositoryWriter],
   );
-  const deleteRepositories = useCallback(
-    async (repoIds: RepositoryId[]): Promise<boolean> => {
+  const commitRepositoryListEdits = useCallback(
+    async (deleteIds: RepositoryId[], orderedIds: RepositoryId[]): Promise<boolean> => {
       if (isSavingRef.current) return false;
       isSavingRef.current = true;
       setSaving(true);
@@ -71,11 +74,16 @@ export function useRepositories(
 
       try {
         // Done starts the commit phase: successful deletions are not rolled back.
-        // If a later deletion fails, refresh the list so Edit mode can continue
-        // against the latest config state.
-        for (const repoId of repoIds) {
+        // If a later delete/reorder step fails, refresh the list so Edit mode
+        // can continue against the latest config state.
+        for (const repoId of deleteIds) {
           await repositoryWriter.removeRepository(repoId);
         }
+
+        if (orderedIds.length > 0) {
+          await repositoryWriter.reorderRepositories(orderedIds);
+        }
+
         await refresh();
         return true;
       } catch (err: unknown) {
@@ -99,7 +107,7 @@ export function useRepositories(
     addRepository,
     adding,
     configMissingError,
-    deleteRepositories,
+    commitRepositoryListEdits,
     editError,
     error,
     loading,

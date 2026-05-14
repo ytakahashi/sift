@@ -20,6 +20,7 @@ describe('useRepositories', () => {
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
 
     // When
@@ -45,6 +46,7 @@ describe('useRepositories', () => {
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
 
     // When
@@ -73,6 +75,7 @@ describe('useRepositories', () => {
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
 
     // When
@@ -107,6 +110,7 @@ describe('useRepositories', () => {
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn().mockResolvedValue(undefined),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -140,6 +144,7 @@ describe('useRepositories', () => {
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn().mockRejectedValue(new Error('Repository path is not a directory.')),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -181,6 +186,7 @@ describe('useRepositories', () => {
     const repositoryWriter: RepositoryWriter = {
       addRepository: vi.fn(),
       removeRepository: vi.fn().mockResolvedValue(undefined),
+      reorderRepositories: vi.fn(),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -189,15 +195,16 @@ describe('useRepositories', () => {
     });
 
     // When
-    let removed = false;
+    let committed = false;
     await act(async () => {
-      removed = await result.current.deleteRepositories(['sift', 'my-app']);
+      committed = await result.current.commitRepositoryListEdits(['sift', 'my-app'], []);
     });
 
     // Then
-    expect(removed).toBe(true);
+    expect(committed).toBe(true);
     expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(1, 'sift');
     expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(2, 'my-app');
+    expect(repositoryWriter.reorderRepositories).not.toHaveBeenCalled();
     expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(2);
     expect(result.current.repositories?.repositories).toHaveLength(0);
     expect(result.current.editError).toBeNull();
@@ -228,6 +235,7 @@ describe('useRepositories', () => {
         .fn()
         .mockResolvedValueOnce(undefined)
         .mockRejectedValueOnce(new Error('Repository not found.')),
+      reorderRepositories: vi.fn(),
     };
 
     const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
@@ -236,16 +244,20 @@ describe('useRepositories', () => {
     });
 
     // When
-    let removed = true;
+    let committed = true;
     await act(async () => {
-      removed = await result.current.deleteRepositories(['sift', 'missing', 'my-app']);
+      committed = await result.current.commitRepositoryListEdits(
+        ['sift', 'missing', 'my-app'],
+        ['my-app'],
+      );
     });
 
     // Then
-    expect(removed).toBe(false);
+    expect(committed).toBe(false);
     expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(1, 'sift');
     expect(repositoryWriter.removeRepository).toHaveBeenNthCalledWith(2, 'missing');
     expect(repositoryWriter.removeRepository).toHaveBeenCalledTimes(2);
+    expect(repositoryWriter.reorderRepositories).not.toHaveBeenCalled();
     expect(result.current.error).toBeNull();
     expect(result.current.editError).toBe('Repository not found.');
     expect(result.current.saving).toBe(false);
@@ -253,5 +265,90 @@ describe('useRepositories', () => {
     expect(result.current.repositories?.repositories).toEqual([
       { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
     ]);
+  });
+
+  it('removes and reorders repositories in one commit before refreshing', async () => {
+    // Given
+    const repositoryReader: RepositoryReader = {
+      fetchRepository: vi.fn(),
+      fetchRepositories: vi
+        .fn()
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [
+            { id: 'sift', name: 'sift', path: '/repo/sift' },
+            { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [{ id: 'my-app', name: 'my-app', path: '/repo/my-app' }],
+        }),
+    };
+    const repositoryWriter: RepositoryWriter = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn().mockResolvedValue(undefined),
+      reorderRepositories: vi.fn().mockResolvedValue(undefined),
+    };
+
+    const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // When
+    let committed = false;
+    await act(async () => {
+      committed = await result.current.commitRepositoryListEdits(['sift'], ['my-app']);
+    });
+
+    // Then
+    expect(committed).toBe(true);
+    expect(repositoryWriter.removeRepository).toHaveBeenCalledWith('sift');
+    expect(repositoryWriter.reorderRepositories).toHaveBeenCalledWith(['my-app']);
+    expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(2);
+  });
+
+  it('refreshes and returns false when reorder fails after deletions', async () => {
+    // Given
+    const repositoryReader: RepositoryReader = {
+      fetchRepository: vi.fn(),
+      fetchRepositories: vi
+        .fn()
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [
+            { id: 'sift', name: 'sift', path: '/repo/sift' },
+            { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+          ],
+        })
+        .mockResolvedValueOnce({
+          invalidRepositories: [],
+          repositories: [{ id: 'my-app', name: 'my-app', path: '/repo/my-app' }],
+        }),
+    };
+    const repositoryWriter: RepositoryWriter = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn().mockResolvedValue(undefined),
+      reorderRepositories: vi.fn().mockRejectedValue(new Error('Reorder failed.')),
+    };
+
+    const { result } = renderHook(() => useRepositories(repositoryReader, repositoryWriter));
+    await waitFor(() => {
+      expect(result.current.loading).toBe(false);
+    });
+
+    // When
+    let committed = true;
+    await act(async () => {
+      committed = await result.current.commitRepositoryListEdits(['sift'], ['my-app']);
+    });
+
+    // Then
+    expect(committed).toBe(false);
+    expect(repositoryWriter.removeRepository).toHaveBeenCalledWith('sift');
+    expect(repositoryWriter.reorderRepositories).toHaveBeenCalledWith(['my-app']);
+    expect(result.current.editError).toBe('Reorder failed.');
+    expect(repositoryReader.fetchRepositories).toHaveBeenCalledTimes(2);
   });
 });

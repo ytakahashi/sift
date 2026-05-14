@@ -58,4 +58,17 @@ export const httpRepositoryWriter: RepositoryWriter = {
       );
     }
   },
+  async reorderRepositories(orderedIds: RepositoryId[]): Promise<void> {
+    const res = await fetch('/api/repositories/order', {
+      body: JSON.stringify({ ids: orderedIds }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+
+    if (!res.ok) {
+      throw new Error(
+        await readErrorMessage(res, `Failed to reorder repositories: ${res.statusText}`),
+      );
+    }
+  },
 };
