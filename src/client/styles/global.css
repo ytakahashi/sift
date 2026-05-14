@@ -575,8 +575,12 @@ button.app-brand-home {
   opacity: 0.65;
 }
 
-.repository-item-drag-over .repository-button {
-  border-color: var(--accent-color);
+.repository-item-drag-over-before .repository-button {
+  border-top-color: var(--accent-color);
+}
+
+.repository-item-drag-over-after .repository-button {
+  border-bottom-color: var(--accent-color);
 }
 
 .repository-drag-handle {

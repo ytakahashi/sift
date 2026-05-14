@@ -1,4 +1,4 @@
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -243,7 +243,36 @@ describe('RepositorySelection', () => {
     expect(screen.queryByRole('button', { name: 'Drag invalid-repo' })).toBeNull();
   });
 
-  it('commits a reordered resolved repository list after drag and drop', async () => {
+  it('sets aria-grabbed attribute during dragging', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+    const row = screen.getByRole('listitem');
+    const dataTransfer = createDataTransfer();
+
+    // Then (initial state)
+    expect(row.getAttribute('aria-grabbed')).toBe('false');
+
+    // When (dragging starts)
+    fireEvent.dragStart(row, { dataTransfer });
+
+    // Then
+    expect(row.getAttribute('aria-grabbed')).toBe('true');
+
+    // When (dragging ends)
+    fireEvent.dragEnd(row);
+
+    // Then
+    expect(row.getAttribute('aria-grabbed')).toBe('false');
+  });
+
+  it('commits a reordered resolved repository list after drag and drop (before target)', async () => {
     // Given
     const user = userEvent.setup();
     const { onCommitRepositoryListEdits } = renderRepositorySelection({
@@ -256,11 +285,115 @@ describe('RepositorySelection', () => {
 
     // When
     await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
-    const rows = screen.getAllByRole('listitem');
+
     const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(rows[1], { dataTransfer });
-    fireEvent.dragOver(rows[0], { dataTransfer });
-    fireEvent.drop(rows[0], { dataTransfer });
+    fireEvent.dragStart(screen.getAllByRole('listitem')[1], { dataTransfer });
+
+    // Mock getBoundingClientRect on the prototype to be safe against re-renders
+    const getBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({
+        top: 100,
+        height: 80,
+      } as DOMRect);
+
+    const targetRow = screen.getAllByRole('listitem')[0];
+    const dragOverEvent = createEvent.dragOver(targetRow);
+    Object.defineProperty(dragOverEvent, 'clientY', { value: 110 });
+    Object.defineProperty(dragOverEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(targetRow, dragOverEvent);
+
+    const dropEvent = createEvent.drop(screen.getAllByRole('listitem')[0]);
+    Object.defineProperty(dropEvent, 'clientY', { value: 110 });
+    Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(screen.getAllByRole('listitem')[0], dropEvent);
+
+    getBoundingClientRect.mockRestore();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    // Then
+    expect(onCommitRepositoryListEdits).toHaveBeenCalledWith([], ['my-app', 'sift']);
+  });
+
+  it('commits a reordered resolved repository list after drag and drop (after target)', async () => {
+    // Given
+    const user = userEvent.setup();
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+      ],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+
+    const dataTransfer = createDataTransfer();
+    fireEvent.dragStart(screen.getAllByRole('listitem')[1], { dataTransfer });
+
+    const getBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({
+        top: 100,
+        height: 80,
+      } as DOMRect);
+
+    const targetRow = screen.getAllByRole('listitem')[0];
+    const dragOverEvent = createEvent.dragOver(targetRow);
+    Object.defineProperty(dragOverEvent, 'clientY', { value: 150 });
+    Object.defineProperty(dragOverEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(targetRow, dragOverEvent);
+
+    const dropEvent = createEvent.drop(screen.getAllByRole('listitem')[0]);
+    Object.defineProperty(dropEvent, 'clientY', { value: 150 });
+    Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(screen.getAllByRole('listitem')[0], dropEvent);
+
+    getBoundingClientRect.mockRestore();
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    // Then
+    // Moving my-app after sift keeps the order as ['sift', 'my-app']
+    expect(onCommitRepositoryListEdits).not.toHaveBeenCalled();
+  });
+
+  it('commits a reordered resolved repository list after drag and drop to the end of the list', async () => {
+    // Given
+    const user = userEvent.setup();
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'my-app', name: 'my-app', path: '/repo/my-app' },
+      ],
+    });
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+
+    const dataTransfer = createDataTransfer();
+    fireEvent.dragStart(screen.getAllByRole('listitem')[0], { dataTransfer });
+
+    const getBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({
+        top: 200,
+        height: 80,
+      } as DOMRect);
+
+    const targetRow = screen.getAllByRole('listitem')[1];
+    const dragOverEvent = createEvent.dragOver(targetRow);
+    Object.defineProperty(dragOverEvent, 'clientY', { value: 250 });
+    Object.defineProperty(dragOverEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(targetRow, dragOverEvent);
+
+    const dropEvent = createEvent.drop(screen.getAllByRole('listitem')[1]);
+    Object.defineProperty(dropEvent, 'clientY', { value: 250 });
+    Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(screen.getAllByRole('listitem')[1], dropEvent);
+
+    getBoundingClientRect.mockRestore();
     await user.click(screen.getByRole('button', { name: 'Done' }));
 
     // Then
@@ -373,11 +506,29 @@ describe('RepositorySelection', () => {
 
     // When
     await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
-    const rows = screen.getAllByRole('listitem');
+
     const dataTransfer = createDataTransfer();
-    fireEvent.dragStart(rows[2], { dataTransfer });
-    fireEvent.dragOver(rows[0], { dataTransfer });
-    fireEvent.drop(rows[0], { dataTransfer });
+    fireEvent.dragStart(screen.getAllByRole('listitem')[2], { dataTransfer });
+
+    const getBoundingClientRect = vi
+      .spyOn(HTMLElement.prototype, 'getBoundingClientRect')
+      .mockReturnValue({
+        top: 100,
+        height: 80,
+      } as DOMRect);
+
+    const targetRow = screen.getAllByRole('listitem')[0];
+    const dragOverEvent = createEvent.dragOver(targetRow);
+    Object.defineProperty(dragOverEvent, 'clientY', { value: 110 });
+    Object.defineProperty(dragOverEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(targetRow, dragOverEvent);
+
+    const dropEvent = createEvent.drop(screen.getAllByRole('listitem')[0]);
+    Object.defineProperty(dropEvent, 'clientY', { value: 110 });
+    Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(screen.getAllByRole('listitem')[0], dropEvent);
+
+    getBoundingClientRect.mockRestore();
     await user.click(screen.getByRole('button', { name: 'Remove my-app' }));
     await user.click(screen.getByRole('button', { name: 'Done' }));
 

@@ -27,7 +27,7 @@ export interface RepositorySelectionProps {
 }
 
 function RepositoryRow({
-  dragOver,
+  dragOverPosition,
   dragging,
   isEditing,
   onDragEnd,
@@ -40,7 +40,7 @@ function RepositoryRow({
   repository,
   saving,
 }: {
-  dragOver: boolean;
+  dragOverPosition: 'before' | 'after' | null;
   dragging: boolean;
   isEditing: boolean;
   onDragEnd: () => void;
@@ -77,13 +77,14 @@ function RepositoryRow({
     return <li className="repository-item">{content}</li>;
   }
 
+  const dragOverClass = dragOverPosition ? ` repository-item-drag-over-${dragOverPosition}` : '';
+
   return (
     <li
+      aria-grabbed={dragging}
       className={`repository-item repository-editing-item repository-reorderable-item${
         pendingDelete ? ' repository-item-pending-delete' : ''
-      }${dragging ? ' repository-item-dragging' : ''}${
-        dragOver ? ' repository-item-drag-over' : ''
-      }`}
+      }${dragging ? ' repository-item-dragging' : ''}${dragOverClass}`}
       draggable={draggable}
       onDragEnd={onDragEnd}
       onDragOver={(event) => onDragOver(event, repository.id)}
@@ -183,6 +184,7 @@ export function RepositorySelection({
   const [pendingOrder, setPendingOrder] = useState<RepositoryId[] | null>(null);
   const [draggingId, setDraggingId] = useState<RepositoryId | null>(null);
   const [dragOverId, setDragOverId] = useState<RepositoryId | null>(null);
+  const [dropPosition, setDropPosition] = useState<'before' | 'after'>('before');
   const [repositoryPath, setRepositoryPath] = useState('');
   const items = repositories?.repositories ?? [];
   const invalidItems = repositories?.invalidRepositories ?? [];
@@ -222,6 +224,7 @@ export function RepositorySelection({
       setPendingOrder(items.map((repository) => repository.id));
       setDraggingId(null);
       setDragOverId(null);
+      setDropPosition('before');
       clearEditError();
       setIsEditingRepositoryList(true);
       return;
@@ -257,6 +260,7 @@ export function RepositorySelection({
     setPendingOrder(null);
     setDraggingId(null);
     setDragOverId(null);
+    setDropPosition('before');
 
     if (!committed) {
       return;
@@ -270,6 +274,7 @@ export function RepositorySelection({
     setPendingOrder(null);
     setDraggingId(null);
     setDragOverId(null);
+    setDropPosition('before');
     clearEditError();
     setIsEditingRepositoryList(false);
   };
@@ -286,10 +291,11 @@ export function RepositorySelection({
   };
 
   const handleDragOver = (event: DragEvent<HTMLLIElement>, repoId: RepositoryId): void => {
+    const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
     if (
-      !draggingId ||
-      draggingId === repoId ||
-      pendingDeleteIds.has(draggingId) ||
+      !sourceId ||
+      sourceId === repoId ||
+      pendingDeleteIds.has(sourceId) ||
       pendingDeleteIds.has(repoId)
     ) {
       return;
@@ -297,32 +303,43 @@ export function RepositorySelection({
 
     event.preventDefault();
     event.dataTransfer.dropEffect = 'move';
+
+    const target = (event.currentTarget || event.target) as HTMLElement;
+    const rect = target.getBoundingClientRect();
+    const midY = rect.top + rect.height / 2;
+    const position = event.clientY < midY ? 'before' : 'after';
+
     setDragOverId(repoId);
+    setDropPosition(position);
   };
 
   const handleDrop = (event: DragEvent<HTMLLIElement>, repoId: RepositoryId): void => {
     event.preventDefault();
+    const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
     if (
-      draggingId &&
-      draggingId !== repoId &&
-      !pendingDeleteIds.has(draggingId) &&
+      sourceId &&
+      sourceId !== repoId &&
+      !pendingDeleteIds.has(sourceId) &&
       !pendingDeleteIds.has(repoId)
     ) {
       setPendingOrder((currentOrder) =>
-        moveRepositoryBefore(
+        moveRepository(
           currentOrder ?? items.map((repository) => repository.id),
-          draggingId,
+          sourceId,
           repoId,
+          dropPosition,
         ),
       );
     }
     setDraggingId(null);
     setDragOverId(null);
+    setDropPosition('before');
   };
 
   const handleDragEnd = (): void => {
     setDraggingId(null);
     setDragOverId(null);
+    setDropPosition('before');
   };
 
   return (
@@ -355,7 +372,7 @@ export function RepositorySelection({
             <ul className="repository-list">
               {orderedItems.map((repository) => (
                 <RepositoryRow
-                  dragOver={dragOverId === repository.id}
+                  dragOverPosition={dragOverId === repository.id ? dropPosition : null}
                   dragging={draggingId === repository.id}
                   isEditing={isEditingRepositoryList}
                   key={repository.id}
@@ -476,10 +493,11 @@ function orderRepositories(
   return [...orderedRepositories, ...newRepositories];
 }
 
-function moveRepositoryBefore(
+function moveRepository(
   orderedIds: RepositoryId[],
   sourceId: RepositoryId,
   targetId: RepositoryId,
+  position: 'before' | 'after',
 ): RepositoryId[] {
   if (sourceId === targetId || !orderedIds.includes(sourceId) || !orderedIds.includes(targetId)) {
     return orderedIds;
@@ -487,5 +505,6 @@ function moveRepositoryBefore(
 
   const withoutSource = orderedIds.filter((id) => id !== sourceId);
   const targetIndex = withoutSource.indexOf(targetId);
-  return [...withoutSource.slice(0, targetIndex), sourceId, ...withoutSource.slice(targetIndex)];
+  const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
+  return [...withoutSource.slice(0, insertIndex), sourceId, ...withoutSource.slice(insertIndex)];
 }
