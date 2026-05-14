@@ -46,6 +46,35 @@ export function createRepositoryRoutes(options: CreateRepositoryRoutesOptions): 
     }
   });
 
+  repositoryRoutes.put('/order', async (c) => {
+    try {
+      let body: unknown;
+      try {
+        body = (await c.req.json()) as unknown;
+      } catch (_error: unknown) {
+        return c.json({ error: 'Reorder request body must be valid JSON.' }, 400);
+      }
+
+      if (typeof body !== 'object' || body === null || !('ids' in body)) {
+        return c.json({ error: 'Repository IDs are required.' }, 400);
+      }
+
+      const repositoryIds = body.ids;
+      if (!Array.isArray(repositoryIds)) {
+        return c.json({ error: 'Repository IDs must be an array.' }, 400);
+      }
+
+      if (repositoryIds.some((id) => typeof id !== 'string')) {
+        return c.json({ error: 'Repository IDs must be strings.' }, 400);
+      }
+
+      await updater.reorderRepositories(repositoryIds);
+      return c.body(null, 204);
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
+    }
+  });
+
   repositoryRoutes.get('/:repoId', async (c) => {
     try {
       const repository = await resolver.resolveRepository(c.req.param('repoId') as string);

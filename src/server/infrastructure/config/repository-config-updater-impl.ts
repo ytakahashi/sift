@@ -4,7 +4,7 @@ import {
   deriveRepositoryId,
   deriveRepositoryName,
 } from '../../../domain/repository/repository-identity';
-import type { RepositoryConfig } from './repository-config-schema';
+import type { RepositoryConfig, RepositoryConfigEntry } from './repository-config-schema';
 import { RepositoryConfigParseError } from './repository-config-schema';
 import {
   DEFAULT_REPOSITORY_CONFIG_PATH,
@@ -128,6 +128,81 @@ export function createRepositoryConfigUpdater(
       };
 
       await writeRepositoryConfig(newConfig, configPath);
+      invalidateConfig();
+    },
+    reorderRepositories: async (orderedIds: RepositoryId[]): Promise<void> => {
+      const existingConfig = await readConfigForUpdate(configPath);
+
+      // Build runtime descriptors from every configured entry before
+      // validation. Reorder operates on derived repository IDs, while the
+      // config still stores path-only entries.
+      const descriptors = existingConfig.repositories.map((entry) => {
+        const normalizedPath = normalizeConfiguredRepositoryPath(entry.path);
+        return {
+          entry,
+          id: deriveRepositoryId(normalizedPath),
+          path: normalizedPath,
+        };
+      });
+
+      // Detect duplicates across all entries, resolved or invalid. This mirrors
+      // list resolution: duplicate derived IDs make the config ambiguous before
+      // any reorder request can be applied.
+      const configuredIds = new Set<RepositoryId>();
+      for (const { id } of descriptors) {
+        if (configuredIds.has(id)) {
+          throw new RepositoryConfigUpdateError(`Repository id "${id}" is duplicated.`, 409);
+        }
+        configuredIds.add(id);
+      }
+
+      const resolvedEntries: Array<{ id: RepositoryId; entry: RepositoryConfigEntry }> = [];
+      const invalidEntries: RepositoryConfigEntry[] = [];
+      // Only valid repositories participate in reorder. Invalid entries cannot
+      // be placed precisely by the client because the API returns them in a
+      // separate list, so they are preserved after the reordered valid entries.
+      for (const descriptor of descriptors) {
+        const validation = await validateRepository({ id: descriptor.id, path: descriptor.path });
+        if (validation.isValid) {
+          resolvedEntries.push({ id: descriptor.id, entry: descriptor.entry });
+        } else {
+          invalidEntries.push(descriptor.entry);
+        }
+      }
+
+      // Request-side duplicates are a client error even if the config itself is
+      // valid; otherwise a single repository could be written more than once.
+      const requestedIds = new Set<RepositoryId>();
+      for (const id of orderedIds) {
+        if (requestedIds.has(id)) {
+          throw new RepositoryConfigUpdateError('Reorder request contains duplicate IDs.', 400);
+        }
+        requestedIds.add(id);
+      }
+
+      const resolvedMap = new Map(resolvedEntries.map(({ id, entry }) => [id, entry]));
+      // The request must provide a complete permutation of resolved entries.
+      // Partial orders are rejected so the persisted config has a deterministic
+      // full order after every successful call.
+      if (orderedIds.length !== resolvedMap.size) {
+        throw new RepositoryConfigUpdateError(
+          'Reorder request must include all resolved repository IDs.',
+          400,
+        );
+      }
+
+      const reorderedResolvedEntries = orderedIds.map((id) => {
+        const entry = resolvedMap.get(id);
+        if (!entry) {
+          throw new RepositoryConfigUpdateError(`Repository id "${id}" is not configured.`, 400);
+        }
+        return entry;
+      });
+
+      await writeRepositoryConfig(
+        { repositories: [...reorderedResolvedEntries, ...invalidEntries] },
+        configPath,
+      );
       invalidateConfig();
     },
   };

@@ -13,4 +13,5 @@ export class RepositoryConfigUpdateError extends Error {
 export interface RepositoryConfigUpdater {
   addRepository(repositoryPath: string): Promise<ResolvedRepository>;
   removeRepository(repoId: RepositoryId): Promise<void>;
+  reorderRepositories(orderedIds: RepositoryId[]): Promise<void>;
 }

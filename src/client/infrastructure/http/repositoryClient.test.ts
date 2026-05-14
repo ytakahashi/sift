@@ -224,4 +224,41 @@ describe('httpRepositoryWriter', () => {
       'Repository id "my-app" is not configured.',
     );
   });
+
+  it('sends PUT request to the repository order endpoint', async () => {
+    // Given
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+    });
+    vi.stubGlobal('fetch', fetchMock);
+
+    // When
+    await httpRepositoryWriter.reorderRepositories(['my-app', 'sift']);
+
+    // Then
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/order', {
+      body: JSON.stringify({ ids: ['my-app', 'sift'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+  });
+
+  it('throws the server error message when reordering repositories fails', async () => {
+    // Given
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue({
+        json: vi.fn().mockResolvedValue({
+          error: 'Reorder request must include all resolved repository IDs.',
+        }),
+        ok: false,
+        statusText: 'Bad Request',
+      }),
+    );
+
+    // When / Then
+    await expect(httpRepositoryWriter.reorderRepositories(['my-app'])).rejects.toThrow(
+      'Reorder request must include all resolved repository IDs.',
+    );
+  });
 });

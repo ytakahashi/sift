@@ -18,6 +18,7 @@ function createApp(
   repositoryConfigUpdater: RepositoryConfigUpdater = {
     addRepository: vi.fn(),
     removeRepository: vi.fn(),
+    reorderRepositories: vi.fn(),
   },
 ): Hono<Env> {
   const app = new Hono<Env>();
@@ -222,6 +223,7 @@ describe('repositoryRoutes', () => {
         path: '/Users/example/projects/sift',
       }),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -253,6 +255,7 @@ describe('repositoryRoutes', () => {
     const mockUpdater = {
       addRepository: vi.fn(),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -279,6 +282,7 @@ describe('repositoryRoutes', () => {
     const mockUpdater = {
       addRepository: vi.fn(),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -305,6 +309,7 @@ describe('repositoryRoutes', () => {
     const mockUpdater = {
       addRepository: vi.fn(),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -335,6 +340,7 @@ describe('repositoryRoutes', () => {
           new RepositoryConfigUpdateError('Repository is already registered: /repo/sift', 409),
         ),
       removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -353,6 +359,168 @@ describe('repositoryRoutes', () => {
     // Then
     expect(response.status).toBe(409);
     expect(data).toEqual({ error: 'Repository is already registered: /repo/sift' });
+  });
+
+  it('reorders repositories and returns 204 No Content', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn(),
+      reorderRepositories: vi.fn().mockResolvedValue(undefined),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/order', {
+      body: JSON.stringify({ ids: ['my-app', 'sift'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+
+    // Then
+    expect(response.status).toBe(204);
+    expect(mockUpdater.reorderRepositories).toHaveBeenCalledWith(['my-app', 'sift']);
+    expect(mockResolver.resolveRepository).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when reordering repositories with an invalid JSON body', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/order', {
+      body: 'not-json',
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Reorder request body must be valid JSON.' });
+    expect(mockUpdater.reorderRepositories).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when reordering repositories without ids', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/order', {
+      body: JSON.stringify({}),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Repository IDs are required.' });
+    expect(mockUpdater.reorderRepositories).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when reordering repositories with non-array ids', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/order', {
+      body: JSON.stringify({ ids: 'sift' }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Repository IDs must be an array.' });
+    expect(mockUpdater.reorderRepositories).not.toHaveBeenCalled();
+  });
+
+  it('returns 400 when reordering repositories with non-string ids', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn(),
+      reorderRepositories: vi.fn(),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/order', {
+      body: JSON.stringify({ ids: ['sift', 123] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Repository IDs must be strings.' });
+    expect(mockUpdater.reorderRepositories).not.toHaveBeenCalled();
+  });
+
+  it('returns reorder updater errors with their configured status', async () => {
+    // Given
+    const mockUpdater = {
+      addRepository: vi.fn(),
+      removeRepository: vi.fn(),
+      reorderRepositories: vi
+        .fn()
+        .mockRejectedValue(new RepositoryConfigUpdateError('Reorder request is invalid.', 400)),
+    };
+    const mockResolver = {
+      resolveRepository: vi.fn(),
+      listRepositories: vi.fn(),
+    };
+    const app = createApp(mockResolver, mockUpdater);
+
+    // When
+    const response = await app.request('/api/repositories/order', {
+      body: JSON.stringify({ ids: ['sift'] }),
+      headers: { 'Content-Type': 'application/json' },
+      method: 'PUT',
+    });
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(400);
+    expect(data).toEqual({ error: 'Reorder request is invalid.' });
   });
 
   it('marks repositories invalid when their paths cannot be used', async () => {
@@ -449,6 +617,7 @@ describe('repositoryRoutes', () => {
     const mockUpdater = {
       addRepository: vi.fn(),
       removeRepository: vi.fn().mockResolvedValue(undefined),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -471,6 +640,7 @@ describe('repositoryRoutes', () => {
     const mockUpdater = {
       addRepository: vi.fn(),
       removeRepository: vi.fn().mockResolvedValue(undefined),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
@@ -497,6 +667,7 @@ describe('repositoryRoutes', () => {
         .mockRejectedValue(
           new RepositoryConfigUpdateError('Repository id "duplicate" is duplicated.', 409),
         ),
+      reorderRepositories: vi.fn(),
     };
     const mockResolver = {
       resolveRepository: vi.fn(),
