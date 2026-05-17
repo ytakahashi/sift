@@ -22,6 +22,7 @@ import { useAutoRefresh } from '../hooks/sync/useAutoRefresh';
 import { usePaneFileActions } from '../hooks/panes/usePaneFileActions';
 import { useDiscardConfirmModal } from '../hooks/discard-confirm/useDiscardConfirmModal';
 import { DiscardConfirmModal } from '../components/discard-confirm/DiscardConfirmModal';
+import { AppHeader } from '../components/app-header/AppHeader';
 import type { AppDependencies } from '../composition/dependencies';
 
 export interface RepositoryViewerPageProps {
@@ -219,44 +220,35 @@ function RepositoryWorkspace({
 
   return (
     <div className="app-container">
-      <header className="app-header">
-        <div className="app-brand">
-          <button className="app-brand-home" onClick={onNavigateToRoot} type="button">
-            <img className="app-brand-logo" src="/favicon.svg" alt="" />
-            <h1 className="app-brand-title">Sift</h1>
-          </button>
-          {repository && (
-            <span className="app-repository-name" title={repository.path}>
-              {repository.name}
-            </span>
-          )}
-        </div>
-        <div className="app-header-actions">
-          {/* These errors come from different workflows. Splitting them into
-          contextual surfaces later would make the UI easier to act on. */}
-          {(repositoryError || diffError || actionError) && (
-            <span style={{ color: '#f85149' }}>{repositoryError || diffError || actionError}</span>
-          )}
-          {notesPanel.canOpen && (
-            <button className="button" onClick={notesPanel.toggle} type="button">
-              View Notes ({notes.length})
+      {/* These errors come from different workflows. Splitting them into
+      contextual surfaces later would make the UI easier to act on. */}
+      <AppHeader
+        onNavigateHome={onNavigateToRoot}
+        repositoryLabel={repository ? { name: repository.name, path: repository.path } : undefined}
+        errorMessage={repositoryError || diffError || actionError}
+        actions={
+          <>
+            {notesPanel.canOpen && (
+              <button className="button" onClick={notesPanel.toggle} type="button">
+                View Notes ({notes.length})
+              </button>
+            )}
+            <button className="button" onClick={refreshAll} type="button">
+              Refresh
             </button>
-          )}
-          <button className="button" onClick={refreshAll} type="button">
-            Refresh
-          </button>
-          <button
-            aria-label={repositorySidebarToggleLabel}
-            aria-pressed={isRepositorySidebarOpen}
-            className="button repository-sidebar-toggle-button"
-            onClick={onToggleRepositorySidebar}
-            title={repositorySidebarToggleLabel}
-            type="button"
-          >
-            <RepositorySidebarToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
-          </button>
-        </div>
-      </header>
+            <button
+              aria-label={repositorySidebarToggleLabel}
+              aria-pressed={isRepositorySidebarOpen}
+              className="button repository-sidebar-toggle-button"
+              onClick={onToggleRepositorySidebar}
+              title={repositorySidebarToggleLabel}
+              type="button"
+            >
+              <RepositorySidebarToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
+            </button>
+          </>
+        }
+      />
       <div style={{ position: 'relative' }}>
         {notesPanel.isOpen && (
           <NotesListModal
