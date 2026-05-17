@@ -106,6 +106,10 @@ function Page({
       repoId={repoId}
       onNavigateToRoot={vi.fn()}
       onSelectRepository={onSelectRepository}
+      tabs={[]}
+      onSelectTab={vi.fn()}
+      onCloseTab={vi.fn()}
+      onRepositoryResolved={vi.fn()}
     />
   );
 }

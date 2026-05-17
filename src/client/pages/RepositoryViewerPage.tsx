@@ -1,6 +1,8 @@
-import { useMemo, useState, type ReactElement } from 'react';
+import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowLeftToLine, ArrowRightFromLine, ArrowRightToLine } from 'lucide-react';
 import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
+import type { RepositoryTab } from '../presentation/repository-tabs/repository-tab';
+import { RepositoryTabs } from '../components/repository-tabs/RepositoryTabs';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
 import { FileList } from '../components/file-list/FileList';
@@ -30,6 +32,10 @@ export interface RepositoryViewerPageProps {
   repoId: RepositoryId;
   onNavigateToRoot: () => void;
   onSelectRepository: (repoId: RepositoryId) => void;
+  tabs: RepositoryTab[];
+  onSelectTab: (repoId: RepositoryId) => void;
+  onCloseTab: (repoId: RepositoryId) => void;
+  onRepositoryResolved: (repoId: RepositoryId, name: string) => void;
 }
 
 export function RepositoryViewerPage({
@@ -37,6 +43,10 @@ export function RepositoryViewerPage({
   repoId,
   onNavigateToRoot,
   onSelectRepository,
+  tabs,
+  onSelectTab,
+  onCloseTab,
+  onRepositoryResolved,
 }: RepositoryViewerPageProps): ReactElement {
   const [isRepositorySidebarOpen, setIsRepositorySidebarOpen] = useState(false);
   const repositoryList = useRepositoryList(dependencies.repositoryReader, {
@@ -68,6 +78,10 @@ export function RepositoryViewerPage({
       repositoryListConfigMissingError={repositoryList.configMissingError}
       repositoryListError={repositoryList.error}
       repositoryListLoading={repositoryList.loading}
+      tabs={tabs}
+      onSelectTab={onSelectTab}
+      onCloseTab={onCloseTab}
+      onRepositoryResolved={onRepositoryResolved}
     />
   );
 }
@@ -83,6 +97,10 @@ interface RepositoryWorkspaceProps {
   repositoryListConfigMissingError: string | null;
   repositoryListError: string | null;
   repositoryListLoading: boolean;
+  tabs: RepositoryTab[];
+  onSelectTab: (repoId: RepositoryId) => void;
+  onCloseTab: (repoId: RepositoryId) => void;
+  onRepositoryResolved: (repoId: RepositoryId, name: string) => void;
 }
 
 const DEFAULT_REPOSITORY_SIDEBAR_WIDTH_PX = 280;
@@ -113,6 +131,10 @@ function RepositoryWorkspace({
   repositoryListConfigMissingError,
   repositoryListError,
   repositoryListLoading,
+  tabs,
+  onSelectTab,
+  onCloseTab,
+  onRepositoryResolved,
 }: RepositoryWorkspaceProps): ReactElement {
   const [isFileListOpen, setIsFileListOpen] = useState(true);
   // Read `--repository-sidebar-width` once at mount. The CSS variable is a fixed
@@ -133,6 +155,11 @@ function RepositoryWorkspace({
     dependencies.repositoryReader,
     repoId,
   );
+  useEffect(() => {
+    if (repository) {
+      onRepositoryResolved(repoId, repository.name);
+    }
+  }, [onRepositoryResolved, repoId, repository]);
   const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
   const { refreshAll } = useRefreshController({
     workingFiles: serverWorkingFiles,
@@ -249,6 +276,7 @@ function RepositoryWorkspace({
           </>
         }
       />
+      <RepositoryTabs tabs={tabs} activeId={repoId} onSelect={onSelectTab} onClose={onCloseTab} />
       <div style={{ position: 'relative' }}>
         {notesPanel.isOpen && (
           <NotesListModal
