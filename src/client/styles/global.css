@@ -103,6 +103,11 @@ button.app-brand-home {
   flex-shrink: 0;
 }
 
+.app-header-error {
+  color: var(--danger-color);
+  font-size: 0.85rem;
+}
+
 .secondary-button {
   background: transparent;
   border: 1px solid var(--border-color);
@@ -437,13 +442,12 @@ button.app-brand-home {
   margin-bottom: 1rem;
 }
 
-.repository-selection-heading h2 {
+.repository-selection-heading h1 {
   font-size: 1.35rem;
   font-weight: 650;
 }
 
-.repository-selection-heading span,
-.repository-selection-status {
+.repository-selection-heading span {
   color: #8b949e;
   font-size: 0.85rem;
 }

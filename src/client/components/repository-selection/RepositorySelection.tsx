@@ -6,6 +6,7 @@ import type {
   RepositoryList,
   ResolvedRepository,
 } from '../../../domain/repository/repository';
+import { AppHeader } from '../app-header/AppHeader';
 
 export interface RepositorySelectionProps {
   addError: string | null;
@@ -344,28 +345,20 @@ export function RepositorySelection({
 
   return (
     <div className="app-container">
-      <header className="app-header">
-        <div className="app-brand">
-          <div className="app-brand-home">
-            <img className="app-brand-logo" src="/favicon.svg" alt="" />
-            <h1 className="app-brand-title">Sift</h1>
-          </div>
-        </div>
-        <div className="app-header-actions">
-          {/* Fetch errors mean the latest repository list is unknown, so show
-          them ahead of config-state messages derived from older or partial data. */}
-          {(error || configMissingError) && (
-            <span className="repository-selection-status">{error || configMissingError}</span>
-          )}
+      {/* Fetch errors mean the latest repository list is unknown, so show
+      them ahead of config-state messages derived from older or partial data. */}
+      <AppHeader
+        errorMessage={error || configMissingError}
+        actions={
           <button className="secondary-button" disabled={saving} onClick={onRefresh} type="button">
             Refresh
           </button>
-        </div>
-      </header>
+        }
+      />
       <main className="repository-selection-main">
         <section className="repository-selection-content">
           <div className="repository-selection-heading">
-            <h2>Repositories</h2>
+            <h1>Repositories</h1>
             <span>{loading ? 'Loading...' : `${itemCount} configured`}</span>
           </div>
           {itemCount > 0 ? (
