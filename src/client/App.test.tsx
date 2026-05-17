@@ -147,3 +147,87 @@ describe('App Routing', () => {
     });
   });
 });
+
+describe('App repository tabs', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.mocked(useDiffData).mockReturnValue({
+      workingFiles: [],
+      stagedFiles: [],
+      loading: false,
+      initialized: true,
+      error: null,
+      refresh: vi.fn(),
+    });
+  });
+
+  afterEach(() => {
+    cleanup();
+    window.history.pushState(null, '', '/');
+  });
+
+  it('opens a tab for the active repository on direct route load and shows the resolved name', async () => {
+    // Given: direct entry to a repository route
+    window.history.pushState(null, '', '/repos/my-app');
+
+    // When
+    render(<App dependencies={testDependencies} />);
+
+    // Then: the tab bar lists the repository once metadata resolves
+    expect(await screen.findByRole('navigation', { name: 'Open repositories' })).toBeDefined();
+    expect(await screen.findByRole('button', { name: 'my-app' })).toBeDefined();
+  });
+
+  it('navigates to selection when the only tab is closed', async () => {
+    // Given: viewing a repository
+    const user = userEvent.setup();
+    window.history.pushState(null, '', '/repos/my-app');
+    render(<App dependencies={testDependencies} />);
+    await screen.findByRole('button', { name: 'my-app' });
+
+    // When: the close button on the active tab is clicked
+    await user.click(screen.getByRole('button', { name: 'Close my-app' }));
+
+    // Then: the app navigates back to the selection page
+    expect(window.location.pathname).toBe('/');
+    expect(await screen.findByRole('heading', { name: 'Repositories' })).toBeDefined();
+  });
+
+  it('does not push a new history entry when the active tab is clicked', async () => {
+    // Given: viewing a repository, so its tab is active
+    const user = userEvent.setup();
+    window.history.pushState(null, '', '/repos/my-app');
+    render(<App dependencies={testDependencies} />);
+    await screen.findByRole('button', { name: 'my-app' });
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    // When: the user clicks the active tab again
+    await user.click(screen.getByRole('button', { name: 'my-app' }));
+
+    // Then: navigate is not invoked, so no duplicate URL is stacked on the
+    // browser history. Without this guard, pressing Back would step through
+    // the same view multiple times.
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    pushStateSpy.mockRestore();
+  });
+
+  it('keeps tabs visible when returning to the viewer from selection', async () => {
+    // Given: the user has opened a repository, then went back to selection
+    const user = userEvent.setup();
+    window.history.pushState(null, '', '/');
+    render(<App dependencies={testDependencies} />);
+    await user.click(await screen.findByRole('button', { name: /my-app/ }));
+    await screen.findByRole('navigation', { name: 'Open repositories' });
+
+    // When: the user returns to selection via the brand button
+    await user.click(screen.getByRole('button', { name: 'Sift' }));
+    expect(window.location.pathname).toBe('/');
+
+    // And then opens the same repository again
+    await user.click(await screen.findByRole('button', { name: /my-app/ }));
+
+    // Then: only one tab remains (no duplicate)
+    const tabBar = await screen.findByRole('navigation', { name: 'Open repositories' });
+    expect(tabBar.querySelectorAll('.repository-tab-item').length).toBe(1);
+  });
+});

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { useAppRoute } from './hooks/routing/useAppRoute';
+import { useRepositoryTabNavigation } from './hooks/useRepositoryTabNavigation';
 import { RepositorySelectionPage } from './pages/RepositorySelectionPage';
 import { RepositoryViewerPage } from './pages/RepositoryViewerPage';
 import type { AppDependencies } from './composition/dependencies';
@@ -9,10 +9,11 @@ interface AppProps {
 }
 
 function App({ dependencies }: AppProps): ReactElement {
-  const { navigate, navigateToSelection, route } = useAppRoute();
+  const { route, tabs, navigateToSelection, selectTab, closeTab, setTabName } =
+    useRepositoryTabNavigation();
 
   if (route.type === 'selection') {
-    return <RepositorySelectionPage dependencies={dependencies} onSelectRepository={navigate} />;
+    return <RepositorySelectionPage dependencies={dependencies} onSelectRepository={selectTab} />;
   }
 
   return (
@@ -20,7 +21,11 @@ function App({ dependencies }: AppProps): ReactElement {
       dependencies={dependencies}
       repoId={route.repoId}
       onNavigateToRoot={navigateToSelection}
-      onSelectRepository={navigate}
+      onSelectRepository={selectTab}
+      tabs={tabs}
+      onSelectTab={selectTab}
+      onCloseTab={closeTab}
+      onRepositoryResolved={setTabName}
     />
   );
 }
