@@ -43,11 +43,15 @@ export function useRepositoryList(
     }
   }, [repositoryReader]);
 
+  // Fetch-on-mount: `refresh` synchronously calls setLoading/setError before
+  // awaiting the repository list read. This is the intended sync between React
+  // and the server, not state derived from props that could be computed in render.
   useEffect(() => {
     if (!enabled) {
       return;
     }
 
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     void refresh();
   }, [enabled, refresh]);
 

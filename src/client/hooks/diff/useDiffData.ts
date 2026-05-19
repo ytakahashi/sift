@@ -58,7 +58,12 @@ export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDi
     }
   }, [diffReader, repoId]);
 
+  // Fetch-on-mount: `fetchDiffs` synchronously calls setLoading/setError before
+  // awaiting the network read. This is the intended behavior (sync external Git
+  // state into React) and there is no idiomatic way to express it without an
+  // effect-driven setState in this codebase.
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchDiffs();
   }, [fetchDiffs]);
 

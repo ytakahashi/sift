@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
 import {
   type FileActionResult,
@@ -25,11 +25,14 @@ interface UseOptimisticPaneFilesResult {
 export function useOptimisticPaneFiles(serverFiles: DiffFile[]): UseOptimisticPaneFilesResult {
   // One-way sync: propagate server data into the local mirror.
   // Optimistic removals are overwritten when the next server refresh arrives.
-  const [files, setFiles] = useState<DiffFile[]>([]);
-
-  useEffect(() => {
+  // Implemented as "adjust state during render" (React docs pattern) so we avoid
+  // an effect that would trigger a second render just to copy the prop.
+  const [files, setFiles] = useState<DiffFile[]>(serverFiles);
+  const [lastServerFiles, setLastServerFiles] = useState(serverFiles);
+  if (lastServerFiles !== serverFiles) {
+    setLastServerFiles(serverFiles);
     setFiles(serverFiles);
-  }, [serverFiles]);
+  }
 
   const runRemoveAction = useCallback(
     async (
