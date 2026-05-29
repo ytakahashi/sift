@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import { resolveRepoRoot } from './resolve-repo';
 import { openBrowser } from './open-browser';
+import { openApp } from './open-app';
 import { APP_INFO } from '../server/app-info';
 import { createRepositoryConfigUpdater, startServer } from '../server/index';
 
@@ -13,6 +14,7 @@ program
   .argument('[path]', 'Repository path used with --add (defaults to current directory)')
   .option('--add [path]', 'Add a repository to the local Sift config before starting')
   .option('-o, --open', 'Open the browser automatically')
+  .option('--app', 'Open the Sift macOS application')
   .action(async (targetPath, options) => {
     try {
       // Commander returns `true` for `sift --add` and a string for
@@ -28,6 +30,18 @@ program
         const updater = createRepositoryConfigUpdater();
         const addedRepository = await updater.addRepository(repoRoot);
         console.log(`Repository registered as "${addedRepository.id}".`);
+      }
+
+      // Check for conflicting options
+      if (options.app && options.open) {
+        throw new Error('Cannot specify both --app and --open.');
+      }
+
+      // Open the standalone desktop app if requested
+      if (options.app) {
+        await openApp();
+        console.log('Sift application opened.');
+        return;
       }
 
       // Start the local development/production server
