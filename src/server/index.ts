@@ -98,6 +98,11 @@ const defaultRuntime = createServerRuntime();
 export default defaultRuntime.app;
 
 export { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
+export { createRegisteredRepositoryLister } from './infrastructure/config/repository-config-lister-impl';
+export type {
+  RegisteredRepositoryLister,
+  RepositoryConfigUpdater,
+} from './services/repository-config';
 
 function buildServerApp(runtime: ServerRuntime, clientDir: string): Hono<Env> {
   const serverApp = new Hono<Env>();

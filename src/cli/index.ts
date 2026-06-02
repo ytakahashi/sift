@@ -4,6 +4,8 @@ import { openBrowser } from './open-browser';
 import { openApp } from './open-app';
 import { APP_INFO } from '../server/app-info';
 import { createRepositoryConfigUpdater, startServer } from '../server/index';
+import { buildRepositoryPath } from '../domain/repository/repository-route';
+import { resolveInitialRepositoryIdForLaunch } from './initial-repository';
 
 const program = new Command();
 
@@ -23,6 +25,14 @@ program
       const addTargetPath =
         typeof options.add === 'string' ? options.add : options.add ? (targetPath ?? '.') : null;
 
+      // Validate conflicting options before any side effects.
+      if (options.app && options.open) {
+        throw new Error('Cannot specify both --app and --open.');
+      }
+      if (addTargetPath && (options.app || options.open)) {
+        throw new Error('Cannot specify --add together with --app or --open.');
+      }
+
       if (addTargetPath) {
         console.log(`Resolving repository at: ${addTargetPath}`);
         const repoRoot = resolveRepoRoot(addTargetPath);
@@ -32,14 +42,15 @@ program
         console.log(`Repository registered as "${addedRepository.id}".`);
       }
 
-      // Check for conflicting options
-      if (options.app && options.open) {
-        throw new Error('Cannot specify both --app and --open.');
+      // Automatically resolve the current Git repository for direct launch routes.
+      let initialRepoId: string | null = null;
+      if (options.open || options.app) {
+        initialRepoId = await resolveInitialRepositoryIdForLaunch();
       }
 
       // Open the standalone desktop app if requested
       if (options.app) {
-        await openApp();
+        await openApp(initialRepoId ?? undefined);
         console.log('Sift application opened.');
         return;
       }
@@ -49,10 +60,12 @@ program
       console.log(`Server started at ${url}`);
 
       // Open browser optionally
+      const targetUrl = initialRepoId ? `${url}${buildRepositoryPath(initialRepoId)}` : url;
+
       if (options.open) {
-        openBrowser(url);
+        openBrowser(targetUrl);
       } else {
-        console.log(`Open ${url} in your browser to view the diff.`);
+        console.log(`Open ${targetUrl} in your browser to view the diff.`);
       }
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);

@@ -13,9 +13,7 @@ export type AppRoute = RepositoryRoute | RepositorySelectionRoute;
 
 const REPOSITORY_ROUTE_PATTERN = /^\/repos\/([^/]+)\/?$/;
 
-export function buildRepositoryPath(repoId: RepositoryId): string {
-  return `/repos/${encodeURIComponent(repoId)}`;
-}
+export { buildRepositoryPath } from '../../../domain/repository/repository-route';
 
 export function parseAppRoute(pathname: string): AppRoute | null {
   if (pathname === '/') {
