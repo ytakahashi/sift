@@ -47,7 +47,7 @@ available.
 
 **Options**:
 
-- `-o, --open`: Automatically open the browser after the server starts
+- `-b, --browser`: Automatically open the browser after the server starts
 
 ### Building for Production
 
