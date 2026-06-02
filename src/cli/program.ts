@@ -16,17 +16,19 @@ interface CliOptions {
   add?: string | boolean;
   app?: boolean;
   browser?: boolean;
+  server?: boolean;
 }
 
 export function createCliProgram(dependencies: CliDependencies): Command {
-  return new Command()
+  const program = new Command()
     .name(APP_INFO.name)
     .description(APP_INFO.description)
     .version(APP_INFO.version)
     .argument('[path]', 'Repository path used with --add (defaults to current directory)')
     .option('--add [path]', 'Add a repository to the local Sift config before starting')
+    .option('-s, --server', 'Start the local Sift server')
     .option('-b, --browser', 'Open the browser automatically')
-    .option('--app', 'Open the Sift macOS application')
+    .option('-a, --app', 'Open the Sift macOS application')
     .action(async (targetPath: string | undefined, options: CliOptions) => {
       // Commander returns `true` for `sift --add` and a string for
       // `sift --add /path`; bare `--add` should reuse the positional path so
@@ -38,10 +40,11 @@ export function createCliProgram(dependencies: CliDependencies): Command {
       if (options.app && options.browser) {
         throw new Error('Cannot specify both --app and --browser.');
       }
-      if (addTargetPath && (options.app || options.browser)) {
-        throw new Error('Cannot specify --add together with --app or --browser.');
+      if (options.app && options.server) {
+        throw new Error('Cannot specify both --app and --server.');
       }
 
+      let addedRepositoryId: string | null = null;
       if (addTargetPath) {
         console.log(`Resolving repository at: ${addTargetPath}`);
         const repoRoot = dependencies.resolveRepoRoot(addTargetPath);
@@ -49,12 +52,23 @@ export function createCliProgram(dependencies: CliDependencies): Command {
         const updater = dependencies.createRepositoryConfigUpdater();
         const addedRepository = await updater.addRepository(repoRoot);
         console.log(`Repository registered as "${addedRepository.id}".`);
+        addedRepositoryId = addedRepository.id;
       }
 
-      // Automatically resolve the current Git repository for direct launch routes.
+      const shouldStartServer = options.server || options.browser;
+      if (!shouldStartServer && !options.app) {
+        if (!addTargetPath) {
+          program.outputHelp();
+        }
+        return;
+      }
+
+      // Prefer the just-added repository so `--add` + `--browser`/`--app` opens
+      // exactly what the user pointed at, avoiding cwd-vs-add-path ambiguity.
       let initialRepoId: string | null = null;
       if (options.browser || options.app) {
-        initialRepoId = await dependencies.resolveInitialRepositoryIdForLaunch();
+        initialRepoId =
+          addedRepositoryId ?? (await dependencies.resolveInitialRepositoryIdForLaunch());
       }
 
       // Open the standalone desktop app if requested.
@@ -76,4 +90,6 @@ export function createCliProgram(dependencies: CliDependencies): Command {
         console.log(`Open ${targetUrl} in your browser to view the diff.`);
       }
     });
+
+  return program;
 }

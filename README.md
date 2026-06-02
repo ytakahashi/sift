@@ -6,26 +6,41 @@ A lightweight local diff viewer for inspecting changes
 
 ## ✨ Features
 
-- **3-Pane Interface**: Easily navigate between your Working Directory changes
-  and Staged Changes, while viewing the diff in the main viewer.
+- **3-Pane Interface**: Easily navigate between your Working Directory changes and Staged Changes,
+  while viewing the diff in the main viewer.
 - **Granular Git Actions**: Stage and unstage changes directly from the UI.
-- **Ephemeral Notes**: Add in-memory, session-only notes to specific lines of
-  code. This is perfect for jotting down self-reminders and double-checking your
-  work before it gets etched into your Git history.
-- **Fast & Local**: Runs entirely locally. Data never leaves your computer, and
-  directory traversal is strictly locked to your Git repository.
+- **Ephemeral Notes**: Add in-memory, session-only notes to specific lines of code. This is perfect
+  for jotting down self-reminders and double-checking your work before it gets etched into your Git
+  history.
+- **Fast & Local**: Runs entirely locally. Data never leaves your computer, and directory traversal
+  is strictly locked to your Git repository.
+
+## 📖 Usage
+
+```sh
+sift [options] [path]
+```
+
+**Options**:
+
+- `--add [path]`: Add a repository to the local Sift config before starting
+- `-s, --server`: Start the local Sift server
+- `-b, --browser`: Automatically open the browser after the server starts
+- `-a, --app`: Open the Sift macOS application
+- `-h, --help`: Show available options and usage
+
+**Arguments**:
+
+- `path`: Repository path used with --add (defaults to current directory)
 
 ## 🚀 Getting Started
 
 ### Prerequisites
 
-- Node.js / [pnpm](https://pnpm.io/)
-- Git installed and initialized in your project
+- Node.js
+- [pnpm](https://pnpm.io/)
 
 ### Installation
-
-1. Clone or download this repository.
-2. Install the dependencies:
 
 ```bash
 pnpm install
@@ -38,16 +53,6 @@ To start Sift in development mode (which utilizes Vite's dev server):
 ```bash
 pnpm run dev
 ```
-
-By default, `sift` will detect the root of your current Git repository and spin
-up a web server. It starts at `http://localhost:49321`; if that port is already
-in use, Sift automatically uses the next available port. If you set the `PORT`
-environment variable, Sift treats it as a fixed port and exits if it is not
-available.
-
-**Options**:
-
-- `-b, --browser`: Automatically open the browser after the server starts
 
 ### Building for Production
 
@@ -65,19 +70,15 @@ pnpm run start
 
 ### Installing Globally
 
-For the best experience, you can link the CLI tool globally so you can run it from any Git repository on your machine:
+For the best experience, you can link the CLI tool globally so you can run it from any Git
+repository on your machine:
 
 ```bash
 pnpm link --global
 ```
 
-Now you can start the viewer from any directory by simply running:
-
-```bash
-sift
-```
-
-> **Note**: If you change the source code, you only need to run `pnpm run build` in the project directory for the global `sift` command to pick up the latest changes.
+> **Note**: If you change the source code, you only need to run `pnpm run build` in the project
+> directory for the global `sift` command to pick up the latest changes.
 
 ### Code Quality (Linting & Formatting)
 
@@ -96,7 +97,6 @@ This project uses [Vitest](https://vitest.dev/) for unit testing.
 
 ## 🛠 Tech Stack
 
-- **Server**: [Hono](https://hono.dev/) handling routing and static file serving
-  on Node.js.
-- **Client**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) with
-  purely Vanilla CSS for modern, lightweight, and ultra-fast rendering.
+- **Server**: [Hono](https://hono.dev/) handling routing and static file serving on Node.js.
+- **Client**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) with purely Vanilla CSS for
+  modern, lightweight, and ultra-fast rendering.
