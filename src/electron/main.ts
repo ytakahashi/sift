@@ -1,6 +1,7 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { buildRepositoryPath } from '../domain/repository/repository-route';
 import { startServerWithHandle, type StartedServer } from '../server/index';
 
 // Resolve dist/client path, absorbing dev / packaged differences.
@@ -24,6 +25,15 @@ function ensureServer(): Promise<StartedServer> {
 async function launch(): Promise<void> {
   const { url } = await ensureServer();
 
+  let targetUrl = url;
+  const repoIdArg = process.argv.find((arg) => arg.startsWith('--repo-id='));
+  if (repoIdArg) {
+    const repoId = repoIdArg.split('=')[1];
+    if (repoId) {
+      targetUrl = `${url}${buildRepositoryPath(repoId)}`;
+    }
+  }
+
   const win = new BrowserWindow({
     width: 1280,
     height: 800,
@@ -33,7 +43,7 @@ async function launch(): Promise<void> {
       sandbox: true,
     },
   });
-  win.loadURL(url);
+  win.loadURL(targetUrl);
 }
 
 app

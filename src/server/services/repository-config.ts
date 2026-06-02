@@ -15,3 +15,8 @@ export interface RepositoryConfigUpdater {
   removeRepository(repoId: RepositoryId): Promise<void>;
   reorderRepositories(orderedIds: RepositoryId[]): Promise<void>;
 }
+
+export interface RegisteredRepositoryLister {
+  findRegisteredRepositoryByPath(repositoryPath: string): Promise<ResolvedRepository | null>;
+  listRegisteredRepositories(): Promise<ResolvedRepository[]>;
+}

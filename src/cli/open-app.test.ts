@@ -36,6 +36,22 @@ describe('openApp', () => {
     expect(mockExec).toHaveBeenCalledWith('open -b net.ytakahashi.sift', expect.any(Function));
   });
 
+  it('should call exec with repo-id argument on macOS when repoId is provided', async () => {
+    // Given
+    vi.mocked(os.platform).mockReturnValue('darwin');
+    const mockExec = vi.fn((_cmd, cb) => cb(null, { stdout: '', stderr: '' }));
+    vi.mocked(exec).mockImplementation(mockExec as unknown as typeof exec);
+
+    // When
+    await expect(openApp('repo-123')).resolves.not.toThrow();
+
+    // Then
+    expect(mockExec).toHaveBeenCalledWith(
+      'open -b net.ytakahashi.sift --args --repo-id=repo-123',
+      expect.any(Function),
+    );
+  });
+
   it('should throw an error if the app fails to open', async () => {
     // Given
     vi.mocked(os.platform).mockReturnValue('darwin');

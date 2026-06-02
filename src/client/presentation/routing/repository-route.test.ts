@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildRepositoryPath, parseAppRoute, parseRepositoryRoute } from './repository-route';
+import { parseAppRoute, parseRepositoryRoute } from './repository-route';
 
 describe('repository-route', () => {
   it('parses the root repository selection route', () => {
@@ -20,10 +20,5 @@ describe('repository-route', () => {
     // Given / When / Then
     expect(parseRepositoryRoute('/repos')).toBeNull();
     expect(parseRepositoryRoute('/repos/sift/diff')).toBeNull();
-  });
-
-  it('builds repository paths with URL-safe ids', () => {
-    // Given / When / Then
-    expect(buildRepositoryPath('my app')).toBe('/repos/my%20app');
   });
 });
