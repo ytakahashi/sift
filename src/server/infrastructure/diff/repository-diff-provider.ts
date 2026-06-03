@@ -5,6 +5,8 @@ import { parseDiff } from '../../../domain/diff/diff-parser';
 import type { DiffFile, FileBucket, DiffHunk, DiffLine } from '../../../domain/diff/types';
 import { GitClient } from '../git/git-client';
 
+const MAX_UNTRACKED_TEXT_DIFF_BYTES = 512 * 1024;
+
 export class RepositoryDiffProvider implements DiffProvider {
   private gitClient: GitClient;
 
@@ -32,41 +34,8 @@ export class RepositoryDiffProvider implements DiffProvider {
       try {
         const untrackedFiles = await this.gitClient.getUntrackedFiles();
         for (const file of untrackedFiles) {
-          const hunks: DiffHunk[] = [];
-          try {
-            const absolutePath = path.resolve(this.gitClient.repoRoot, file);
-            const content: string = await fs.readFile(absolutePath, 'utf8');
-            const lines: string[] = content.split('\n');
-            const diffLines: DiffLine[] = lines.map(
-              (line: string, idx: number): DiffLine => ({
-                id: `line-${file}-untracked-${idx}`,
-                type: 'add',
-                newLineNumber: idx + 1,
-                content: line,
-              }),
-            );
-            hunks.push({
-              id: `hunk-${file}-untracked`,
-              header: `@@ -0,0 +1,${lines.length} @@`,
-              oldStart: 0,
-              oldLines: 0,
-              newStart: 1,
-              newLines: lines.length,
-              lines: diffLines,
-            });
-          } catch (_error: unknown) {
-            // File might be binary or unreadable, leave hunks empty
-          }
-
-          files.push({
-            id: `file-${file}`,
-            bucket: 'working',
-            path: file,
-            status: 'untracked',
-            kind: 'text',
-            displayPath: file,
-            hunks,
-          });
+          const absolutePath = path.resolve(this.gitClient.repoRoot, file);
+          files.push(await this.createUntrackedFileDiff(file, absolutePath));
         }
       } catch (_error: unknown) {
         // Ignore error
@@ -74,5 +43,65 @@ export class RepositoryDiffProvider implements DiffProvider {
     }
 
     return files;
+  }
+
+  private async createUntrackedFileDiff(file: string, absolutePath: string): Promise<DiffFile> {
+    const hunks: DiffHunk[] = [];
+
+    try {
+      const stats = await fs.stat(absolutePath);
+      if (!stats.isFile() || stats.size > MAX_UNTRACKED_TEXT_DIFF_BYTES) {
+        return this.createUntrackedBinaryFile(file);
+      }
+
+      const contentBuffer = await fs.readFile(absolutePath);
+      if (contentBuffer.includes(0)) {
+        return this.createUntrackedBinaryFile(file);
+      }
+
+      const content = contentBuffer.toString('utf8');
+      const lines: string[] = content.split('\n');
+      const diffLines: DiffLine[] = lines.map(
+        (line: string, idx: number): DiffLine => ({
+          id: `line-${file}-untracked-${idx}`,
+          type: 'add',
+          newLineNumber: idx + 1,
+          content: line,
+        }),
+      );
+      hunks.push({
+        id: `hunk-${file}-untracked`,
+        header: `@@ -0,0 +1,${lines.length} @@`,
+        oldStart: 0,
+        oldLines: 0,
+        newStart: 1,
+        newLines: lines.length,
+        lines: diffLines,
+      });
+    } catch (_error: unknown) {
+      return this.createUntrackedBinaryFile(file);
+    }
+
+    return {
+      id: `file-${file}`,
+      bucket: 'working',
+      path: file,
+      status: 'untracked',
+      kind: 'text',
+      displayPath: file,
+      hunks,
+    };
+  }
+
+  private createUntrackedBinaryFile(file: string): DiffFile {
+    return {
+      id: `file-${file}`,
+      bucket: 'working',
+      path: file,
+      status: 'untracked',
+      kind: 'binary',
+      displayPath: file,
+      hunks: [],
+    };
   }
 }
