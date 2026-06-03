@@ -3,12 +3,21 @@ import { createRepoWatcher } from './repo-watcher-impl';
 
 type WatchHandler = () => void;
 
-const { closeMock, execFileMock, execFileSyncMock, watchMock } = vi.hoisted(() => ({
-  closeMock: vi.fn().mockResolvedValue(undefined),
-  execFileMock: vi.fn(),
-  execFileSyncMock: vi.fn(),
-  watchMock: vi.fn(),
-}));
+interface FakeStat {
+  size: number;
+  mtimeMs: number;
+}
+
+const { closeMock, execFileMock, execFileSyncMock, statMock, statSyncMock, watchMock } = vi.hoisted(
+  () => ({
+    closeMock: vi.fn().mockResolvedValue(undefined),
+    execFileMock: vi.fn(),
+    execFileSyncMock: vi.fn(),
+    statMock: vi.fn(),
+    statSyncMock: vi.fn(),
+    watchMock: vi.fn(),
+  }),
+);
 
 vi.mock('chokidar', () => ({
   default: {
@@ -19,6 +28,14 @@ vi.mock('chokidar', () => ({
 vi.mock('node:child_process', () => ({
   execFile: execFileMock,
   execFileSync: execFileSyncMock,
+}));
+
+vi.mock('node:fs', () => ({
+  statSync: statSyncMock,
+}));
+
+vi.mock('node:fs/promises', () => ({
+  stat: statMock,
 }));
 
 function createExecFileMock() {
@@ -55,6 +72,11 @@ function createExecFileMock() {
       return;
     }
 
+    if (command === 'ls-files -m -z') {
+      callback(null, { stdout: asyncModifiedTrackedOutput, stderr: '' });
+      return;
+    }
+
     callback(new Error(`Unexpected command: ${command}`), { stdout: '', stderr: '' });
   };
 }
@@ -65,8 +87,10 @@ let asyncHeadOutput = '';
 let asyncWorkingRawOutput = '';
 let asyncStagedRawOutput = '';
 let asyncUntrackedOutput = '';
+let asyncModifiedTrackedOutput = '';
 let statusGate: Promise<void> | null = null;
 let releaseStatusGate: (() => void) | null = null;
+let fakeStats = new Map<string, FakeStat>();
 
 describe('createRepoWatcher', () => {
   beforeEach(() => {
@@ -79,8 +103,26 @@ describe('createRepoWatcher', () => {
     asyncWorkingRawOutput = 'working-raw-initial\n';
     asyncStagedRawOutput = 'staged-raw-initial\n';
     asyncUntrackedOutput = '';
+    asyncModifiedTrackedOutput = '';
     statusGate = null;
     releaseStatusGate = null;
+    fakeStats = new Map();
+
+    statSyncMock.mockImplementation((filePath: string): FakeStat => {
+      const fakeStat = fakeStats.get(filePath);
+      if (!fakeStat) {
+        throw new Error(`Unexpected statSync path: ${filePath}`);
+      }
+      return fakeStat;
+    });
+
+    statMock.mockImplementation(async (filePath: string): Promise<FakeStat> => {
+      const fakeStat = fakeStats.get(filePath);
+      if (!fakeStat) {
+        throw new Error(`Unexpected stat path: ${filePath}`);
+      }
+      return fakeStat;
+    });
 
     execFileSyncMock.mockImplementation((_file: string, args: string[]) => {
       const command = args.join(' ');
@@ -102,6 +144,10 @@ describe('createRepoWatcher', () => {
       }
 
       if (command === 'ls-files --others --exclude-standard -z') {
+        return '';
+      }
+
+      if (command === 'ls-files -m -z') {
         return '';
       }
 
@@ -196,9 +242,9 @@ describe('createRepoWatcher', () => {
     await vi.advanceTimersByTimeAsync(200);
 
     // Then: the fingerprint commands are queried once for the burst
-    // (5 async Git calls per check: status, rev-parse HEAD,
-    //  working diff --raw, staged diff --raw, ls-files --others)
-    expect(execFileMock).toHaveBeenCalledTimes(5);
+    // (6 async Git calls per check: status, rev-parse HEAD,
+    //  working diff --raw, staged diff --raw, ls-files --others, ls-files -m)
+    expect(execFileMock).toHaveBeenCalledTimes(6);
     expect(onChanged).not.toHaveBeenCalled();
   });
 
@@ -215,6 +261,60 @@ describe('createRepoWatcher', () => {
 
     // Then: a repository change is reported even though status stayed the same
     expect(onChanged).toHaveBeenCalledTimes(1);
+  });
+
+  it('detects successive working-tree edits to the same tracked file', async () => {
+    // Given: a tracked file already marked modified, captured by the initial fingerprint.
+    // `git diff --raw` and `git status --porcelain=v2` both report the same structural
+    // line for any worktree modification (destination hash is `0000000`), so we rely on
+    // ls-files -m + stat metadata to differentiate successive edits.
+    asyncModifiedTrackedOutput = 'a.txt\0';
+    execFileSyncMock.mockImplementation((_file: string, args: string[]) => {
+      const command = args.join(' ');
+      if (command === 'ls-files -m -z') {
+        return 'a.txt\0';
+      }
+      if (command === 'status --porcelain=v2 --branch --untracked-files=all') {
+        return 'status-initial\n';
+      }
+      if (command === 'rev-parse HEAD') {
+        return 'HEAD-initial\n';
+      }
+      if (command === 'diff --raw --no-ext-diff --color=never') {
+        return 'working-raw-initial\n';
+      }
+      if (command === 'diff --raw --no-ext-diff --color=never --cached') {
+        return 'staged-raw-initial\n';
+      }
+      if (command === 'ls-files --others --exclude-standard -z') {
+        return '';
+      }
+      if (command === 'rev-parse --git-path index') return '.git/index\n';
+      if (command === 'rev-parse --git-path HEAD') return '.git/HEAD\n';
+      if (command === 'rev-parse --git-path refs') return '.git/refs\n';
+      if (command === 'rev-parse --git-path packed-refs') return '.git/packed-refs\n';
+      throw new Error(`Unexpected sync command: ${command}`);
+    });
+    fakeStats.set('/repo/root/a.txt', { size: 10, mtimeMs: 1_000 });
+
+    const onChanged = vi.fn();
+    createRepoWatcher('/repo/root', onChanged);
+
+    // When: the file is edited again — same ls-files -m output, different stat.
+    fakeStats.set('/repo/root/a.txt', { size: 25, mtimeMs: 2_000 });
+    allHandler?.();
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Then: the change is reported even though every Git command produced the same output.
+    expect(onChanged).toHaveBeenCalledTimes(1);
+
+    // When: another edit changes the stat again.
+    fakeStats.set('/repo/root/a.txt', { size: 25, mtimeMs: 3_000 });
+    allHandler?.();
+    await vi.advanceTimersByTimeAsync(200);
+
+    // Then: a second notification fires.
+    expect(onChanged).toHaveBeenCalledTimes(2);
   });
 
   it('stops the underlying chokidar watcher', async () => {

@@ -82,14 +82,12 @@ async function getDiffRaw(repoRoot: string, staged: boolean): Promise<string> {
   return await runGitCommand(repoRoot, args);
 }
 
-function getUntrackedMetadataSync(repoRoot: string): string {
-  // Git raw diff does not include untracked file content. Track path, size, and
-  // mtime so editing an existing untracked file still triggers a refresh.
-  const output = runGitCommandSync(repoRoot, ['ls-files', '--others', '--exclude-standard', '-z']);
-  return output
-    .split('\0')
-    .filter(Boolean)
-    .sort()
+function parseNulSeparatedPaths(output: string): string[] {
+  return output.split('\0').filter(Boolean).sort();
+}
+
+function buildPathMetadataSync(repoRoot: string, paths: string[]): string {
+  return paths
     .map((filePath) => {
       try {
         const fileStat = statSync(path.join(repoRoot, filePath));
@@ -101,6 +99,27 @@ function getUntrackedMetadataSync(repoRoot: string): string {
     .join('\n');
 }
 
+async function buildPathMetadata(repoRoot: string, paths: string[]): Promise<string> {
+  const entries = await Promise.all(
+    paths.map(async (filePath) => {
+      try {
+        const fileStat = await stat(path.join(repoRoot, filePath));
+        return `${filePath}\t${fileStat.size}\t${fileStat.mtimeMs}`;
+      } catch {
+        return `${filePath}\tmissing`;
+      }
+    }),
+  );
+  return entries.join('\n');
+}
+
+function getUntrackedMetadataSync(repoRoot: string): string {
+  // Git raw diff does not include untracked file content. Track path, size, and
+  // mtime so editing an existing untracked file still triggers a refresh.
+  const output = runGitCommandSync(repoRoot, ['ls-files', '--others', '--exclude-standard', '-z']);
+  return buildPathMetadataSync(repoRoot, parseNulSeparatedPaths(output));
+}
+
 async function getUntrackedMetadata(repoRoot: string): Promise<string> {
   // Mirror the sync untracked metadata path for runtime checks.
   const output = await runGitCommand(repoRoot, [
@@ -109,21 +128,23 @@ async function getUntrackedMetadata(repoRoot: string): Promise<string> {
     '--exclude-standard',
     '-z',
   ]);
-  const entries = await Promise.all(
-    output
-      .split('\0')
-      .filter(Boolean)
-      .sort()
-      .map(async (filePath) => {
-        try {
-          const fileStat = await stat(path.join(repoRoot, filePath));
-          return `${filePath}\t${fileStat.size}\t${fileStat.mtimeMs}`;
-        } catch {
-          return `${filePath}\tmissing`;
-        }
-      }),
-  );
-  return entries.join('\n');
+  return await buildPathMetadata(repoRoot, parseNulSeparatedPaths(output));
+}
+
+function getModifiedTrackedMetadataSync(repoRoot: string): string {
+  // `git diff --raw` reports working-tree changes as `:<mode> <mode> <hash> 0000000 M`,
+  // i.e. the destination hash is always zero. Two unrelated edits to the same tracked
+  // file therefore produce identical raw output and the structural fingerprint cannot
+  // tell them apart. Capture size + mtime of every modified-or-deleted tracked file so
+  // successive edits also flip the fingerprint.
+  const output = runGitCommandSync(repoRoot, ['ls-files', '-m', '-z']);
+  return buildPathMetadataSync(repoRoot, parseNulSeparatedPaths(output));
+}
+
+async function getModifiedTrackedMetadata(repoRoot: string): Promise<string> {
+  // Mirror the sync modified-tracked metadata path for runtime checks.
+  const output = await runGitCommand(repoRoot, ['ls-files', '-m', '-z']);
+  return await buildPathMetadata(repoRoot, parseNulSeparatedPaths(output));
 }
 
 function getGitStateFingerprintSync(repoRoot: string): string {
@@ -141,20 +162,37 @@ function getGitStateFingerprintSync(repoRoot: string): string {
   const workingRaw = getDiffRawSync(repoRoot, false);
   const stagedRaw = getDiffRawSync(repoRoot, true);
   const untrackedMetadata = getUntrackedMetadataSync(repoRoot);
-  return buildFingerprint([status, head.trim(), workingRaw, stagedRaw, untrackedMetadata]);
+  const modifiedTrackedMetadata = getModifiedTrackedMetadataSync(repoRoot);
+  return buildFingerprint([
+    status,
+    head.trim(),
+    workingRaw,
+    stagedRaw,
+    untrackedMetadata,
+    modifiedTrackedMetadata,
+  ]);
 }
 
 async function getGitStateFingerprint(repoRoot: string): Promise<string> {
   // Runtime fingerprint pieces can be computed independently, so run them in
   // parallel to keep auto-refresh latency low after a filesystem event.
-  const [status, head, workingRaw, stagedRaw, untrackedMetadata] = await Promise.all([
-    runGitCommand(repoRoot, ['status', '--porcelain=v2', '--branch', '--untracked-files=all']),
-    getHeadRevision(repoRoot),
-    getDiffRaw(repoRoot, false),
-    getDiffRaw(repoRoot, true),
-    getUntrackedMetadata(repoRoot),
+  const [status, head, workingRaw, stagedRaw, untrackedMetadata, modifiedTrackedMetadata] =
+    await Promise.all([
+      runGitCommand(repoRoot, ['status', '--porcelain=v2', '--branch', '--untracked-files=all']),
+      getHeadRevision(repoRoot),
+      getDiffRaw(repoRoot, false),
+      getDiffRaw(repoRoot, true),
+      getUntrackedMetadata(repoRoot),
+      getModifiedTrackedMetadata(repoRoot),
+    ]);
+  return buildFingerprint([
+    status,
+    head.trim(),
+    workingRaw,
+    stagedRaw,
+    untrackedMetadata,
+    modifiedTrackedMetadata,
   ]);
-  return buildFingerprint([status, head.trim(), workingRaw, stagedRaw, untrackedMetadata]);
 }
 
 function resolveGitPathSync(repoRoot: string, name: string): string {
