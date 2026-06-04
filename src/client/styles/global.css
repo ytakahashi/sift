@@ -117,6 +117,7 @@ button.app-brand-home {
 .repository-tab-list {
   display: flex;
   align-items: stretch;
+  width: 100%;
   list-style: none;
   margin: 0;
   padding: 0;
@@ -128,7 +129,6 @@ button.app-brand-home {
   align-items: center;
   flex: 1 1 0;
   min-width: 0;
-  max-width: 14rem;
   border-right: 1px solid var(--border-color);
   background-color: var(--header-bg);
   color: #8b949e;
