@@ -7,6 +7,8 @@
   --accent-color: #c93245;
   --success-color: #3ca251;
   --danger-color: #fd4845;
+  --diff-add-color: #3fb950;
+  --diff-delete-color: #f85149;
   --sidebar-default-width: 300px;
   --repository-sidebar-width: 280px;
   --pane-header-height: 34px;
@@ -478,15 +480,26 @@ button.app-brand-home {
 }
 
 .diff-line-stats-add {
-  color: #3fb950;
+  color: var(--diff-add-color);
 }
 
 .diff-line-stats-delete {
-  color: #f85149;
+  color: var(--diff-delete-color);
 }
 
 .pane-header-with-stats {
   gap: 0.5rem;
+}
+
+.pane-header-with-stats > span:first-child {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.pane-header-with-stats .diff-line-stats {
+  margin-left: auto;
 }
 
 .pane-content {
