@@ -7,6 +7,7 @@ import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
 import { FileList } from '../components/file-list/FileList';
 import { PaneBulkActions } from '../components/file-list/PaneBulkActions';
+import { DiffFilesLineStats, DiffLineStats } from '../components/diff/DiffLineStats';
 import { UnifiedDiffViewer } from '../components/diff/UnifiedDiffViewer';
 import { RepositorySidebar } from '../components/repository-sidebar/RepositorySidebar';
 import { useWorkspaceActions } from '../hooks/workspace-actions/useWorkspaceActions';
@@ -292,7 +293,10 @@ function RepositoryWorkspace({
           <>
             <div className="pane sidebar-container" ref={sidebarRef} style={sidebarStyle}>
               <div className="sidebar-panel" style={workingPaneStyle}>
-                <div className="pane-header">Working Directory ({workingFiles.length})</div>
+                <div className="pane-header pane-header-with-stats">
+                  <span>Working Directory ({workingFiles.length})</span>
+                  <DiffFilesLineStats files={workingFiles} />
+                </div>
                 <div className="pane-content" style={{ padding: 0 }}>
                   {loading && workingFiles.length === 0 ? (
                     <div style={{ padding: '1rem' }}>Loading...</div>
@@ -326,7 +330,10 @@ function RepositoryWorkspace({
               </div>
               <div {...paneSplitterProps} />
               <div className="sidebar-panel">
-                <div className="pane-header">Staged Changes ({stagedFiles.length})</div>
+                <div className="pane-header pane-header-with-stats">
+                  <span>Staged Changes ({stagedFiles.length})</span>
+                  <DiffFilesLineStats files={stagedFiles} />
+                </div>
                 <div className="pane-content" style={{ padding: 0 }}>
                   {loading && stagedFiles.length === 0 ? (
                     <div style={{ padding: '1rem' }}>Loading...</div>
@@ -371,7 +378,10 @@ function RepositoryWorkspace({
               >
                 <FileListToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
               </button>
-              <span>{selectedFile ? selectedFile.displayPath : 'Diff Viewer'}</span>
+              <span className="diff-header-file-name">
+                {selectedFile ? selectedFile.displayPath : 'Diff Viewer'}
+              </span>
+              {selectedFile && <DiffLineStats file={selectedFile} />}
             </div>
             {selectedFile && (
               <div style={{ display: 'flex', gap: '0.5rem' }}>

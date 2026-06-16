@@ -464,10 +464,29 @@ button.app-brand-home {
   gap: 0.5rem;
 }
 
-.diff-header-title-group span {
+.diff-header-file-name {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.diff-line-stats {
+  display: inline-flex;
+  flex: 0 0 auto;
+  gap: 0.35rem;
+  font-weight: 600;
+}
+
+.diff-line-stats-add {
+  color: #3fb950;
+}
+
+.diff-line-stats-delete {
+  color: #f85149;
+}
+
+.pane-header-with-stats {
+  gap: 0.5rem;
 }
 
 .pane-content {
