@@ -55,6 +55,53 @@ describe('RepositoryDiffProvider', () => {
     expect(files[0].hunks[0].lines.map((line) => line.content)).toEqual(['hello', 'world']);
   });
 
+  it('does not render a trailing newline in an untracked text file as an extra blank line', async () => {
+    // Given: an untracked text file ends with the conventional newline terminator
+    statMock.mockResolvedValue(createStats(12));
+    readFileMock.mockResolvedValue(Buffer.from('hello\nworld\n', 'utf8'));
+    const provider = createProvider(['notes.txt']);
+
+    // When
+    const files = await provider.getFiles('working');
+
+    // Then
+    expect(files[0].hunks[0].newLines).toBe(2);
+    expect(files[0].hunks[0].lines.map((line) => line.content)).toEqual(['hello', 'world']);
+  });
+
+  it('preserves intentional blank lines before the trailing newline in untracked text files', async () => {
+    // Given: the file has an actual blank line before the final newline terminator
+    statMock.mockResolvedValue(createStats(7));
+    readFileMock.mockResolvedValue(Buffer.from('hello\n\n', 'utf8'));
+    const provider = createProvider(['notes.txt']);
+
+    // When
+    const files = await provider.getFiles('working');
+
+    // Then
+    expect(files[0].hunks[0].newLines).toBe(2);
+    expect(files[0].hunks[0].lines.map((line) => line.content)).toEqual(['hello', '']);
+  });
+
+  it('keeps empty untracked text files visible without adding a synthetic blank line', async () => {
+    // Given: an untracked text file has no content
+    statMock.mockResolvedValue(createStats(0));
+    readFileMock.mockResolvedValue(Buffer.from('', 'utf8'));
+    const provider = createProvider(['empty.txt']);
+
+    // When
+    const files = await provider.getFiles('working');
+
+    // Then
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({
+      path: 'empty.txt',
+      status: 'untracked',
+      kind: 'text',
+      hunks: [],
+    });
+  });
+
   it('marks untracked binary files as binary instead of rendering their bytes as text', async () => {
     // Given: an untracked file has binary-looking bytes
     statMock.mockResolvedValue(createStats(5));

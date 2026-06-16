@@ -7,6 +7,20 @@ import { GitClient } from '../git/git-client';
 
 const MAX_UNTRACKED_TEXT_DIFF_BYTES = 512 * 1024;
 
+function splitTextFileLines(content: string): string[] {
+  if (content === '') {
+    return [];
+  }
+
+  const lines = content.split('\n');
+  if (content.endsWith('\n')) {
+    // A trailing newline is a line terminator, not an empty final line.
+    lines.pop();
+  }
+
+  return lines;
+}
+
 export class RepositoryDiffProvider implements DiffProvider {
   private gitClient: GitClient;
 
@@ -60,7 +74,7 @@ export class RepositoryDiffProvider implements DiffProvider {
       }
 
       const content = contentBuffer.toString('utf8');
-      const lines: string[] = content.split('\n');
+      const lines = splitTextFileLines(content);
       const diffLines: DiffLine[] = lines.map(
         (line: string, idx: number): DiffLine => ({
           id: `line-${file}-untracked-${idx}`,
@@ -69,15 +83,17 @@ export class RepositoryDiffProvider implements DiffProvider {
           content: line,
         }),
       );
-      hunks.push({
-        id: `hunk-${file}-untracked`,
-        header: `@@ -0,0 +1,${lines.length} @@`,
-        oldStart: 0,
-        oldLines: 0,
-        newStart: 1,
-        newLines: lines.length,
-        lines: diffLines,
-      });
+      if (diffLines.length > 0) {
+        hunks.push({
+          id: `hunk-${file}-untracked`,
+          header: `@@ -0,0 +1,${lines.length} @@`,
+          oldStart: 0,
+          oldLines: 0,
+          newStart: 1,
+          newLines: lines.length,
+          lines: diffLines,
+        });
+      }
     } catch (_error: unknown) {
       return this.createUntrackedBinaryFile(file);
     }
