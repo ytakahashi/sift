@@ -14,6 +14,7 @@ function splitTextFileLines(content: string): string[] {
 
   const lines = content.split('\n');
   if (content.endsWith('\n')) {
+    // A trailing newline is a line terminator, not an empty final line.
     lines.pop();
   }
 
