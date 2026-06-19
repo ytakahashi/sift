@@ -51,6 +51,7 @@ describe('useDiffData', () => {
     });
     expect(result.current.workingFiles).toEqual([workingFile]);
     expect(result.current.stagedFiles).toEqual([stagedFile]);
+    expect(result.current.repoRoot).toBe('/repo/sift');
     expect(result.current.initialized).toBe(true);
     expect(result.current.error).toBeNull();
     expect(diffReader.fetchDiff).toHaveBeenCalledWith('sift');
@@ -101,5 +102,6 @@ describe('useDiffData', () => {
     expect(firstResult).toBeNull();
     expect(secondResult!.workingFiles.map((file) => file.id)).toEqual(['latest']);
     expect(result.current.workingFiles.map((file) => file.id)).toEqual(['latest']);
+    expect(result.current.repoRoot).toBe('/repo/sift');
   });
 });

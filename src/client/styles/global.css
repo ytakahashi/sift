@@ -541,6 +541,54 @@ button.app-brand-home {
   border-left: 3px solid var(--accent-color);
 }
 
+.file-path-context-menu {
+  position: fixed;
+  z-index: 200;
+  display: grid;
+  min-width: 190px;
+  padding: 0.3rem;
+  background: #161b22;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+
+.file-path-context-menu-item {
+  width: 100%;
+  padding: 0.4rem 0.55rem;
+  color: var(--text-color);
+  font: inherit;
+  font-size: 0.82rem;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.file-path-context-menu-item:hover,
+.file-path-context-menu-item:focus-visible {
+  background: var(--border-color);
+  outline: none;
+}
+
+.file-path-context-menu-item:disabled {
+  cursor: default;
+}
+
+.file-path-copy-tooltip {
+  position: absolute;
+  bottom: calc(100% + 4px);
+  left: 50%;
+  padding: 0.2rem 0.4rem;
+  color: #fff;
+  white-space: nowrap;
+  background: #373434;
+  border-radius: 4px;
+  transform: translateX(-50%);
+  animation: fadeIn 0.2s ease-in-out;
+}
+
 .repository-selection-main {
   flex: 1;
   overflow: auto;
