@@ -124,6 +124,7 @@ describe('RepositoryViewerPage interactions', () => {
   const discardWorkingFile = vi.fn(async () => {});
   const discardAllWorkingFiles = vi.fn(async () => {});
   let diffState: {
+    repoRoot: string | null;
     workingFiles: DiffFile[];
     stagedFiles: DiffFile[];
     loading: boolean;
@@ -135,6 +136,7 @@ describe('RepositoryViewerPage interactions', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     diffState = {
+      repoRoot: '/Users/dev/projects/my-app',
       workingFiles: [
         createFile('a', 'working'),
         createFile('b', 'working'),
@@ -614,6 +616,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       configurable: true,
     });
     vi.mocked(useDiffData).mockReturnValue({
+      repoRoot: '/Users/dev/projects/my-app',
       workingFiles: [],
       stagedFiles: [],
       loading: false,

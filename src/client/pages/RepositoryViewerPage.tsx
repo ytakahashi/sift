@@ -143,6 +143,7 @@ function RepositoryWorkspace({
   // Revisit if the variable becomes responsive (e.g., changes via media query).
   const repositorySidebarWidthPx = useMemo(() => resolveRepositorySidebarWidthPx(), []);
   const {
+    repoRoot,
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
     loading,
@@ -303,6 +304,7 @@ function RepositoryWorkspace({
                   ) : (
                     <FileList
                       files={workingFiles}
+                      repoRoot={repoRoot}
                       selectedFileId={paneMode === 'working' ? (selectedFile?.id ?? null) : null}
                       disabled={acting}
                       isActive={paneMode === 'working'}
@@ -340,6 +342,7 @@ function RepositoryWorkspace({
                   ) : (
                     <FileList
                       files={stagedFiles}
+                      repoRoot={repoRoot}
                       selectedFileId={paneMode === 'staged' ? (selectedFile?.id ?? null) : null}
                       disabled={acting}
                       isActive={paneMode === 'staged'}

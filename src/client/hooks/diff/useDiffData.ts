@@ -4,6 +4,8 @@ import type { RepositoryId } from '../../../domain/repository/repository';
 import type { DiffReader } from '../../application/ports';
 
 export interface UseDiffDataResult {
+  /** Absolute repository root returned with the latest accepted diff read. */
+  repoRoot: string | null;
   /** Files with unstaged working-tree changes returned by the latest accepted diff read. */
   workingFiles: DiffFile[];
   /** Files with staged index changes returned by the latest accepted diff read. */
@@ -19,6 +21,7 @@ export interface UseDiffDataResult {
 }
 
 export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDiffDataResult {
+  const [repoRoot, setRepoRoot] = useState<string | null>(null);
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -44,6 +47,7 @@ export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDi
 
       setWorkingFiles(result.workingFiles);
       setStagedFiles(result.stagedFiles);
+      setRepoRoot(result.metadata.repoRoot);
       return result;
     } catch (err: unknown) {
       if (requestId === latestRequestId.current) {
@@ -67,5 +71,13 @@ export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDi
     fetchDiffs();
   }, [fetchDiffs]);
 
-  return { workingFiles, stagedFiles, loading, initialized, error, refresh: fetchDiffs };
+  return {
+    repoRoot,
+    workingFiles,
+    stagedFiles,
+    loading,
+    initialized,
+    error,
+    refresh: fetchDiffs,
+  };
 }

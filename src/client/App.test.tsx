@@ -87,6 +87,7 @@ describe('App Routing', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useDiffData).mockReturnValue({
+      repoRoot: '/repo/my-app',
       workingFiles: [],
       stagedFiles: [],
       loading: false,
@@ -152,6 +153,7 @@ describe('App repository tabs', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.mocked(useDiffData).mockReturnValue({
+      repoRoot: '/repo/my-app',
       workingFiles: [],
       stagedFiles: [],
       loading: false,

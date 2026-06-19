@@ -1,15 +1,24 @@
-import { useEffect, useRef, type ReactElement } from 'react';
+import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
+import { resolveAbsoluteFilePath } from '../../presentation/file-list/file-path';
+import { FilePathContextMenu } from './FilePathContextMenu';
 import { useFileListController } from './useFileListController';
 
 interface FileListProps {
   files: DiffFile[];
+  repoRoot: string | null;
   selectedFileId: string | null;
   onSelect: (file: DiffFile) => void;
   onActivate: (file: DiffFile) => void;
   disabled?: boolean;
   isActive?: boolean;
   onBoundaryNavigate?: (direction: 'previous' | 'next') => void;
+}
+
+interface FilePathContextMenuState {
+  clientX: number;
+  clientY: number;
+  file: DiffFile;
 }
 
 function getStatusColor(status: string): string {
@@ -29,6 +38,7 @@ function getStatusColor(status: string): string {
 
 export function FileList({
   files,
+  repoRoot,
   selectedFileId,
   onSelect,
   onActivate,
@@ -37,6 +47,10 @@ export function FileList({
   onBoundaryNavigate,
 }: FileListProps): ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
+  const [contextMenu, setContextMenu] = useState<FilePathContextMenuState | null>(null);
+  const closeContextMenu = useCallback((): void => {
+    setContextMenu(null);
+  }, []);
   const { onKeyDown } = useFileListController({
     files,
     selectedFileId,
@@ -98,6 +112,15 @@ export function FileList({
                 onActivate(file);
               }
             }}
+            onContextMenu={(event) => {
+              event.preventDefault();
+              onSelect(file);
+              setContextMenu({
+                clientX: event.clientX,
+                clientY: event.clientY,
+                file,
+              });
+            }}
             style={{
               cursor: disabled ? 'default' : 'pointer',
               opacity: disabled ? 0.7 : 1,
@@ -134,6 +157,15 @@ export function FileList({
           </div>
         );
       })}
+      {contextMenu && (
+        <FilePathContextMenu
+          absolutePath={repoRoot ? resolveAbsoluteFilePath(repoRoot, contextMenu.file.path) : null}
+          clientX={contextMenu.clientX}
+          clientY={contextMenu.clientY}
+          onClose={closeContextMenu}
+          relativePath={contextMenu.file.path}
+        />
+      )}
     </div>
   );
 }
