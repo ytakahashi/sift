@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
 import { resolveAbsoluteFilePath } from '../../presentation/file-list/file-path';
+import { FilePathLabel } from './FilePathLabel';
 import { FilePathContextMenu } from './FilePathContextMenu';
 import { useFileListController } from './useFileListController';
 
@@ -91,8 +92,11 @@ export function FileList({
     >
       {files.map((file) => {
         const isSelected = selectedFileId === file.id;
+        const fullPathLabel = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+        const statusLabel = file.status.charAt(0).toUpperCase();
         return (
           <div
+            aria-label={`${fullPathLabel}${statusLabel}`}
             key={file.id}
             id={`file-item-${file.id}`}
             className={`file-item ${isSelected ? 'selected' : ''}`}
@@ -126,23 +130,7 @@ export function FileList({
               opacity: disabled ? 0.7 : 1,
             }}
           >
-            <span
-              style={{
-                textOverflow: 'ellipsis',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                flex: 1,
-              }}
-              title={file.oldPath ? `${file.oldPath} -> ${file.path}` : file.path}
-            >
-              {file.oldPath ? (
-                <span>
-                  <span style={{ opacity: 0.6 }}>{file.oldPath}</span> &rarr; {file.path}
-                </span>
-              ) : (
-                file.path
-              )}
-            </span>
+            <FilePathLabel oldPath={file.oldPath} path={file.path} />
             <span
               className="status-badge"
               style={{
@@ -152,7 +140,7 @@ export function FileList({
                 fontWeight: 600,
               }}
             >
-              {file.status.charAt(0).toUpperCase()}
+              {statusLabel}
             </span>
           </div>
         );
