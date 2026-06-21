@@ -536,9 +536,50 @@ button.app-brand-home {
   border-left: 3px solid transparent;
 }
 
+.file-item-path {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-item-path-measure {
+  position: absolute;
+  width: max-content;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+.file-item-old-path {
+  opacity: 0.6;
+}
+
+.status-badge {
+  flex: 0 0 auto;
+}
+
 .file-item.selected {
   background-color: rgba(201, 50, 69, 0.15);
   border-left: 3px solid var(--accent-color);
+}
+
+.file-path-tooltip {
+  position: fixed;
+  z-index: 210;
+  max-width: calc(100vw - 16px);
+  padding: 0.35rem 0.5rem;
+  overflow-wrap: anywhere;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 400;
+  background: #373434;
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  pointer-events: none;
+  animation: fadeIn 0.12s ease-in-out;
 }
 
 .file-path-context-menu {

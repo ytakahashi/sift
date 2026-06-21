@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveAbsoluteFilePath } from './file-path';
+import { abbreviateFilePath, resolveAbsoluteFilePath } from './file-path';
 
 describe('resolveAbsoluteFilePath', () => {
   it('joins a POSIX repository root and relative path', () => {
@@ -34,5 +34,40 @@ describe('resolveAbsoluteFilePath', () => {
 
     // Then
     expect(result).toBe(String.raw`C:\Users\dev\projects\sift\src\client\App.tsx`);
+  });
+});
+
+describe('abbreviateFilePath', () => {
+  it('keeps a root-level file name unchanged', () => {
+    // Given: a file at the repository root
+    const filePath = 'VeryLongRootFileName.ts';
+
+    // When
+    const result = abbreviateFilePath(filePath);
+
+    // Then
+    expect(result).toBe(filePath);
+  });
+
+  it('keeps only the file name for a nested POSIX path', () => {
+    // Given: a nested Git-style file path
+    const filePath = 'src/client/components/file-list/FileList.tsx';
+
+    // When
+    const result = abbreviateFilePath(filePath);
+
+    // Then
+    expect(result).toBe('.../FileList.tsx');
+  });
+
+  it('keeps only the file name for a nested Windows path', () => {
+    // Given: a nested Windows-style file path
+    const filePath = String.raw`src\client\components\FileList.tsx`;
+
+    // When
+    const result = abbreviateFilePath(filePath);
+
+    // Then
+    expect(result).toBe('.../FileList.tsx');
   });
 });

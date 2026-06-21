@@ -19,9 +19,27 @@ function createFile(id: string): DiffFile {
 describe('FileList', () => {
   const files = [createFile('a'), createFile('b'), createFile('c')];
   const originalClipboard = navigator.clipboard;
+  const originalClientWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'clientWidth');
+  const originalScrollWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, 'scrollWidth');
   let writeText: ReturnType<typeof vi.fn>;
+  let pathContainerWidth: number;
+  let pathMeasureWidth: number;
 
   beforeEach(() => {
+    pathContainerWidth = 300;
+    pathMeasureWidth = 100;
+    Object.defineProperty(HTMLElement.prototype, 'clientWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('file-item-path') ? pathContainerWidth : 0;
+      },
+    });
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        return this.classList?.contains('file-item-path-measure') ? pathMeasureWidth : 0;
+      },
+    });
     writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, 'clipboard', {
       value: {
@@ -45,6 +63,194 @@ describe('FileList', () => {
       // @ts-expect-error: cleanup requires deletion of mocked property
       delete navigator.clipboard;
     }
+    if (originalClientWidth) {
+      Object.defineProperty(HTMLElement.prototype, 'clientWidth', originalClientWidth);
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, 'clientWidth');
+    }
+    if (originalScrollWidth) {
+      Object.defineProperty(HTMLElement.prototype, 'scrollWidth', originalScrollWidth);
+    } else {
+      Reflect.deleteProperty(HTMLElement.prototype, 'scrollWidth');
+    }
+  });
+
+  it('abbreviates an overflowing path and shows its full value after 500ms hover', () => {
+    // Given: a nested path wider than the available file-list row
+    vi.useFakeTimers();
+    pathContainerWidth = 120;
+    pathMeasureWidth = 400;
+    const file = {
+      ...createFile('long-file'),
+      path: 'src/client/components/file-list/LongFileName.tsx',
+      displayPath: 'src/client/components/file-list/LongFileName.tsx',
+    };
+    render(
+      <FileList
+        files={[file]}
+        repoRoot="/repo/sift"
+        selectedFileId={file.id}
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    const abbreviatedPath = screen.getByText('.../LongFileName.tsx', {
+      selector: '.file-item-path-visible',
+    });
+
+    // When: the pointer remains over the abbreviated path for less than 500ms
+    fireEvent.mouseEnter(abbreviatedPath);
+    act(() => {
+      vi.advanceTimersByTime(499);
+    });
+
+    // Then: the full-path tooltip is not shown yet
+    expect(screen.queryByRole('tooltip')).toBeNull();
+
+    // When: the 500ms delay elapses
+    act(() => {
+      vi.advanceTimersByTime(1);
+    });
+
+    // Then: the complete path is shown and remains the option's accessible name
+    expect(screen.getByRole('tooltip').textContent).toBe(file.path);
+    expect(screen.getByRole('option', { name: `${file.path}M` })).toBeDefined();
+
+    // When: the pointer leaves the path
+    fireEvent.mouseLeave(abbreviatedPath);
+
+    // Then: the tooltip closes immediately
+    expect(screen.queryByRole('tooltip')).toBeNull();
+  });
+
+  it('restores the full path when the file-list row becomes wide enough', () => {
+    // Given: a path initially wider than its row
+    pathContainerWidth = 120;
+    pathMeasureWidth = 400;
+    const file = {
+      ...createFile('responsive-file'),
+      path: 'src/client/components/file-list/ResponsiveFile.tsx',
+      displayPath: 'src/client/components/file-list/ResponsiveFile.tsx',
+    };
+    render(
+      <FileList
+        files={[file]}
+        repoRoot="/repo/sift"
+        selectedFileId={file.id}
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+    expect(
+      screen.getByText('.../ResponsiveFile.tsx', {
+        selector: '.file-item-path-visible',
+      }),
+    ).toBeDefined();
+
+    // When: the sidebar becomes wide enough for the complete path
+    pathContainerWidth = 500;
+    fireEvent(window, new Event('resize'));
+
+    // Then: the complete path is restored
+    expect(
+      screen.getByText(file.path, {
+        selector: '.file-item-path-visible',
+      }),
+    ).toBeDefined();
+  });
+
+  it('restores the full path through ResizeObserver when the container widens', () => {
+    // Given: a ResizeObserver stub that exposes its callback, since jsdom has
+    // none and sidebar drag-resize changes the row width without firing a
+    // window resize event — the production restore path relies on the observer.
+    let observerCallback: ResizeObserverCallback | null = null;
+    const observe = vi.fn();
+    const disconnect = vi.fn();
+    class ResizeObserverStub {
+      constructor(callback: ResizeObserverCallback) {
+        observerCallback = callback;
+      }
+      observe = observe;
+      unobserve = vi.fn();
+      disconnect = disconnect;
+    }
+    const originalResizeObserver = globalThis.ResizeObserver;
+    globalThis.ResizeObserver = ResizeObserverStub as unknown as typeof ResizeObserver;
+
+    try {
+      pathContainerWidth = 120;
+      pathMeasureWidth = 400;
+      const file = {
+        ...createFile('observed-file'),
+        path: 'src/client/components/file-list/ObservedFile.tsx',
+        displayPath: 'src/client/components/file-list/ObservedFile.tsx',
+      };
+      render(
+        <FileList
+          files={[file]}
+          repoRoot="/repo/sift"
+          selectedFileId={file.id}
+          onSelect={vi.fn()}
+          onActivate={vi.fn()}
+        />,
+      );
+
+      // Then: the observer is wired to the path container and the path is abbreviated
+      expect(observe).toHaveBeenCalledTimes(1);
+      expect(
+        screen.getByText('.../ObservedFile.tsx', {
+          selector: '.file-item-path-visible',
+        }),
+      ).toBeDefined();
+
+      // When: the container widens and the observer reports the new size
+      pathContainerWidth = 500;
+      act(() => {
+        observerCallback?.([], {} as ResizeObserver);
+      });
+
+      // Then: the complete path is restored without a window resize event
+      expect(
+        screen.getByText(file.path, {
+          selector: '.file-item-path-visible',
+        }),
+      ).toBeDefined();
+    } finally {
+      globalThis.ResizeObserver = originalResizeObserver;
+    }
+  });
+
+  it('abbreviates both sides of an overflowing renamed path', () => {
+    // Given: a renamed path wider than the available row
+    pathContainerWidth = 120;
+    pathMeasureWidth = 500;
+    const file = {
+      ...createFile('renamed-file'),
+      path: 'src/client/new-location/NewFile.tsx',
+      oldPath: 'src/client/old-location/OldFile.tsx',
+      displayPath: 'src/client/new-location/NewFile.tsx',
+      status: 'renamed' as const,
+    };
+
+    render(
+      <FileList
+        files={[file]}
+        repoRoot="/repo/sift"
+        selectedFileId={file.id}
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    // Then: both paths retain their file names while omitting directories
+    const visiblePath = document.querySelector('.file-item-path-visible');
+    expect(visiblePath?.textContent).toBe('.../OldFile.tsx → .../NewFile.tsx');
+    expect(
+      screen.getByRole('option', {
+        name: `${file.oldPath} → ${file.path}R`,
+      }),
+    ).toBeDefined();
   });
 
   it('selects on single click and activates on double click', async () => {
