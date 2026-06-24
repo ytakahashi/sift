@@ -3,7 +3,7 @@ import {
   createRepositoryConfigUpdater,
   type RegisteredRepositoryLister,
   type RepositoryConfigUpdater,
-} from '../server/index';
+} from '../../server/index';
 import { resolveRepoRoot } from './resolve-repo';
 
 interface Logger {

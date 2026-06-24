@@ -4,5 +4,5 @@
     "outDir": "./dist/electron",
     "rootDir": "./src"
   },
-  "include": ["src/electron", "src/server", "src/domain", "src/local-config"]
+  "include": ["src/entrypoints/electron", "src/server", "src/domain", "src/local-config"]
 }

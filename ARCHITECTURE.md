@@ -12,21 +12,29 @@ The application consists of:
 
 ```text
 src/
-├── cli/          # CLI entry point (commander, repo resolution, browser opener)
-├── electron/     # Electron main process entry point (standalone GUI app)
+├── entrypoints/  # Program entry points that host the product on a runtime
+│   ├── cli/        # CLI entry point (commander, repo resolution, browser opener)
+│   └── electron/   # Electron main process entry point (standalone GUI app)
 ├── server/       # Hono HTTP server (routes, services, watch, infrastructure)
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
 └── domain/       # Pure business logic and models shared across server and client
 ```
 
+Code shared between sibling entry points lives in an `entrypoints/shared/` subdirectory, introduced
+when the first such dependency appears.
+
+`domain/`, `server/`, and `client/` are the building-block libraries; `entrypoints/*` are the
+runnable deliverables that compose them for a specific runtime (CLI today, Electron desktop app, and
+potentially others such as a VS Code extension).
+
 Top-level dependency rules:
 
 - `domain/` contains pure logic with no framework, Node.js, browser, or infrastructure dependencies.
 - `server/` depends on `domain/` and Node.js APIs. It must not import from `client/`.
-- `client/` depends on `domain/` and React. It must not import from `server/` or `cli/`.
-- `cli/` is the entry point. It wires together `server/` and launches the HTTP server.
-- `electron/` is the Electron main process entry point. It wires together `server/` and manages the
-  BrowserWindow lifecycle. Its only external dependency is the `electron` package.
+- `client/` depends on `domain/` and React. It must not import from `server/` or `entrypoints/`.
+- `entrypoints/` groups the program entry points. Each entry point wires together `server/` (and, for
+  GUI runtimes, renders `client/`) for one runtime. See the Entry Points Layer below for the rules
+  among its subdirectories.
 
 ## Dependency Overview
 
@@ -35,14 +43,17 @@ graph TD
     domain
     server
     client
-    cli
-    electron
 
-    cli --> domain
+    subgraph entrypoints
+        cli
+        electron
+    end
+
     client --> domain
     server --> domain
-    electron --> domain
+    cli --> domain
     cli --> server
+    electron --> domain
     electron --> server
 ```
 
@@ -67,33 +78,40 @@ Disallowed dependencies:
 
 - Other directories, External modules, Node.js APIs, Browser runtime APIs
 
-## CLI Layer
+## Entry Points Layer
 
-`cli/` contains the command-line entry point, repository resolution, local config editing, and
-browser/server startup wiring.
+`entrypoints/` groups the program entry points that turn the building-block layers into a runnable
+product for a specific runtime. Each subdirectory is one such entry point; `shared/` holds the
+contract common to them.
 
-Allowed dependencies:
+The only dependency allowed between sibling entry points is through `shared/`: an entry point must
+not import from another entry point directly (e.g. `cli/` must not import from `electron/`).
 
-- `domain/`, `server/`
-- Node.js APIs
+### `entrypoints/shared/`
 
-Disallowed dependencies:
+Contract shared between entry points that is not domain business logic. Introduced when the first
+cross-entry-point dependency appears.
 
-- `client/`, `electron/`
+- Allowed dependencies: `domain/`, and within `shared/`.
+- Disallowed dependencies: any entry-point subdirectory (`cli/`, `electron/`, …), `server/`,
+  `client/`, and runtime-specific APIs (Node.js, Electron, browser).
 
-## Electron Layer
+### `entrypoints/cli/`
 
-`electron/` contains the Electron main process entry point. It starts the Hono server via
-`startServerWithHandle` from `server/` and manages the `BrowserWindow` lifecycle.
+The command-line entry point: repository resolution, local config editing, and browser/server
+startup wiring.
 
-Allowed dependencies:
+- Allowed dependencies: `entrypoints/shared/`, `domain/`, `server/`, Node.js APIs.
+- Disallowed dependencies: other entry-point subdirectories (e.g. `electron/`), `client/`.
 
-- `domain/`, `server/`
-- Electron, Node.js APIs
+### `entrypoints/electron/`
 
-Disallowed dependencies:
+The Electron main process entry point. It starts the Hono server via `startServerWithHandle` from
+`server/`, renders `client/` in a `BrowserWindow`, and manages the window lifecycle.
 
-- `client/`, `cli/`
+- Allowed dependencies: `entrypoints/shared/`, `domain/`, `server/`, Electron, Node.js APIs.
+- Disallowed dependencies: other entry-point subdirectories (e.g. `cli/`), `client/` source (it is
+  loaded as built assets, not imported).
 
 ## Client Layer
 

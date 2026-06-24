@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ResolvedRepository } from '../domain/repository/repository';
-import type { RegisteredRepositoryLister } from '../server/index';
+import type { ResolvedRepository } from '../../domain/repository/repository';
+import type { RegisteredRepositoryLister } from '../../server/index';
 import { resolveInitialRepositoryIdForLaunch } from './initial-repository';
 
 function createRepository(path: string, id = 'sift-abc123'): ResolvedRepository {

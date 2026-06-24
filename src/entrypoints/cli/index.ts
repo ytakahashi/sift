@@ -1,7 +1,7 @@
 import { resolveRepoRoot } from './resolve-repo';
 import { openBrowser } from './open-browser';
 import { openApp } from './open-app';
-import { createRepositoryConfigUpdater, startServer } from '../server/index';
+import { createRepositoryConfigUpdater, startServer } from '../../server/index';
 import { resolveInitialRepositoryIdForLaunch } from './initial-repository';
 import { createCliProgram } from './program';
 
