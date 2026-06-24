@@ -1,8 +1,8 @@
 import { app, BrowserWindow } from 'electron';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildRepositoryPath } from '../domain/repository/repository-route';
-import { startServerWithHandle, type StartedServer } from '../server/index';
+import { buildRepositoryPath } from '../../domain/repository/repository-route';
+import { startServerWithHandle, type StartedServer } from '../../server/index';
 
 // Resolve dist/client path, absorbing dev / packaged differences.
 function resolveClientDir(): string {

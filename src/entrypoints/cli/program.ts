@@ -1,7 +1,7 @@
 import { Command } from 'commander';
-import { buildRepositoryPath } from '../domain/repository/repository-route';
-import { APP_INFO } from '../server/app-info';
-import type { RepositoryConfigUpdater } from '../server/index';
+import { buildRepositoryPath } from '../../domain/repository/repository-route';
+import { APP_INFO } from '../../server/app-info';
+import type { RepositoryConfigUpdater } from '../../server/index';
 
 export interface CliDependencies {
   createRepositoryConfigUpdater: () => Pick<RepositoryConfigUpdater, 'addRepository'>;
