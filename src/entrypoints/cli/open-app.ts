@@ -1,6 +1,7 @@
 import { exec } from 'node:child_process';
 import os from 'node:os';
 import { promisify } from 'node:util';
+import { buildRepositoryAppUrl } from '../shared/repository-app-url';
 
 /**
  * Launches the Sift macOS application using its bundle identifier.
@@ -16,9 +17,13 @@ export async function openApp(repoId?: string): Promise<void> {
   const execAsync = promisify(exec);
 
   try {
-    // Bundle ID must stay in sync with electron-builder.yml `appId`.
+    // When a repository is targeted, open it via the sift:// URL scheme so the
+    // request reaches an already-running instance (the bundle-id `--args` path
+    // only delivers arguments on a fresh launch). Without a target, just bring
+    // the app to the foreground by its bundle ID (kept in sync with
+    // electron-builder.yml `appId`).
     const command = repoId
-      ? `open -b net.ytakahashi.sift --args --repo-id=${repoId}`
+      ? `open ${buildRepositoryAppUrl(repoId)}`
       : 'open -b net.ytakahashi.sift';
     await execAsync(command);
   } catch (error: unknown) {
