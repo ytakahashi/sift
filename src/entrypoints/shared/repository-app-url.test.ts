@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { buildRepositoryAppUrl, parseRepositoryIdFromAppUrl } from './repository-app-url';
+import {
+  buildRepositoryAppUrl,
+  findRepositoryIdFromArgv,
+  parseRepositoryIdFromAppUrl,
+} from './repository-app-url';
 
 describe('buildRepositoryAppUrl', () => {
   it('should build a sift://repos/<id> URL for a repository id', () => {
@@ -73,6 +77,63 @@ describe('parseRepositoryIdFromAppUrl', () => {
     // Given an invalid percent-escape that decodeURIComponent rejects
     // When
     const repoId = parseRepositoryIdFromAppUrl('sift://repos/%');
+
+    // Then
+    expect(repoId).toBeNull();
+  });
+});
+
+describe('findRepositoryIdFromArgv', () => {
+  it('should extract a repository id from a sift URL argument', () => {
+    // Given
+    const argv = ['Sift.app/Contents/MacOS/Sift', 'sift://repos/repo-a'];
+
+    // When
+    const repoId = findRepositoryIdFromArgv(argv);
+
+    // Then
+    expect(repoId).toBe('repo-a');
+  });
+
+  it('should use the last repository intent when multiple arguments match', () => {
+    // Given: Electron can append platform arguments before or after app-specific ones.
+    const argv = ['sift://repos/repo-a', '--irrelevant', 'sift://repos/repo-b'];
+
+    // When
+    const repoId = findRepositoryIdFromArgv(argv);
+
+    // Then
+    expect(repoId).toBe('repo-b');
+  });
+
+  it('should ignore malformed URLs and continue scanning earlier arguments', () => {
+    // Given
+    const argv = ['sift://repos/repo-a', 'sift://repos/%'];
+
+    // When
+    const repoId = findRepositoryIdFromArgv(argv);
+
+    // Then
+    expect(repoId).toBe('repo-a');
+  });
+
+  it('should support a repo-id argument for future launch paths', () => {
+    // Given
+    const argv = ['Sift.app/Contents/MacOS/Sift', '--repo-id=repo-a'];
+
+    // When
+    const repoId = findRepositoryIdFromArgv(argv);
+
+    // Then
+    expect(repoId).toBe('repo-a');
+  });
+
+  it('should return null when no repository intent is present', () => {
+    // Given
+    const argv = ['Sift.app/Contents/MacOS/Sift', '--flag'];
+
+    // When
+    const repoId = findRepositoryIdFromArgv(argv);
 
     // Then
     expect(repoId).toBeNull();

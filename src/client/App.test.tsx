@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppDependencies } from './composition/dependencies';
@@ -150,8 +150,22 @@ describe('App Routing', () => {
 });
 
 describe('App repository tabs', () => {
+  let desktopOpenListener: ((repoId: string) => void) | null;
+  let notifyReady: ReturnType<typeof vi.fn<() => void>>;
+  let unsubscribeDesktopListener: ReturnType<typeof vi.fn<() => void>>;
+
   beforeEach(() => {
     vi.clearAllMocks();
+    desktopOpenListener = null;
+    notifyReady = vi.fn<() => void>();
+    unsubscribeDesktopListener = vi.fn<() => void>();
+    window.siftDesktop = {
+      notifyReady,
+      onOpenRepository: vi.fn((listener: (repoId: string) => void) => {
+        desktopOpenListener = listener;
+        return unsubscribeDesktopListener;
+      }),
+    };
     vi.mocked(useDiffData).mockReturnValue({
       repoRoot: '/repo/my-app',
       workingFiles: [],
@@ -165,6 +179,7 @@ describe('App repository tabs', () => {
 
   afterEach(() => {
     cleanup();
+    delete window.siftDesktop;
     window.history.pushState(null, '', '/');
   });
 
@@ -231,5 +246,41 @@ describe('App repository tabs', () => {
     // Then: only one tab remains (no duplicate)
     const tabBar = await screen.findByRole('navigation', { name: 'Open repositories' });
     expect(tabBar.querySelectorAll('.repository-tab-item').length).toBe(1);
+  });
+
+  it('notifies the desktop bridge when the renderer is ready and unsubscribes on unmount', () => {
+    // Given
+    window.history.pushState(null, '', '/');
+
+    // When
+    const { unmount } = render(<App dependencies={testDependencies} />);
+
+    // Then
+    expect(notifyReady).toHaveBeenCalledTimes(1);
+
+    // When
+    unmount();
+
+    // Then
+    expect(unsubscribeDesktopListener).toHaveBeenCalledTimes(1);
+  });
+
+  it('opens a repository from a desktop intent without clearing existing tabs', async () => {
+    // Given: the app already has an in-memory tab seeded from the current route.
+    window.history.pushState(null, '', '/repos/my-app');
+    render(<App dependencies={testDependencies} />);
+    expect(await screen.findByRole('button', { name: 'my-app' })).toBeDefined();
+
+    // When: Electron main delivers a repository-open intent through preload.
+    act(() => {
+      desktopOpenListener?.('repo-b');
+    });
+
+    // Then: SPA navigation opens the requested repo while preserving the old tab.
+    await waitFor(() => {
+      expect(window.location.pathname).toBe('/repos/repo-b');
+    });
+    expect(await screen.findByRole('button', { name: 'repo-b' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'my-app' })).toBeDefined();
   });
 });

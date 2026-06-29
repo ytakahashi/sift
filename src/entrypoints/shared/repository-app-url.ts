@@ -50,3 +50,27 @@ export function parseRepositoryIdFromAppUrl(url: string): RepositoryId | null {
     return null;
   }
 }
+
+/**
+ * Finds a repository-open intent in command-line arguments delivered to a
+ * secondary Electron process.
+ */
+export function findRepositoryIdFromArgv(argv: readonly string[]): RepositoryId | null {
+  for (let index = argv.length - 1; index >= 0; index -= 1) {
+    const argument = argv[index];
+    const repoIdFromUrl = parseRepositoryIdFromAppUrl(argument);
+    if (repoIdFromUrl !== null) {
+      return repoIdFromUrl;
+    }
+
+    const repoIdPrefix = '--repo-id=';
+    if (argument.startsWith(repoIdPrefix)) {
+      const repoId = argument.slice(repoIdPrefix.length);
+      if (repoId.length > 0) {
+        return repoId;
+      }
+    }
+  }
+
+  return null;
+}
