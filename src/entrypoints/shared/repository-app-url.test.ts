@@ -117,17 +117,6 @@ describe('findRepositoryIdFromArgv', () => {
     expect(repoId).toBe('repo-a');
   });
 
-  it('should support a repo-id argument for future launch paths', () => {
-    // Given
-    const argv = ['Sift.app/Contents/MacOS/Sift', '--repo-id=repo-a'];
-
-    // When
-    const repoId = findRepositoryIdFromArgv(argv);
-
-    // Then
-    expect(repoId).toBe('repo-a');
-  });
-
   it('should return null when no repository intent is present', () => {
     // Given
     const argv = ['Sift.app/Contents/MacOS/Sift', '--flag'];

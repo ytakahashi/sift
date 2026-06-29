@@ -4,11 +4,10 @@ import type { RepositoryId } from '../../domain/repository/repository';
  * Custom URL scheme used to deliver "open this repository" intents to the
  * desktop app.
  *
- * Passing `--repo-id` via `open -b <bundle> --args` only works when macOS
- * actually launches the app; an already-running instance ignores those args.
  * A registered URL scheme is routed by macOS to the running instance through
  * the Electron `open-url` event, so the same mechanism handles both the cold
- * start and the already-running case.
+ * start and the already-running case. On platforms that launch the app with
+ * the URL on the command line, the same `sift://` form is recovered from argv.
  */
 export const SIFT_URL_SCHEME = 'sift';
 
@@ -52,23 +51,18 @@ export function parseRepositoryIdFromAppUrl(url: string): RepositoryId | null {
 }
 
 /**
- * Finds a repository-open intent in command-line arguments delivered to a
- * secondary Electron process.
+ * Finds a repository-open intent among the command-line arguments delivered to
+ * a secondary Electron process.
+ *
+ * Scans from the end so the most recent `sift://repos/<id>` intent wins when the
+ * platform appends several, and skips arguments that are not repository URLs
+ * (platform flags, malformed URLs).
  */
 export function findRepositoryIdFromArgv(argv: readonly string[]): RepositoryId | null {
   for (let index = argv.length - 1; index >= 0; index -= 1) {
-    const argument = argv[index];
-    const repoIdFromUrl = parseRepositoryIdFromAppUrl(argument);
-    if (repoIdFromUrl !== null) {
-      return repoIdFromUrl;
-    }
-
-    const repoIdPrefix = '--repo-id=';
-    if (argument.startsWith(repoIdPrefix)) {
-      const repoId = argument.slice(repoIdPrefix.length);
-      if (repoId.length > 0) {
-        return repoId;
-      }
+    const repoId = parseRepositoryIdFromAppUrl(argv[index]);
+    if (repoId !== null) {
+      return repoId;
     }
   }
 
