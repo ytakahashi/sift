@@ -8,6 +8,7 @@ import {
   parseRepositoryIdFromAppUrl,
   SIFT_URL_SCHEME,
 } from '../shared/repository-app-url';
+import { recordPreReadyIntent, resolveOpenDeliveryAction } from './open-repository-delivery';
 import { startServerWithHandle, type StartedServer } from '../../server/index';
 
 function resolveDistDir(): string {
@@ -101,13 +102,12 @@ function flushPendingRepositoryOpenRequests(): void {
 
 async function handleOpenRepositoryRequest(repoId: RepositoryId | null): Promise<void> {
   if (!app.isReady()) {
-    if (repoId !== null) {
-      if (initialRepoIdBeforeReady === null) {
-        initialRepoIdBeforeReady = repoId;
-      } else {
-        pendingRepoIds.push(repoId);
-      }
-    }
+    const next = recordPreReadyIntent(
+      { initialRepoId: initialRepoIdBeforeReady, pendingRepoIds },
+      repoId,
+    );
+    initialRepoIdBeforeReady = next.initialRepoId;
+    pendingRepoIds = next.pendingRepoIds;
     return;
   }
 
@@ -115,20 +115,25 @@ async function handleOpenRepositoryRequest(repoId: RepositoryId | null): Promise
   const win = await ensureMainWindow(windowAlreadyExists ? null : repoId);
   focusWindow(win);
 
-  if (repoId === null) {
-    return;
-  }
+  const action = resolveOpenDeliveryAction({
+    repoId,
+    windowAlreadyExists,
+    canSend: canSendRepositoryOpenRequest(win),
+  });
 
-  if (!windowAlreadyExists) {
-    return;
+  switch (action.type) {
+    case 'focus-only':
+    case 'load-initial':
+      // The window is already focused; a newly created window shows the repo
+      // via its initial route, so nothing further is required.
+      return;
+    case 'send':
+      win.webContents.send('repository-open-requested', action.repoId);
+      return;
+    case 'queue':
+      pendingRepoIds.push(action.repoId);
+      return;
   }
-
-  if (canSendRepositoryOpenRequest(win)) {
-    win.webContents.send('repository-open-requested', repoId);
-    return;
-  }
-
-  pendingRepoIds.push(repoId);
 }
 
 // Register this app as the handler for sift:// URLs. macOS uses the bundle's
@@ -162,7 +167,12 @@ if (!gotSingleInstanceLock) {
 
   app
     .whenReady()
-    .then(() => handleOpenRepositoryRequest(initialRepoIdBeforeReady))
+    .then(() => {
+      // Consume the launch intent once; it is only meaningful before `ready`.
+      const initialRepoId = initialRepoIdBeforeReady;
+      initialRepoIdBeforeReady = null;
+      return handleOpenRepositoryRequest(initialRepoId);
+    })
     .catch((error: unknown) => {
       console.error('Failed to launch Sift:', error);
       app.exit(1);
