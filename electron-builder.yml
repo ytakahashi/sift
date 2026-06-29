@@ -5,6 +5,13 @@ copyright: Copyright © 2026
 extraMetadata:
   main: dist/electron/main.js
 
+# Registers the sift:// URL scheme so `sift --app <repo>` can reach an
+# already-running instance via the Electron `open-url` event.
+protocols:
+  - name: Sift
+    schemes:
+      - sift
+
 files:
   - dist/client/**
   - dist/electron/**

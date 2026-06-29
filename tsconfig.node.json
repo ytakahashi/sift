@@ -14,5 +14,11 @@
     "rootDir": "./src",
     "types": ["node"]
   },
-  "include": ["src/entrypoints/cli", "src/server", "src/domain", "src/local-config"]
+  "include": [
+    "src/entrypoints/cli",
+    "src/entrypoints/shared",
+    "src/server",
+    "src/domain",
+    "src/local-config"
+  ]
 }

@@ -14,14 +14,15 @@ The application consists of:
 src/
 ├── entrypoints/  # Program entry points that host the product on a runtime
 │   ├── cli/        # CLI entry point (commander, repo resolution, browser opener)
-│   └── electron/   # Electron main process entry point (standalone GUI app)
+│   ├── electron/   # Electron main process entry point (standalone GUI app)
+│   └── shared/     # Contract shared between entry points (no runtime-specific code)
 ├── server/       # Hono HTTP server (routes, services, watch, infrastructure)
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
 └── domain/       # Pure business logic and models shared across server and client
 ```
 
-Code shared between sibling entry points lives in an `entrypoints/shared/` subdirectory, introduced
-when the first such dependency appears.
+Code shared between sibling entry points lives in `entrypoints/shared/`, keeping such cross-host
+contracts out of `domain/` (which is reserved for pure business logic shared by `server`/`client`).
 
 `domain/`, `server/`, and `client/` are the building-block libraries; `entrypoints/*` are the
 runnable deliverables that compose them for a specific runtime (CLI today, Electron desktop app, and
@@ -45,16 +46,20 @@ graph TD
     client
 
     subgraph entrypoints
+        shared
         cli
         electron
     end
 
     client --> domain
     server --> domain
+    shared --> domain
     cli --> domain
     cli --> server
+    cli --> shared
     electron --> domain
     electron --> server
+    electron --> shared
 ```
 
 ## Domain Layer
@@ -89,8 +94,9 @@ not import from another entry point directly (e.g. `cli/` must not import from `
 
 ### `entrypoints/shared/`
 
-Contract shared between entry points that is not domain business logic. Introduced when the first
-cross-entry-point dependency appears.
+Contract shared between entry points that is not domain business logic, such as the `sift://` URL
+scheme used to deliver "open this repository" intents to the desktop app (built by `cli/`, handled
+by `electron/`).
 
 - Allowed dependencies: `domain/`, and within `shared/`.
 - Disallowed dependencies: any entry-point subdirectory (`cli/`, `electron/`, …), `server/`,

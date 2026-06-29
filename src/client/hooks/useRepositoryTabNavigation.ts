@@ -48,6 +48,16 @@ export function useRepositoryTabNavigation(): UseRepositoryTabNavigationResult {
     [activeRepoId, navigate, openTab],
   );
 
+  useEffect(() => {
+    window.siftDesktop?.notifyReady();
+  }, []);
+
+  useEffect(() => {
+    return window.siftDesktop?.onOpenRepository((repoId) => {
+      selectTab(repoId);
+    });
+  }, [selectTab]);
+
   const handleCloseTab = useCallback(
     (repoId: RepositoryId): void => {
       const nextNeighborId = closeTab(repoId);

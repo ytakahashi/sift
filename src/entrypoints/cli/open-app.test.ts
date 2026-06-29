@@ -36,7 +36,7 @@ describe('openApp', () => {
     expect(mockExec).toHaveBeenCalledWith('open -b net.ytakahashi.sift', expect.any(Function));
   });
 
-  it('should call exec with repo-id argument on macOS when repoId is provided', async () => {
+  it('should open the sift:// URL on macOS when repoId is provided', async () => {
     // Given
     vi.mocked(os.platform).mockReturnValue('darwin');
     const mockExec = vi.fn((_cmd, cb) => cb(null, { stdout: '', stderr: '' }));
@@ -45,11 +45,9 @@ describe('openApp', () => {
     // When
     await expect(openApp('repo-123')).resolves.not.toThrow();
 
-    // Then
-    expect(mockExec).toHaveBeenCalledWith(
-      'open -b net.ytakahashi.sift --args --repo-id=repo-123',
-      expect.any(Function),
-    );
+    // Then: the URL scheme is used so an already-running instance receives the
+    // request via the Electron `open-url` event.
+    expect(mockExec).toHaveBeenCalledWith('open sift://repos/repo-123', expect.any(Function));
   });
 
   it('should throw an error if the app fails to open', async () => {
