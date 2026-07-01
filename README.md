@@ -23,6 +23,9 @@ sift add  [path]
 sift serve
 ```
 
+`-h, --help` is available on `sift` itself and on every subcommand (e.g. `sift open --help`) to show
+its available options and usage.
+
 ### `sift open [path]`
 
 Open a repository in the browser or the Sift macOS app.
@@ -41,8 +44,6 @@ Register a repository in the local Sift config without opening it.
 ### `sift serve`
 
 Start the local Sift server and print its URL, without opening any specific repository.
-
-- `-h, --help`: Show available commands and usage.
 
 ## 🚀 Getting Started
 
