@@ -7,6 +7,7 @@
     "sift": "./dist/cli/index.js"
   },
   "dependencies": {
+    "@clack/prompts": "1.6.0",
     "@hono/node-server": "2.0.5",
     "chokidar": "5.0.0",
     "commander": "15.0.0",

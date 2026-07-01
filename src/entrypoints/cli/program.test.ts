@@ -12,10 +12,12 @@ function createDependencies(): CliDependencies {
 
   return {
     createRepositoryConfigUpdater: vi.fn(() => ({ addRepository })),
+    listRegisteredRepositories: vi.fn().mockResolvedValue([]),
     openApp: vi.fn().mockResolvedValue(undefined),
     openBrowser: vi.fn(),
     resolveRepoRoot: vi.fn().mockReturnValue('/repo/sift'),
     resolveRepositoryIdForOpen: vi.fn().mockResolvedValue('repo-123'),
+    selectRepository: vi.fn().mockResolvedValue(null),
     startServer: vi.fn().mockResolvedValue('http://127.0.0.1:49321'),
   };
 }
