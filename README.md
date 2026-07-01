@@ -18,20 +18,32 @@ A lightweight local diff viewer for inspecting changes
 ## 📖 Usage
 
 ```sh
-sift [options] [path]
+sift open [path] [--app|--browser]
+sift add  [path]
+sift serve
 ```
 
-**Options**:
+`-h, --help` is available on `sift` itself and on every subcommand (e.g. `sift open --help`) to show
+its available options and usage.
 
-- `--add [path]`: Add a repository to the local Sift config before starting
-- `-s, --server`: Start the local Sift server
-- `-b, --browser`: Automatically open the browser after the server starts
-- `-a, --app`: Open the Sift macOS application
-- `-h, --help`: Show available options and usage
+### `sift open [path]`
 
-**Arguments**:
+Open a repository in the browser or the Sift macOS app.
 
-- `path`: Repository path used with --add (defaults to current directory)
+- `path`: Repository path to open (defaults to the current directory). Registers the repository
+  automatically if it isn't already in the local Sift config.
+- `-b, --browser`: Open the browser (default).
+- `-a, --app`: Open the Sift macOS application instead of the browser.
+
+### `sift add [path]`
+
+Register a repository in the local Sift config without opening it.
+
+- `path`: Repository path to add (defaults to the current directory).
+
+### `sift serve`
+
+Start the local Sift server and print its URL, without opening any specific repository.
 
 ## 🚀 Getting Started
 

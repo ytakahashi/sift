@@ -11,25 +11,32 @@ interface Logger {
   warn(message: string): void;
 }
 
-export interface ResolveInitialRepositoryIdOptions {
+export interface ResolveRepositoryIdForOpenOptions {
   createRegisteredRepositoryLister?: () => RegisteredRepositoryLister;
   createRepositoryConfigUpdater?: () => Pick<RepositoryConfigUpdater, 'addRepository'>;
-  currentWorkingDirectory?: string;
   logger?: Logger;
   resolveRepoRoot?: (targetPath?: string) => string;
 }
 
-export async function resolveInitialRepositoryIdForLaunch(
-  options: ResolveInitialRepositoryIdOptions = {},
+export async function resolveRepositoryIdForOpen(
+  targetPath?: string,
+  options: ResolveRepositoryIdForOpenOptions = {},
 ): Promise<string | null> {
-  const currentWorkingDirectory = options.currentWorkingDirectory ?? process.cwd();
   const logger = options.logger ?? console;
   const resolveRoot = options.resolveRepoRoot ?? resolveRepoRoot;
+  // An explicit path is a direct request to open that repo, so resolution or
+  // registration failures must surface as errors. A defaulted (cwd) target is
+  // best-effort auto-detection for the zero-argument `sift open` convenience,
+  // so it keeps failing silently and falls back to the server's base URL.
+  const hasExplicitTarget = targetPath !== undefined;
 
   let gitRepoRoot: string;
   try {
-    gitRepoRoot = resolveRoot(currentWorkingDirectory);
-  } catch (_error: unknown) {
+    gitRepoRoot = resolveRoot(targetPath);
+  } catch (error: unknown) {
+    if (hasExplicitTarget) {
+      throw error;
+    }
     return null;
   }
 
@@ -48,6 +55,9 @@ export async function resolveInitialRepositoryIdForLaunch(
     );
     return addedRepository.id;
   } catch (error: unknown) {
+    if (hasExplicitTarget) {
+      throw error;
+    }
     logger.warn(
       `Failed to automatically register repository: ${
         error instanceof Error ? error.message : String(error)
