@@ -65,5 +65,6 @@ export function createOpenCommand(dependencies: OpenCommandDependencies): Comman
 
       const targetUrl = repoId ? `${url}${buildRepositoryPath(repoId)}` : url;
       dependencies.openBrowser(targetUrl);
+      console.log('Browser opened.');
     });
 }

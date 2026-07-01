@@ -42,6 +42,7 @@ describe('createOpenCommand', () => {
     expect(dependencies.startServer).toHaveBeenCalledOnce();
     expect(console.log).toHaveBeenCalledWith('Server started at http://127.0.0.1:49321');
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it('does not print "Server started" when reusing an already-running server', async () => {
@@ -59,6 +60,7 @@ describe('createOpenCommand', () => {
     // Then
     expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining('Server started'));
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it('opens the browser when --browser is provided explicitly', async () => {
@@ -72,6 +74,7 @@ describe('createOpenCommand', () => {
     // Then
     expect(dependencies.startServer).toHaveBeenCalledOnce();
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it('opens the browser when -b is provided', async () => {
@@ -85,6 +88,7 @@ describe('createOpenCommand', () => {
     // Then
     expect(dependencies.startServer).toHaveBeenCalledOnce();
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it.each([['--app'], ['-a']])(
@@ -118,6 +122,7 @@ describe('createOpenCommand', () => {
     // Then
     expect(dependencies.resolveRepositoryIdForOpen).toHaveBeenCalledWith('/path');
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it('rejects --app together with --browser before side effects', async () => {
@@ -161,6 +166,7 @@ describe('createOpenCommand', () => {
     // Then
     expect(dependencies.startServer).toHaveBeenCalledOnce();
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it('opens the browser with the interactively selected repository when -i is provided', async () => {
@@ -180,6 +186,7 @@ describe('createOpenCommand', () => {
     expect(dependencies.resolveRepositoryIdForOpen).not.toHaveBeenCalled();
     expect(dependencies.startServer).toHaveBeenCalledOnce();
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-b');
+    expect(console.log).toHaveBeenCalledWith('Browser opened.');
   });
 
   it('opens the macOS app with the interactively selected repository when -i --app is provided', async () => {
