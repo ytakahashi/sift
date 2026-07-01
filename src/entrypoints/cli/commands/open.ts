@@ -1,6 +1,7 @@
 import { Command } from 'commander';
 import type { ResolvedRepository } from '../../../domain/repository/repository';
 import { buildRepositoryPath } from '../../../domain/repository/repository-route';
+import type { StartServerResult } from '../../../server/index';
 
 export interface OpenCommandDependencies {
   listRegisteredRepositories: () => Promise<ResolvedRepository[]>;
@@ -8,7 +9,7 @@ export interface OpenCommandDependencies {
   openBrowser: (url: string) => void;
   resolveRepositoryIdForOpen: (targetPath?: string) => Promise<string | null>;
   selectRepository: (repositories: ResolvedRepository[]) => Promise<ResolvedRepository | null>;
-  startServer: () => Promise<string>;
+  startServer: () => Promise<StartServerResult>;
 }
 
 interface OpenCommandOptions {
@@ -57,8 +58,10 @@ export function createOpenCommand(dependencies: OpenCommandDependencies): Comman
         return;
       }
 
-      const url = await dependencies.startServer();
-      console.log(`Server started at ${url}`);
+      const { owned, url } = await dependencies.startServer();
+      if (owned) {
+        console.log(`Server started at ${url}`);
+      }
 
       const targetUrl = repoId ? `${url}${buildRepositoryPath(repoId)}` : url;
       dependencies.openBrowser(targetUrl);

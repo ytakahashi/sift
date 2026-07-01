@@ -10,7 +10,7 @@ function createDependencies(): OpenCommandDependencies {
     openBrowser: vi.fn(),
     resolveRepositoryIdForOpen: vi.fn().mockResolvedValue('repo-123'),
     selectRepository: vi.fn().mockResolvedValue(null),
-    startServer: vi.fn().mockResolvedValue('http://127.0.0.1:49321'),
+    startServer: vi.fn().mockResolvedValue({ owned: true, url: 'http://127.0.0.1:49321' }),
   };
 }
 
@@ -40,6 +40,24 @@ describe('createOpenCommand', () => {
     // Then
     expect(dependencies.resolveRepositoryIdForOpen).toHaveBeenCalledWith(undefined);
     expect(dependencies.startServer).toHaveBeenCalledOnce();
+    expect(console.log).toHaveBeenCalledWith('Server started at http://127.0.0.1:49321');
+    expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
+  });
+
+  it('does not print "Server started" when reusing an already-running server', async () => {
+    // Given
+    const dependencies = createDependencies();
+    vi.mocked(dependencies.startServer).mockResolvedValue({
+      owned: false,
+      url: 'http://127.0.0.1:49321',
+    });
+    const command = createOpenCommand(dependencies);
+
+    // When
+    await command.parseAsync([], { from: 'user' });
+
+    // Then
+    expect(console.log).not.toHaveBeenCalledWith(expect.stringContaining('Server started'));
     expect(dependencies.openBrowser).toHaveBeenCalledWith('http://127.0.0.1:49321/repos/repo-123');
   });
 
