@@ -19,6 +19,7 @@ A lightweight local diff viewer for inspecting changes
 
 ```sh
 sift open [path] [--app|--browser]
+sift open -i [--app|--browser]
 sift add  [path]
 sift serve
 ```
@@ -31,9 +32,11 @@ its available options and usage.
 Open a repository in the browser or the Sift macOS app.
 
 - `path`: Repository path to open (defaults to the current directory). Registers the repository
-  automatically if it isn't already in the local Sift config.
+  automatically if it isn't already in the local Sift config. Cannot be combined with `-i`.
 - `-b, --browser`: Open the browser (default).
 - `-a, --app`: Open the Sift macOS application instead of the browser.
+- `-i, --interactive`: Pick a registered repository from an interactive list instead of using `path`
+  or the current directory.
 
 ### `sift add [path]`
 

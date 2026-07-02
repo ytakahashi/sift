@@ -165,7 +165,12 @@ export async function startServerWithHandle(options: {
   };
 }
 
-export async function startServer(): Promise<string> {
+export interface StartServerResult {
+  owned: boolean;
+  url: string;
+}
+
+export async function startServer(): Promise<StartServerResult> {
   const __filename = fileURLToPath(import.meta.url);
   const __dirname = path.dirname(__filename);
   const clientDir = path.resolve(__dirname, '../../dist/client');
@@ -180,5 +185,5 @@ export async function startServer(): Promise<string> {
     process.once('SIGTERM', cleanup);
   }
 
-  return url;
+  return { owned, url };
 }
