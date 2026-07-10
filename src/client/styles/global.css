@@ -551,7 +551,7 @@ button.app-brand-home {
   pointer-events: none;
 }
 
-.file-item-path-measure > span {
+.file-item-path-measure-candidate {
   display: block;
   width: max-content;
 }

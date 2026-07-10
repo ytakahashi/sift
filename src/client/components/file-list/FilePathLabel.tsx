@@ -22,20 +22,32 @@ function formatPathLabel(oldPath: string | undefined, path: string): string {
   return oldPath ? `${oldPath} → ${path}` : path;
 }
 
-function createPathLabelCandidates(oldPath: string | undefined, path: string): string[] {
+// Keeps the old/new path text apart instead of joining them into one string,
+// so rendering never has to split a combined string back apart (a path that
+// happens to contain " → " would otherwise be split at the wrong place).
+interface PathLabelCandidate {
+  measureText: string;
+  oldPathText?: string;
+  pathText: string;
+}
+
+function createPathLabelCandidates(
+  oldPath: string | undefined,
+  path: string,
+): PathLabelCandidate[] {
   const pathCandidates = createFilePathCandidates(path);
   if (!oldPath) {
-    return pathCandidates;
+    return pathCandidates.map((pathText) => ({ measureText: pathText, pathText }));
   }
 
   const oldPathCandidates = createFilePathCandidates(oldPath);
   const candidateCount = Math.max(oldPathCandidates.length, pathCandidates.length);
 
   return Array.from({ length: candidateCount }, (_value, index) => {
-    const oldPathCandidate = oldPathCandidates[Math.min(index, oldPathCandidates.length - 1)];
-    const pathCandidate = pathCandidates[Math.min(index, pathCandidates.length - 1)];
-    return `${oldPathCandidate} → ${pathCandidate}`;
-  }).filter((candidate, index, candidates) => index === 0 || candidate !== candidates[index - 1]);
+    const oldPathText = oldPathCandidates[Math.min(index, oldPathCandidates.length - 1)];
+    const pathText = pathCandidates[Math.min(index, pathCandidates.length - 1)];
+    return { measureText: `${oldPathText} → ${pathText}`, oldPathText, pathText };
+  });
 }
 
 export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactElement {
@@ -47,7 +59,7 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const fullText = formatPathLabel(oldPath, path);
   const candidates = useMemo(() => createPathLabelCandidates(oldPath, path), [oldPath, path]);
-  const [visibleText, setVisibleText] = useState(fullText);
+  const [visibleCandidate, setVisibleCandidate] = useState<PathLabelCandidate>(candidates[0]);
 
   const clearTooltipTimer = useCallback((): void => {
     if (tooltipTimerRef.current !== null) {
@@ -76,7 +88,7 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
       const selectedCandidateIndex =
         fittingCandidateIndex >= 0 ? fittingCandidateIndex : candidates.length - 1;
       const nextIsOverflowing = candidateMeasures[0]?.scrollWidth > container.clientWidth;
-      setVisibleText(candidates[selectedCandidateIndex] ?? fullText);
+      setVisibleCandidate(candidates[selectedCandidateIndex] ?? candidates[0]);
       setIsOverflowing(nextIsOverflowing);
       if (!nextIsOverflowing) {
         hideTooltip();
@@ -107,7 +119,7 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateOverflow);
     };
-  }, [candidates, fullText, hideTooltip]);
+  }, [candidates, hideTooltip]);
 
   useEffect(
     () => () => {
@@ -154,20 +166,22 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
       ref={containerRef}
     >
       <span aria-hidden="true" className="file-item-path-measure" ref={fullTextMeasureRef}>
-        {candidates.map((candidate) => (
-          <span className="file-item-path-measure" key={candidate}>
-            {candidate}
+        {candidates.map((candidate, index) => (
+          // Keyed by index (not text): the list is positional — updateOverflow
+          // matches measured DOM children back to `candidates` by array index.
+          <span className="file-item-path-measure-candidate" key={index}>
+            {candidate.measureText}
           </span>
         ))}
       </span>
       <span className="file-item-path-visible">
         {oldPath ? (
           <>
-            <span className="file-item-old-path">{visibleText.split(' → ')[0]}</span> &rarr;{' '}
-            {visibleText.split(' → ')[1]}
+            <span className="file-item-old-path">{visibleCandidate.oldPathText}</span> &rarr;{' '}
+            {visibleCandidate.pathText}
           </>
         ) : (
-          visibleText
+          visibleCandidate.pathText
         )}
       </span>
       {isTooltipVisible && (
