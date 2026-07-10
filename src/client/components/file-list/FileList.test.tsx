@@ -37,7 +37,7 @@ describe('FileList', () => {
     Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
       configurable: true,
       get() {
-        return this.classList?.contains('file-item-path-measure') ? pathMeasureWidth : 0;
+        return this.classList?.contains('file-item-path-measure-candidate') ? pathMeasureWidth : 0;
       },
     });
     writeText = vi.fn().mockResolvedValue(undefined);
@@ -160,6 +160,51 @@ describe('FileList', () => {
     ).toBeDefined();
   });
 
+  it('keeps the longest trailing path that fits in the file-list row', () => {
+    // Given: successively abbreviated path candidates with known rendered widths
+    pathContainerWidth = 260;
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        if (!this.classList?.contains('file-item-path-measure-candidate')) {
+          return 0;
+        }
+
+        const widthsByPrefix: Array<[string, number]> = [
+          ['src/', 400],
+          ['.../client/', 320],
+          ['.../components/', 250],
+          ['.../file-list/', 180],
+          ['.../', 100],
+        ];
+        return widthsByPrefix.find(([prefix]) => this.textContent?.startsWith(prefix))?.[1] ?? 0;
+      },
+    });
+    const file = {
+      ...createFile('partially-abbreviated-file'),
+      path: 'src/client/components/file-list/PartialFile.tsx',
+      displayPath: 'src/client/components/file-list/PartialFile.tsx',
+    };
+
+    // When
+    render(
+      <FileList
+        files={[file]}
+        repoRoot="/repo/sift"
+        selectedFileId={file.id}
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    // Then: leading directories are omitted only until the label fits
+    expect(
+      screen.getByText('.../components/file-list/PartialFile.tsx', {
+        selector: '.file-item-path-visible',
+      }),
+    ).toBeDefined();
+  });
+
   it('restores the full path through ResizeObserver when the container widens', () => {
     // Given: a ResizeObserver stub that exposes its callback, since jsdom has
     // none and sidebar drag-resize changes the row width without firing a
@@ -251,6 +296,54 @@ describe('FileList', () => {
         name: `${file.oldPath} → ${file.path}R`,
       }),
     ).toBeDefined();
+  });
+
+  it('abbreviates only the side of a renamed path that needs it to fit the row', () => {
+    // Given: a deeply nested old path and a root-level new path, so only the
+    // old side has further candidates to abbreviate through, with rendered
+    // widths that make the old side's third candidate the first that fits.
+    pathContainerWidth = 260;
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        if (!this.classList?.contains('file-item-path-measure-candidate')) {
+          return 0;
+        }
+
+        const widthsByPrefix: Array<[string, number]> = [
+          ['src/', 500],
+          ['.../client/', 430],
+          ['.../components/', 360],
+          ['.../file-list/', 250],
+          ['.../renamed/', 200],
+          ['.../OldFile.tsx', 150],
+        ];
+        return widthsByPrefix.find(([prefix]) => this.textContent?.startsWith(prefix))?.[1] ?? 0;
+      },
+    });
+    const file = {
+      ...createFile('partially-abbreviated-renamed-file'),
+      path: 'NewFile.tsx',
+      oldPath: 'src/client/components/file-list/renamed/OldFile.tsx',
+      displayPath: 'NewFile.tsx',
+      status: 'renamed' as const,
+    };
+
+    // When
+    render(
+      <FileList
+        files={[file]}
+        repoRoot="/repo/sift"
+        selectedFileId={file.id}
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    // Then: the old path is abbreviated only as far as needed to fit, while
+    // the root-level new path (which has no further candidates) stays intact
+    const visiblePath = document.querySelector('.file-item-path-visible');
+    expect(visiblePath?.textContent).toBe('.../file-list/renamed/OldFile.tsx → NewFile.tsx');
   });
 
   it('selects on single click and activates on double click', async () => {
