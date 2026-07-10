@@ -19,15 +19,17 @@ export function resolveAbsoluteFilePath(repositoryRoot: string, filePath: string
   return `${normalizedRoot}${separator}${normalizedFilePath}`;
 }
 
-export function abbreviateFilePath(filePath: string): string {
-  const lastSeparatorIndex = Math.max(
-    filePath.lastIndexOf(POSIX_PATH_SEPARATOR),
-    filePath.lastIndexOf(WINDOWS_PATH_SEPARATOR),
-  );
+export function createFilePathCandidates(filePath: string): string[] {
+  const segments = filePath.split(/[\\/]/);
 
-  if (lastSeparatorIndex < 0 || lastSeparatorIndex === filePath.length - 1) {
-    return filePath;
+  if (segments.length < 2 || segments.at(-1) === '') {
+    return [filePath];
   }
 
-  return `.../${filePath.slice(lastSeparatorIndex + 1)}`;
+  return [
+    filePath,
+    ...segments.slice(1).map((_segment, omittedSegmentIndex) => {
+      return `.../${segments.slice(omittedSegmentIndex + 1).join(POSIX_PATH_SEPARATOR)}`;
+    }),
+  ];
 }

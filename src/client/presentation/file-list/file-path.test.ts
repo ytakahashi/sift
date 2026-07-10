@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { abbreviateFilePath, resolveAbsoluteFilePath } from './file-path';
+import { createFilePathCandidates, resolveAbsoluteFilePath } from './file-path';
 
 describe('resolveAbsoluteFilePath', () => {
   it('joins a POSIX repository root and relative path', () => {
@@ -37,37 +37,48 @@ describe('resolveAbsoluteFilePath', () => {
   });
 });
 
-describe('abbreviateFilePath', () => {
+describe('createFilePathCandidates', () => {
   it('keeps a root-level file name unchanged', () => {
     // Given: a file at the repository root
     const filePath = 'VeryLongRootFileName.ts';
 
     // When
-    const result = abbreviateFilePath(filePath);
+    const result = createFilePathCandidates(filePath);
 
     // Then
-    expect(result).toBe(filePath);
+    expect(result).toEqual([filePath]);
   });
 
-  it('keeps only the file name for a nested POSIX path', () => {
+  it('creates progressively shorter suffixes for a nested POSIX path', () => {
     // Given: a nested Git-style file path
     const filePath = 'src/client/components/file-list/FileList.tsx';
 
     // When
-    const result = abbreviateFilePath(filePath);
+    const result = createFilePathCandidates(filePath);
 
     // Then
-    expect(result).toBe('.../FileList.tsx');
+    expect(result).toEqual([
+      filePath,
+      '.../client/components/file-list/FileList.tsx',
+      '.../components/file-list/FileList.tsx',
+      '.../file-list/FileList.tsx',
+      '.../FileList.tsx',
+    ]);
   });
 
-  it('keeps only the file name for a nested Windows path', () => {
+  it('creates POSIX-style display suffixes for a nested Windows path', () => {
     // Given: a nested Windows-style file path
     const filePath = String.raw`src\client\components\FileList.tsx`;
 
     // When
-    const result = abbreviateFilePath(filePath);
+    const result = createFilePathCandidates(filePath);
 
     // Then
-    expect(result).toBe('.../FileList.tsx');
+    expect(result).toEqual([
+      filePath,
+      '.../client/components/FileList.tsx',
+      '.../components/FileList.tsx',
+      '.../FileList.tsx',
+    ]);
   });
 });

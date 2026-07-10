@@ -3,11 +3,12 @@ import {
   useEffect,
   useId,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactElement,
 } from 'react';
-import { abbreviateFilePath } from '../../presentation/file-list/file-path';
+import { createFilePathCandidates } from '../../presentation/file-list/file-path';
 import { FilePathTooltip } from './FilePathTooltip';
 
 interface FilePathLabelProps {
@@ -21,6 +22,22 @@ function formatPathLabel(oldPath: string | undefined, path: string): string {
   return oldPath ? `${oldPath} → ${path}` : path;
 }
 
+function createPathLabelCandidates(oldPath: string | undefined, path: string): string[] {
+  const pathCandidates = createFilePathCandidates(path);
+  if (!oldPath) {
+    return pathCandidates;
+  }
+
+  const oldPathCandidates = createFilePathCandidates(oldPath);
+  const candidateCount = Math.max(oldPathCandidates.length, pathCandidates.length);
+
+  return Array.from({ length: candidateCount }, (_value, index) => {
+    const oldPathCandidate = oldPathCandidates[Math.min(index, oldPathCandidates.length - 1)];
+    const pathCandidate = pathCandidates[Math.min(index, pathCandidates.length - 1)];
+    return `${oldPathCandidate} → ${pathCandidate}`;
+  }).filter((candidate, index, candidates) => index === 0 || candidate !== candidates[index - 1]);
+}
+
 export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactElement {
   const containerRef = useRef<HTMLSpanElement | null>(null);
   const fullTextMeasureRef = useRef<HTMLSpanElement | null>(null);
@@ -29,6 +46,8 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
   const [isOverflowing, setIsOverflowing] = useState(false);
   const [isTooltipVisible, setIsTooltipVisible] = useState(false);
   const fullText = formatPathLabel(oldPath, path);
+  const candidates = useMemo(() => createPathLabelCandidates(oldPath, path), [oldPath, path]);
+  const [visibleText, setVisibleText] = useState(fullText);
 
   const clearTooltipTimer = useCallback((): void => {
     if (tooltipTimerRef.current !== null) {
@@ -44,13 +63,20 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
 
   useLayoutEffect(() => {
     const container = containerRef.current;
-    const fullTextMeasure = fullTextMeasureRef.current;
-    if (!container || !fullTextMeasure) {
+    const measureContainer = fullTextMeasureRef.current;
+    if (!container || !measureContainer) {
       return;
     }
 
     const updateOverflow = (): void => {
-      const nextIsOverflowing = fullTextMeasure.scrollWidth > container.clientWidth;
+      const candidateMeasures = Array.from(measureContainer.children) as HTMLElement[];
+      const fittingCandidateIndex = candidateMeasures.findIndex(
+        (candidateMeasure) => candidateMeasure.scrollWidth <= container.clientWidth,
+      );
+      const selectedCandidateIndex =
+        fittingCandidateIndex >= 0 ? fittingCandidateIndex : candidates.length - 1;
+      const nextIsOverflowing = candidateMeasures[0]?.scrollWidth > container.clientWidth;
+      setVisibleText(candidates[selectedCandidateIndex] ?? fullText);
       setIsOverflowing(nextIsOverflowing);
       if (!nextIsOverflowing) {
         hideTooltip();
@@ -81,7 +107,7 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
       resizeObserver.disconnect();
       window.removeEventListener('resize', updateOverflow);
     };
-  }, [fullText, hideTooltip]);
+  }, [candidates, fullText, hideTooltip]);
 
   useEffect(
     () => () => {
@@ -128,20 +154,20 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
       ref={containerRef}
     >
       <span aria-hidden="true" className="file-item-path-measure" ref={fullTextMeasureRef}>
-        {fullText}
+        {candidates.map((candidate) => (
+          <span className="file-item-path-measure" key={candidate}>
+            {candidate}
+          </span>
+        ))}
       </span>
       <span className="file-item-path-visible">
         {oldPath ? (
           <>
-            <span className="file-item-old-path">
-              {isOverflowing ? abbreviateFilePath(oldPath) : oldPath}
-            </span>{' '}
-            &rarr; {isOverflowing ? abbreviateFilePath(path) : path}
+            <span className="file-item-old-path">{visibleText.split(' → ')[0]}</span> &rarr;{' '}
+            {visibleText.split(' → ')[1]}
           </>
-        ) : isOverflowing ? (
-          abbreviateFilePath(path)
         ) : (
-          path
+          visibleText
         )}
       </span>
       {isTooltipVisible && (

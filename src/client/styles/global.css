@@ -547,9 +547,13 @@ button.app-brand-home {
 
 .file-item-path-measure {
   position: absolute;
-  width: max-content;
   visibility: hidden;
   pointer-events: none;
+}
+
+.file-item-path-measure > span {
+  display: block;
+  width: max-content;
 }
 
 .file-item-old-path {

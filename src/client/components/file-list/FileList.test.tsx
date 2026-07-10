@@ -160,6 +160,51 @@ describe('FileList', () => {
     ).toBeDefined();
   });
 
+  it('keeps the longest trailing path that fits in the file-list row', () => {
+    // Given: successively abbreviated path candidates with known rendered widths
+    pathContainerWidth = 260;
+    Object.defineProperty(HTMLElement.prototype, 'scrollWidth', {
+      configurable: true,
+      get() {
+        if (!this.classList?.contains('file-item-path-measure')) {
+          return 0;
+        }
+
+        const widthsByPrefix: Array<[string, number]> = [
+          ['src/', 400],
+          ['.../client/', 320],
+          ['.../components/', 250],
+          ['.../file-list/', 180],
+          ['.../', 100],
+        ];
+        return widthsByPrefix.find(([prefix]) => this.textContent?.startsWith(prefix))?.[1] ?? 0;
+      },
+    });
+    const file = {
+      ...createFile('partially-abbreviated-file'),
+      path: 'src/client/components/file-list/PartialFile.tsx',
+      displayPath: 'src/client/components/file-list/PartialFile.tsx',
+    };
+
+    // When
+    render(
+      <FileList
+        files={[file]}
+        repoRoot="/repo/sift"
+        selectedFileId={file.id}
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    // Then: leading directories are omitted only until the label fits
+    expect(
+      screen.getByText('.../components/file-list/PartialFile.tsx', {
+        selector: '.file-item-path-visible',
+      }),
+    ).toBeDefined();
+  });
+
   it('restores the full path through ResizeObserver when the container widens', () => {
     // Given: a ResizeObserver stub that exposes its callback, since jsdom has
     // none and sidebar drag-resize changes the row width without firing a
