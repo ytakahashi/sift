@@ -279,7 +279,7 @@ function RepositoryWorkspace({
         }
       />
       <RepositoryTabs tabs={tabs} activeId={repoId} onSelect={onSelectTab} onClose={onCloseTab} />
-      <div style={{ position: 'relative' }}>
+      <main className="app-main" ref={appMainRef}>
         {notesPanel.isOpen && (
           <NotesListModal
             notes={notes}
@@ -288,8 +288,6 @@ function RepositoryWorkspace({
             resolveFilePath={notesPanel.resolveFilePath}
           />
         )}
-      </div>
-      <main className="app-main" ref={appMainRef}>
         {isFileListOpen && (
           <>
             <div className="pane sidebar-container" ref={sidebarRef} style={sidebarStyle}>
