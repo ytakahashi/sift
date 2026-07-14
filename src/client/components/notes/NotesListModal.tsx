@@ -54,12 +54,13 @@ export function NotesListModal({
       />
       {/* Modal panel */}
       <div
+        data-testid="notes-modal-panel"
         style={{
           position: 'absolute',
           top: '40px',
           right: '1rem',
           width: '500px',
-          maxHeight: 'calc(100vh - 60px)',
+          maxHeight: 'calc(100% - 60px)',
           backgroundColor: '#161b22',
           border: '1px solid #30363d',
           borderRadius: '6px',
@@ -94,9 +95,12 @@ export function NotesListModal({
           </button>
         </div>
         <div
+          data-testid="notes-modal-scroll-area"
           style={{
-            padding: '1rem',
+            flex: 1,
+            minHeight: 0,
             overflowY: 'auto',
+            padding: '1rem',
             display: 'flex',
             flexDirection: 'column',
             gap: '1rem',
@@ -147,6 +151,7 @@ export function NotesListModal({
         </div>
         <div
           style={{
+            flexShrink: 0,
             padding: '0.8rem 1rem',
             borderTop: '1px solid #30363d',
             display: 'flex',

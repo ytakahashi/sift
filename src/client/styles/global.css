@@ -285,6 +285,7 @@ button.app-brand-home {
 .app-main {
   display: flex;
   flex: 1;
+  position: relative;
   overflow: hidden;
   min-width: 0;
 }

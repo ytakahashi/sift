@@ -731,6 +731,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
 
     // Then: modal is visible
     expect(screen.getByText('Your Notes (1)')).toBeDefined();
+    expect(screen.getByTestId('notes-modal-panel').closest('.app-main')).not.toBeNull();
 
     // When: close button clicked
     await user.click(screen.getByRole('button', { name: '×' }));
