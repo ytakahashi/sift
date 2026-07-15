@@ -63,6 +63,7 @@ function createLineNote(overrides?: Partial<Note>): Note {
     target: {
       kind: 'line',
       fileId: 'file-1',
+      bucket: 'working',
       hunkId: 'hunk-1',
       startNewLineNumber: 1,
       endNewLineNumber: 1,

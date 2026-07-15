@@ -676,6 +676,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
           target: {
             kind: 'line',
             fileId: 'f1',
+            bucket: 'working',
             hunkId: 'h1',
             startNewLineNumber: 1,
             endNewLineNumber: 1,
@@ -706,6 +707,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
           target: {
             kind: 'line',
             fileId: 'f1',
+            bucket: 'working',
             hunkId: 'h1',
             startNewLineNumber: 1,
             endNewLineNumber: 1,
@@ -749,6 +751,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
           target: {
             kind: 'line',
             fileId: 'f1',
+            bucket: 'working',
             hunkId: 'h1',
             startNewLineNumber: 1,
             endNewLineNumber: 1,
@@ -796,6 +799,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
           target: {
             kind: 'line',
             fileId: 'f1',
+            bucket: 'working',
             hunkId: 'h1',
             startNewLineNumber: 10,
             endNewLineNumber: 10,

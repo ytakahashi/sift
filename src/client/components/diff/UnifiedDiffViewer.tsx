@@ -210,6 +210,7 @@ export function UnifiedDiffViewer({
                               {
                                 kind: 'line',
                                 fileId: file.id,
+                                bucket: paneMode,
                                 hunkId: row.hunkId,
                                 startNewLineNumber: row.newLineNumber!,
                                 endNewLineNumber: row.newLineNumber!,

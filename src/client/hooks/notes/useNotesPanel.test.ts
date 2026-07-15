@@ -17,6 +17,7 @@ function createNote(id: string, fileId: string): Note {
     target: {
       kind: 'line',
       fileId,
+      bucket: 'working',
       hunkId: `h-${id}`,
       startNewLineNumber: 1,
       endNewLineNumber: 1,
