@@ -12,6 +12,7 @@ describe('formatNotesForClipboard', () => {
         target: {
           kind: 'line',
           fileId: 'file-1',
+          bucket: 'working',
           hunkId: 'h1',
           startNewLineNumber: 10,
           endNewLineNumber: 10,
@@ -64,6 +65,7 @@ describe('formatNoteForClipboard', () => {
       target: {
         kind: 'line',
         fileId: 'file-1',
+        bucket: 'working',
         hunkId: 'h1',
         startNewLineNumber: 10,
         endNewLineNumber: 10,
