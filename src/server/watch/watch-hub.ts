@@ -12,10 +12,17 @@ export interface WatchStream {
   writeSSE: (message: WatchMessage) => Promise<unknown>;
 }
 
+/**
+ * Events delivered over the per-repository SSE stream.
+ * 'changed' signals a filesystem change; 'notes-changed' signals that the
+ * server-side notes store was mutated (by any client, or by reconcile).
+ */
+export type WatchEvent = 'changed' | 'notes-changed';
+
 export interface WatchHub {
   subscribe: (stream: WatchStream) => void;
   unsubscribe: (stream: WatchStream) => void;
-  broadcastChanged: () => void;
+  broadcast: (event: WatchEvent) => void;
   close: () => void;
 }
 
@@ -37,14 +44,14 @@ export function createWatchHub(): WatchHub {
     });
   };
 
-  const broadcastChanged = (): void => {
+  const broadcast = (event: WatchEvent): void => {
     for (const stream of clients) {
       if (stream.aborted || stream.closed) {
         unsubscribe(stream);
         continue;
       }
 
-      void stream.writeSSE({ event: 'changed', data: 'changed' }).catch(() => {
+      void stream.writeSSE({ event, data: event }).catch(() => {
         unsubscribe(stream);
       });
     }
@@ -61,7 +68,7 @@ export function createWatchHub(): WatchHub {
   return {
     subscribe,
     unsubscribe,
-    broadcastChanged,
+    broadcast,
     close,
   };
 }

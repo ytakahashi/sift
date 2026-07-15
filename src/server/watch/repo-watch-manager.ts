@@ -1,4 +1,4 @@
-import type { RepositoryDescriptor } from '../../domain/repository/repository';
+import type { RepositoryDescriptor, RepositoryId } from '../../domain/repository/repository';
 import type { RepoWatcher } from './repo-watcher';
 import { createWatchHub, type WatchHub, type WatchStream } from './watch-hub';
 
@@ -11,6 +11,12 @@ interface RepoWatchEntry {
 export interface RepoWatchManager {
   close: () => Promise<void>;
   subscribe: (repository: RepositoryDescriptor, stream: WatchStream) => Promise<void>;
+  /**
+   * Pushes a 'notes-changed' event to the repository's subscribed streams.
+   * A no-op when nothing is subscribed for the repoId: no subscribers means
+   * there is nobody to notify, and no watcher entry should be created for it.
+   */
+  broadcastNotesChanged: (repoId: RepositoryId) => void;
 }
 
 export interface CreateRepoWatchManagerOptions {
@@ -36,7 +42,7 @@ export function createRepoWatchManager(options: CreateRepoWatchManagerOptions): 
 
     const hub = createHub();
     const watcher = createWatcher(repository.path, () => {
-      hub.broadcastChanged();
+      hub.broadcast('changed');
     });
     const entry: RepoWatchEntry = {
       hub,
@@ -58,6 +64,9 @@ export function createRepoWatchManager(options: CreateRepoWatchManagerOptions): 
   };
 
   return {
+    broadcastNotesChanged: (repoId: RepositoryId) => {
+      entries.get(repoId)?.hub.broadcast('notes-changed');
+    },
     close: async () => {
       const activeEntries = Array.from(entries.values());
       entries.clear();

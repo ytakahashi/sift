@@ -30,7 +30,7 @@ function createHub(): WatchHub & {
   const unsubscribeMock = vi.fn();
 
   return {
-    broadcastChanged: vi.fn(),
+    broadcast: vi.fn(),
     close: vi.fn(),
     subscribe: subscribeMock,
     subscribeMock,
@@ -82,7 +82,42 @@ describe('createRepoWatchManager', () => {
     onChanged();
 
     // Then
-    expect(hub.broadcastChanged).toHaveBeenCalledTimes(1);
+    expect(hub.broadcast).toHaveBeenCalledTimes(1);
+    expect(hub.broadcast).toHaveBeenCalledWith('changed');
+  });
+
+  it('broadcasts notes-changed through the hub of the subscribed repository', async () => {
+    // Given: one repository with an active subscription
+    const hub = createHub();
+    const manager = createRepoWatchManager({
+      createHub: () => hub,
+      createWatcher: () => ({ stop: vi.fn().mockResolvedValue(undefined) }),
+    });
+    await manager.subscribe({ id: 'sift', path: '/repo/sift' }, createStream());
+
+    // When: a notes change is broadcast for that repoId
+    manager.broadcastNotesChanged('sift');
+
+    // Then: the repository's hub receives the notes-changed event
+    expect(hub.broadcast).toHaveBeenCalledWith('notes-changed');
+  });
+
+  it('is a no-op when broadcasting notes-changed without subscribers', async () => {
+    // Given: a manager with a subscription for a different repository only
+    const hub = createHub();
+    const createHubMock = vi.fn(() => hub);
+    const manager = createRepoWatchManager({
+      createHub: createHubMock,
+      createWatcher: () => ({ stop: vi.fn().mockResolvedValue(undefined) }),
+    });
+    await manager.subscribe({ id: 'sift', path: '/repo/sift' }, createStream());
+
+    // When: a notes change is broadcast for a repoId nobody subscribed to
+    manager.broadcastNotesChanged('other');
+
+    // Then: no hub is created or invoked for the unknown repoId
+    expect(createHubMock).toHaveBeenCalledTimes(1);
+    expect(hub.broadcast).not.toHaveBeenCalled();
   });
 
   it('unsubscribes aborted streams while keeping the watcher alive for remaining streams', async () => {
