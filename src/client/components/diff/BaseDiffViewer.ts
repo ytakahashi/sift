@@ -1,5 +1,6 @@
-import type { Note, NoteTarget } from '../../../domain/notes/types';
+import type { Note } from '../../../domain/notes/types';
 import type { DiffFile } from '../../../domain/diff/types';
+import type { NoteCreateTarget } from '../../application/ports';
 
 export interface BaseDiffViewerProps {
   file: DiffFile;
@@ -7,9 +8,16 @@ export interface BaseDiffViewerProps {
   onStageHunk?: (hunkId: string) => void;
   onUnstageHunk?: (hunkId: string) => void;
   notes?: Note[];
-  onAddNote?: (target: NoteTarget, body: string) => void;
-  onUpdateNote?: (id: string, body: string) => void;
-  onDeleteNote?: (id: string) => void;
+  /**
+   * Notes are created by path + line number; fileId/hunkId/bucket resolution
+   * happens on the server so UI- and agent-created notes share one code path.
+   * The promises resolve after persistence: editors close only on success.
+   */
+  onAddNote?: (target: NoteCreateTarget, body: string) => Promise<void>;
+  onUpdateNote?: (id: string, body: string) => Promise<void>;
+  onDeleteNote?: (id: string) => Promise<void>;
+  /** Disables note Delete buttons while another notes mutation is in flight. */
+  notesDeleteDisabled?: boolean;
   resolveFilePath: (fileId: string) => string;
   isFileNoteEditorOpen?: boolean;
   onCloseFileNoteEditor?: () => void;

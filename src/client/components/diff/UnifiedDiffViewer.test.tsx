@@ -102,7 +102,7 @@ describe('UnifiedDiffViewer', () => {
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
     // Then: the note target is file-level and the editor closes
-    expect(onAddNote).toHaveBeenCalledWith({ kind: 'file', fileId: 'file-1' }, 'new file note');
+    expect(onAddNote).toHaveBeenCalledWith({ kind: 'file', path: 'src/file.ts' }, 'new file note');
     expect(onCloseFileNoteEditor).toHaveBeenCalled();
   });
 
@@ -127,6 +127,67 @@ describe('UnifiedDiffViewer', () => {
     expect(renderedText.indexOf('line note body')).toBeGreaterThan(
       renderedText.indexOf('const a = 1;'),
     );
+  });
+
+  it('adds a line note addressed by path, line and pane', async () => {
+    // Given: the diff is rendered in the staged pane
+    const user = userEvent.setup();
+    const onAddNote = vi.fn(async () => {});
+    render(
+      <UnifiedDiffViewer
+        file={createTextFile()}
+        paneMode="staged"
+        onAddNote={onAddNote}
+        resolveFilePath={resolveFilePath}
+      />,
+    );
+
+    // When: the user opens the line editor and saves a note
+    await user.click(screen.getByTitle('Add note'));
+    await user.type(screen.getByRole('textbox'), 'line comment');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    // Then: the target carries path + line + the current pane; the server
+    // resolves fileId/hunkId from it
+    expect(onAddNote).toHaveBeenCalledWith(
+      { kind: 'line', path: 'src/file.ts', line: 1, bucket: 'staged' },
+      'line comment',
+    );
+  });
+
+  it('shows a line note only in its own pane, and file notes in both panes', () => {
+    // Given: a working-pane line note and a pane-agnostic file note
+    const notes = [createFileNote(), createLineNote()];
+
+    // When: the file is rendered in the staged pane
+    const staged = render(
+      <UnifiedDiffViewer
+        file={createTextFile()}
+        paneMode="staged"
+        notes={notes}
+        resolveFilePath={resolveFilePath}
+      />,
+    );
+
+    // Then: the working-anchored line note is hidden (the same line number can
+    // hold different content in this pane) while the file note still shows
+    expect(staged.container.textContent).not.toContain('line note body');
+    expect(staged.container.textContent).toContain('file note body');
+    staged.unmount();
+
+    // When: the same notes render in the working pane
+    const working = render(
+      <UnifiedDiffViewer
+        file={createTextFile()}
+        paneMode="working"
+        notes={notes}
+        resolveFilePath={resolveFilePath}
+      />,
+    );
+
+    // Then: the line note is anchored in its own pane
+    expect(working.container.textContent).toContain('line note body');
+    expect(working.container.textContent).toContain('file note body');
   });
 
   it('renders file notes for non-text files', () => {

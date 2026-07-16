@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState, type ReactElement } from 'react';
 import { ArrowLeftToLine, ArrowRightFromLine, ArrowRightToLine } from 'lucide-react';
+import { isNoteEligibleFile } from '../../domain/notes/note-eligibility';
 import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
 import type { RepositoryTab } from '../presentation/repository-tabs/repository-tab';
 import { RepositoryTabs } from '../components/repository-tabs/RepositoryTabs';
@@ -162,12 +163,20 @@ function RepositoryWorkspace({
       onRepositoryResolved(repoId, repository.name);
     }
   }, [onRepositoryResolved, repoId, repository]);
-  const { notes, addNote, updateNote, deleteNote, clearNotes } = useNotes();
+  const {
+    notes,
+    addNote,
+    updateNote,
+    deleteNote,
+    refetchNotes,
+    mutating: notesMutating,
+    error: notesError,
+  } = useNotes(dependencies.notesGateway, repoId);
   const { refreshAll } = useRefreshController({
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
     refresh,
-    clearNotes,
+    refetchNotes,
   });
 
   const {
@@ -185,6 +194,9 @@ function RepositoryWorkspace({
   useAutoRefresh(dependencies.repositoryChangeSource, repoId, refreshAll, {
     enabled: initialized,
     paused: acting,
+    onNotesChange: () => {
+      void refetchNotes();
+    },
   });
 
   const {
@@ -254,7 +266,7 @@ function RepositoryWorkspace({
       <AppHeader
         onNavigateHome={onNavigateToRoot}
         repositoryLabel={repository ? { name: repository.name, path: repository.path } : undefined}
-        errorMessage={repositoryError || diffError || actionError}
+        errorMessage={repositoryError || diffError || actionError || notesError}
         actions={
           <>
             {notesPanel.canOpen && (
@@ -285,6 +297,7 @@ function RepositoryWorkspace({
             notes={notes}
             onClose={notesPanel.close}
             onDeleteNote={deleteNote}
+            deleteDisabled={notesMutating}
             resolveFilePath={notesPanel.resolveFilePath}
           />
         )}
@@ -402,13 +415,15 @@ function RepositoryWorkspace({
                     Discard
                   </button>
                 )}
-                <button
-                  className="button diff-file-action-button"
-                  onClick={fileNoteEditor.open}
-                  type="button"
-                >
-                  Add Note
-                </button>
+                {isNoteEligibleFile(selectedFile) && (
+                  <button
+                    className="button diff-file-action-button"
+                    onClick={fileNoteEditor.open}
+                    type="button"
+                  >
+                    Add Note
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -427,8 +442,12 @@ function RepositoryWorkspace({
                 onAddNote={addNote}
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}
+                notesDeleteDisabled={notesMutating}
                 resolveFilePath={notesPanel.resolveFilePath}
-                isFileNoteEditorOpen={fileNoteEditor.isOpen}
+                // The editor state is keyed by DiffFile.id, which does not
+                // distinguish panes; a same-path entry in the other pane can be
+                // a submodule (type transition), where notes are not allowed.
+                isFileNoteEditorOpen={fileNoteEditor.isOpen && isNoteEligibleFile(selectedFile)}
                 onCloseFileNoteEditor={fileNoteEditor.close}
               />
             )}

@@ -6,8 +6,10 @@ import { NoteViewer } from './NoteViewer';
 interface NoteCardProps {
   note: Note;
   resolveFilePath: (fileId: string) => string;
-  onUpdate?: (id: string, body: string) => void;
-  onDelete?: (id: string) => void;
+  onUpdate?: (id: string, body: string) => Promise<void>;
+  onDelete?: (id: string) => void | Promise<void>;
+  /** Disables Delete while another notes mutation is in flight. */
+  deleteDisabled?: boolean;
 }
 
 export function NoteCard({
@@ -15,12 +17,15 @@ export function NoteCard({
   resolveFilePath,
   onUpdate,
   onDelete,
+  deleteDisabled,
 }: NoteCardProps): ReactElement {
   const [isEditing, setIsEditing] = useState(false);
 
-  const handleSave = (val: string): void => {
+  const handleSave = async (val: string): Promise<void> => {
     if (val.trim()) {
-      onUpdate?.(note.id, val);
+      // A rejection propagates to NoteEditor, which keeps the draft and shows
+      // the error; the editor is closed only after the update succeeded.
+      await onUpdate?.(note.id, val);
     }
     setIsEditing(false);
   };
@@ -46,6 +51,7 @@ export function NoteCard({
           resolveFilePath={resolveFilePath}
           onEdit={() => setIsEditing(true)}
           onDelete={onDelete}
+          deleteDisabled={deleteDisabled}
         />
       )}
     </div>

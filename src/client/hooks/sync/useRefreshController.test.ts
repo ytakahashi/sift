@@ -31,19 +31,19 @@ function createFile(path: string, bucket: 'working' | 'staged', content: string)
 }
 
 describe('useRefreshController', () => {
-  it('clears notes when refreshed diff content changes', async () => {
+  it('refetches notes when refreshed diff content changes', async () => {
     // Given: refresh returns different diff content
     const refresh = vi.fn().mockResolvedValue({
       workingFiles: [createFile('a.ts', 'working', 'newer')],
       stagedFiles: [],
     });
-    const clearNotes = vi.fn();
+    const refetchNotes = vi.fn();
     const { result } = renderHook(() =>
       useRefreshController({
         workingFiles: [createFile('a.ts', 'working', 'new')],
         stagedFiles: [],
         refresh,
-        clearNotes,
+        refetchNotes,
       }),
     );
 
@@ -53,22 +53,24 @@ describe('useRefreshController', () => {
     });
 
     // Then
-    expect(clearNotes).toHaveBeenCalledTimes(1);
+    expect(refetchNotes).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps notes when refreshed diff only moves between working and staged panes', async () => {
+  it('refetches notes when content moves between working and staged panes', async () => {
     // Given: refresh returns the same content in a different pane
+    // (stage/unstage). The server re-anchors line notes to the new bucket
+    // during reconcile, so the client must pick up that result.
     const refresh = vi.fn().mockResolvedValue({
       workingFiles: [],
       stagedFiles: [createFile('a.ts', 'staged', 'new')],
     });
-    const clearNotes = vi.fn();
+    const refetchNotes = vi.fn();
     const { result } = renderHook(() =>
       useRefreshController({
         workingFiles: [createFile('a.ts', 'working', 'new')],
         stagedFiles: [],
         refresh,
-        clearNotes,
+        refetchNotes,
       }),
     );
 
@@ -78,19 +80,44 @@ describe('useRefreshController', () => {
     });
 
     // Then
-    expect(clearNotes).not.toHaveBeenCalled();
+    expect(refetchNotes).toHaveBeenCalledTimes(1);
   });
 
-  it('keeps notes when refresh fails or is superseded', async () => {
-    // Given: refresh returns null
-    const refresh = vi.fn().mockResolvedValue(null);
-    const clearNotes = vi.fn();
+  it('does not refetch notes when the refreshed diff is unchanged', async () => {
+    // Given: refresh returns the identical pane contents
+    const refresh = vi.fn().mockResolvedValue({
+      workingFiles: [createFile('a.ts', 'working', 'new')],
+      stagedFiles: [],
+    });
+    const refetchNotes = vi.fn();
     const { result } = renderHook(() =>
       useRefreshController({
         workingFiles: [createFile('a.ts', 'working', 'new')],
         stagedFiles: [],
         refresh,
-        clearNotes,
+        refetchNotes,
+      }),
+    );
+
+    // When
+    await act(async () => {
+      await result.current.refreshAll();
+    });
+
+    // Then: no-op filesystem events do not cause extra notes traffic
+    expect(refetchNotes).not.toHaveBeenCalled();
+  });
+
+  it('skips the refetch when refresh fails or is superseded', async () => {
+    // Given: refresh returns null
+    const refresh = vi.fn().mockResolvedValue(null);
+    const refetchNotes = vi.fn();
+    const { result } = renderHook(() =>
+      useRefreshController({
+        workingFiles: [createFile('a.ts', 'working', 'new')],
+        stagedFiles: [],
+        refresh,
+        refetchNotes,
       }),
     );
 
@@ -100,6 +127,6 @@ describe('useRefreshController', () => {
     });
 
     // Then
-    expect(clearNotes).not.toHaveBeenCalled();
+    expect(refetchNotes).not.toHaveBeenCalled();
   });
 });
