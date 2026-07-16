@@ -1,24 +1,32 @@
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { RepositoryChangeSource, RepositoryChangeSubscription } from '../../application/ports';
+import type {
+  RepositoryChangeHandlers,
+  RepositoryChangeSource,
+  RepositoryChangeSubscription,
+} from '../../application/ports';
 import { useAutoRefresh } from './useAutoRefresh';
-
-type ChangeHandler = () => void;
 
 class FakeRepositoryChangeSource implements RepositoryChangeSource {
   readonly unsubscribe = vi.fn();
-  private handlers: ChangeHandler[] = [];
+  private handlers: RepositoryChangeHandlers[] = [];
   private repoIds: string[] = [];
 
-  subscribe(repoId: string, onChange: ChangeHandler): RepositoryChangeSubscription {
+  subscribe(repoId: string, handlers: RepositoryChangeHandlers): RepositoryChangeSubscription {
     this.repoIds.push(repoId);
-    this.handlers.push(onChange);
+    this.handlers.push(handlers);
     return { unsubscribe: this.unsubscribe };
   }
 
-  emitChange(): void {
+  emitDiffChange(): void {
     for (const handler of this.handlers) {
-      handler();
+      handler.onDiffChange();
+    }
+  }
+
+  emitNotesChange(): void {
+    for (const handler of this.handlers) {
+      handler.onNotesChange();
     }
   }
 
@@ -50,7 +58,7 @@ describe('useAutoRefresh', () => {
 
     // When: the repository change source emits a change
     act(() => {
-      changeSource.emitChange();
+      changeSource.emitDiffChange();
     });
 
     // Then: the subscription is stable and latest callback is used
@@ -72,8 +80,8 @@ describe('useAutoRefresh', () => {
 
     // When: multiple change events arrive while paused
     act(() => {
-      changeSource.emitChange();
-      changeSource.emitChange();
+      changeSource.emitDiffChange();
+      changeSource.emitDiffChange();
     });
 
     // Then: refresh is not run while paused
@@ -104,6 +112,49 @@ describe('useAutoRefresh', () => {
 
     // Then: the change subscription is opened
     expect(changeSource.subscriptionCount()).toBe(1);
+  });
+
+  it('invokes the latest onNotesChange handler for notes-changed events', () => {
+    // Given: the hook is rendered with one notes handler and rerendered with another
+    const changeSource = new FakeRepositoryChangeSource();
+    const firstHandler = vi.fn();
+    const secondHandler = vi.fn();
+    const { rerender } = renderHook(
+      ({ onNotesChange }: { onNotesChange: () => void }) =>
+        useAutoRefresh(changeSource, 'sift', vi.fn(), { onNotesChange }),
+      { initialProps: { onNotesChange: firstHandler } },
+    );
+
+    rerender({ onNotesChange: secondHandler });
+
+    // When: the server-side notes store changes
+    act(() => {
+      changeSource.emitNotesChange();
+    });
+
+    // Then: the subscription is stable and the latest handler is used
+    expect(changeSource.subscriptionCount()).toBe(1);
+    expect(firstHandler).not.toHaveBeenCalled();
+    expect(secondHandler).toHaveBeenCalledTimes(1);
+  });
+
+  it('delivers notes-changed even while diff refresh is paused', () => {
+    // Given: a workspace action pauses diff refresh
+    const changeSource = new FakeRepositoryChangeSource();
+    const refresh = vi.fn();
+    const onNotesChange = vi.fn();
+    renderHook(() =>
+      useAutoRefresh(changeSource, 'sift', refresh, { paused: true, onNotesChange }),
+    );
+
+    // When: a notes change arrives while paused
+    act(() => {
+      changeSource.emitNotesChange();
+    });
+
+    // Then: notes refetch is not deferred (it cannot overwrite optimistic diff state)
+    expect(onNotesChange).toHaveBeenCalledTimes(1);
+    expect(refresh).not.toHaveBeenCalled();
   });
 
   it('unsubscribes when the hook unmounts', () => {
