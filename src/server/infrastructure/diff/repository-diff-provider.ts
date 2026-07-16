@@ -7,6 +7,15 @@ import { GitClient } from '../git/git-client';
 
 const MAX_UNTRACKED_TEXT_DIFF_BYTES = 512 * 1024;
 
+export interface RepositoryDiffProviderOptions {
+  /**
+   * The diff viewer historically treats Git/filesystem failures as an empty
+   * result. Consumers that make destructive decisions from file absence must
+   * instead receive those failures and abort their operation.
+   */
+  errorMode?: 'suppress' | 'throw';
+}
+
 function splitTextFileLines(content: string): string[] {
   if (content === '') {
     return [];
@@ -23,9 +32,11 @@ function splitTextFileLines(content: string): string[] {
 
 export class RepositoryDiffProvider implements DiffProvider {
   private gitClient: GitClient;
+  private readonly errorMode: 'suppress' | 'throw';
 
-  constructor(repoRoot: string) {
+  constructor(repoRoot: string, options: RepositoryDiffProviderOptions = {}) {
     this.gitClient = new GitClient(repoRoot);
+    this.errorMode = options.errorMode ?? 'suppress';
   }
 
   async getFiles(bucket: FileBucket): Promise<DiffFile[]> {
@@ -38,7 +49,10 @@ export class RepositoryDiffProvider implements DiffProvider {
 
     try {
       rawDiff = await this.gitClient.getDiffOutput(isStaged);
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      if (this.errorMode === 'throw') {
+        throw error;
+      }
       // In case diff fails (e.g. empty repo edges)
     }
 
@@ -51,7 +65,10 @@ export class RepositoryDiffProvider implements DiffProvider {
           const absolutePath = path.resolve(this.gitClient.repoRoot, file);
           files.push(await this.createUntrackedFileDiff(file, absolutePath));
         }
-      } catch (_error: unknown) {
+      } catch (error: unknown) {
+        if (this.errorMode === 'throw') {
+          throw error;
+        }
         // Ignore error
       }
     }
@@ -94,7 +111,10 @@ export class RepositoryDiffProvider implements DiffProvider {
           lines: diffLines,
         });
       }
-    } catch (_error: unknown) {
+    } catch (error: unknown) {
+      if (this.errorMode === 'throw') {
+        throw error;
+      }
       return this.createUntrackedBinaryFile(file);
     }
 
