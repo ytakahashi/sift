@@ -1,5 +1,6 @@
 import { sseRepositoryChangeSource } from '../infrastructure/event/repositoryChangeSource';
 import { httpDiffReader } from '../infrastructure/http/diffClient';
+import { httpNotesGateway } from '../infrastructure/http/notesClient';
 import {
   httpRepositoryReader,
   httpRepositoryWriter,
@@ -13,6 +14,7 @@ export function createClientDependencies(): AppDependencies {
     repositoryReader: httpRepositoryReader,
     repositoryWriter: httpRepositoryWriter,
     workspaceActions: httpWorkspaceActions,
+    notesGateway: httpNotesGateway,
     repositoryChangeSource: sseRepositoryChangeSource,
   };
 }

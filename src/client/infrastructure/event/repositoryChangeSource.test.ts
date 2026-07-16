@@ -18,17 +18,29 @@ describe('sseRepositoryChangeSource', () => {
     vi.unstubAllGlobals();
   });
 
-  it('subscribes to the repository-scoped watch endpoint', () => {
+  it('subscribes both event kinds over one repository-scoped connection', () => {
     // Given
-    const onChange = vi.fn();
+    const onDiffChange = vi.fn();
+    const onNotesChange = vi.fn();
     vi.stubGlobal('EventSource', FakeEventSource);
 
     // When
-    const subscription = sseRepositoryChangeSource.subscribe('my-app', onChange);
+    const subscription = sseRepositoryChangeSource.subscribe('my-app', {
+      onDiffChange,
+      onNotesChange,
+    });
 
-    // Then
+    // Then: one connection carries both listeners
+    expect(FakeEventSource.instances).toHaveLength(1);
     expect(FakeEventSource.instances[0].url).toBe('/api/repositories/my-app/watch');
-    expect(FakeEventSource.instances[0].addEventListener).toHaveBeenCalledWith('changed', onChange);
+    expect(FakeEventSource.instances[0].addEventListener).toHaveBeenCalledWith(
+      'changed',
+      onDiffChange,
+    );
+    expect(FakeEventSource.instances[0].addEventListener).toHaveBeenCalledWith(
+      'notes-changed',
+      onNotesChange,
+    );
 
     // When
     subscription.unsubscribe();

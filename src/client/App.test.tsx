@@ -78,6 +78,13 @@ const testDependencies: AppDependencies = {
     stageHunk: vi.fn(async () => {}),
     unstageHunk: vi.fn(async () => {}),
   },
+  notesGateway: {
+    fetchNotes: vi.fn(async () => []),
+    addNote: vi.fn(),
+    updateNote: vi.fn(),
+    deleteNote: vi.fn(async () => {}),
+    clearNotes: vi.fn(async () => {}),
+  },
   repositoryChangeSource: {
     subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
   },
@@ -141,10 +148,10 @@ describe('App Routing', () => {
     // Then
     expect(useDiffData).toHaveBeenCalledWith(testDependencies.diffReader, 'my-app');
     await waitFor(() => {
-      expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith(
-        'my-app',
-        expect.any(Function),
-      );
+      expect(testDependencies.repositoryChangeSource.subscribe).toHaveBeenCalledWith('my-app', {
+        onDiffChange: expect.any(Function),
+        onNotesChange: expect.any(Function),
+      });
     });
   });
 });

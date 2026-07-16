@@ -16,15 +16,22 @@ export interface UseAutoRefreshOptions {
    * optimistic UI update is not overwritten mid-action.
    */
   paused?: boolean;
+  /**
+   * Invoked when the server-side notes store changed (notes-changed SSE).
+   * Unlike diff refresh, this is not deferred by `paused`: refetching notes
+   * is idempotent and does not overwrite optimistic diff state.
+   */
+  onNotesChange?: () => void;
 }
 
 export function useAutoRefresh(
   changeSource: RepositoryChangeSource,
   repoId: RepositoryId,
   onRefresh: () => Promise<void> | void,
-  { enabled = true, paused = false }: UseAutoRefreshOptions = {},
+  { enabled = true, paused = false, onNotesChange }: UseAutoRefreshOptions = {},
 ): void {
   const onRefreshRef = useRef(onRefresh);
+  const onNotesChangeRef = useRef(onNotesChange);
   const pausedRef = useRef(paused);
   const pendingRefreshRef = useRef(false);
 
@@ -33,6 +40,10 @@ export function useAutoRefresh(
   useEffect(() => {
     onRefreshRef.current = onRefresh;
   }, [onRefresh]);
+
+  useEffect(() => {
+    onNotesChangeRef.current = onNotesChange;
+  }, [onNotesChange]);
 
   useEffect(() => {
     pausedRef.current = paused;
@@ -48,13 +59,18 @@ export function useAutoRefresh(
       return;
     }
 
-    const subscription = changeSource.subscribe(repoId, () => {
-      if (pausedRef.current) {
-        pendingRefreshRef.current = true;
-        return;
-      }
+    const subscription = changeSource.subscribe(repoId, {
+      onDiffChange: () => {
+        if (pausedRef.current) {
+          pendingRefreshRef.current = true;
+          return;
+        }
 
-      void onRefreshRef.current();
+        void onRefreshRef.current();
+      },
+      onNotesChange: () => {
+        onNotesChangeRef.current?.();
+      },
     });
 
     return () => {

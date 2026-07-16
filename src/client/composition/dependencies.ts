@@ -1,5 +1,6 @@
 import type {
   DiffReader,
+  NotesGateway,
   RepositoryReader,
   RepositoryWriter,
   RepositoryChangeSource,
@@ -11,5 +12,6 @@ export interface AppDependencies {
   repositoryReader: RepositoryReader;
   repositoryWriter: RepositoryWriter;
   workspaceActions: WorkspaceActions;
+  notesGateway: NotesGateway;
   repositoryChangeSource: RepositoryChangeSource;
 }
