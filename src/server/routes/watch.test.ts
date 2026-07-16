@@ -16,6 +16,7 @@ function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
     createWatchRoutes({
       repositoryResolver,
       repoWatchManager: {
+        broadcastNotesChanged: vi.fn(),
         close: vi.fn().mockResolvedValue(undefined),
         subscribe: vi.fn().mockResolvedValue(undefined),
       },

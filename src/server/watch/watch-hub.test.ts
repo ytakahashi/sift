@@ -34,13 +34,31 @@ describe('createWatchHub', () => {
     hub.subscribe(stream);
 
     // When: a repository change is broadcast
-    hub.broadcastChanged();
+    hub.broadcast('changed');
     await Promise.resolve();
 
     // Then: the client receives the changed event payload
     expect(stream.writeSSE).toHaveBeenCalledWith({
       event: 'changed',
       data: 'changed',
+    });
+  });
+
+  it('broadcasts notes-changed events under their own event name', async () => {
+    // Given: a hub with one subscribed SSE client
+    const hub = createWatchHub();
+    const stream = createStream();
+    hub.subscribe(stream);
+
+    // When: a notes change is broadcast
+    hub.broadcast('notes-changed');
+    await Promise.resolve();
+
+    // Then: the client receives the event under the notes-changed name,
+    // independent from filesystem 'changed' events
+    expect(stream.writeSSE).toHaveBeenCalledWith({
+      event: 'notes-changed',
+      data: 'notes-changed',
     });
   });
 
@@ -51,7 +69,7 @@ describe('createWatchHub', () => {
     hub.subscribe(stream);
 
     // When: a repository change is broadcast
-    hub.broadcastChanged();
+    hub.broadcast('changed');
     await Promise.resolve();
 
     // Then: no write is attempted for the aborted client
@@ -67,10 +85,10 @@ describe('createWatchHub', () => {
     hub.subscribe(stream);
 
     // When: broadcasting twice
-    hub.broadcastChanged();
+    hub.broadcast('changed');
     await Promise.resolve();
     await Promise.resolve();
-    hub.broadcastChanged();
+    hub.broadcast('changed');
     await Promise.resolve();
 
     // Then: the failed client is only attempted once
@@ -86,7 +104,7 @@ describe('createWatchHub', () => {
     // When: the client aborts and another change is broadcast
     stream.aborted = true;
     await stream.triggerAbort();
-    hub.broadcastChanged();
+    hub.broadcast('changed');
     await Promise.resolve();
 
     // Then: the aborted client is not written to again
