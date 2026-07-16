@@ -14,6 +14,7 @@ export function UnifiedDiffViewer({
   onAddNote,
   onUpdateNote,
   onDeleteNote,
+  notesDeleteDisabled,
   resolveFilePath,
   isFileNoteEditorOpen = false,
   onCloseFileNoteEditor,
@@ -31,9 +32,11 @@ export function UnifiedDiffViewer({
       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.35rem' }}>
         {isFileNoteEditorOpen && (
           <NoteEditor
-            onSave={(val) => {
+            onSave={async (val) => {
               if (val.trim()) {
-                onAddNote?.({ kind: 'file', fileId: file.id }, val);
+                // Close only after the server accepted the note; a rejection
+                // stays in the editor (draft + inline error).
+                await onAddNote?.({ kind: 'file', path: file.path }, val);
               }
               onCloseFileNoteEditor?.();
             }}
@@ -48,6 +51,7 @@ export function UnifiedDiffViewer({
             resolveFilePath={resolveFilePath}
             onUpdate={onUpdateNote}
             onDelete={onDeleteNote}
+            deleteDisabled={notesDeleteDisabled}
           />
         ))}
       </div>
@@ -99,10 +103,13 @@ export function UnifiedDiffViewer({
             if (row.type === 'delete') bgColor = 'rgba(248, 81, 73, 0.15)';
             if (row.type === 'hunk-header') bgColor = 'rgba(56, 139, 253, 0.15)';
 
+            // Anchor line notes to this pane only: the same path and line
+            // number can hold different content in the other pane.
             const lineNotes =
               notes.filter(
                 (n) =>
                   n.target.kind === 'line' &&
+                  n.target.bucket === paneMode &&
                   n.target.startNewLineNumber === row.newLineNumber &&
                   row.type !== 'hunk-header',
               ) || [];
@@ -204,16 +211,16 @@ export function UnifiedDiffViewer({
                   <tr>
                     <td colSpan={4} style={{ padding: '0.2rem 1rem 0.5rem 6.5rem' }}>
                       <NoteEditor
-                        onSave={(val) => {
+                        onSave={async (val) => {
                           if (val.trim()) {
-                            onAddNote?.(
+                            // Close only after the server accepted the note; a
+                            // rejection stays in the editor (draft + inline error).
+                            await onAddNote?.(
                               {
                                 kind: 'line',
-                                fileId: file.id,
+                                path: file.path,
+                                line: row.newLineNumber!,
                                 bucket: paneMode,
-                                hunkId: row.hunkId,
-                                startNewLineNumber: row.newLineNumber!,
-                                endNewLineNumber: row.newLineNumber!,
                               },
                               val,
                             );
@@ -234,6 +241,7 @@ export function UnifiedDiffViewer({
                           resolveFilePath={resolveFilePath}
                           onUpdate={onUpdateNote}
                           onDelete={onDeleteNote}
+                          deleteDisabled={notesDeleteDisabled}
                         />
                       </div>
                     </td>

@@ -163,6 +163,9 @@ describe('RepositoryViewerPage interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
     vi.mocked(useWorkspaceActions).mockReturnValue({
       stageFile,
@@ -267,6 +270,62 @@ describe('RepositoryViewerPage interactions', () => {
 
     // Then: the editor is open
     expect(screen.getByText('file note editor open')).toBeDefined();
+  });
+
+  it('hides Add Note when the selected file is a submodule', async () => {
+    // Given: the working pane contains a submodule entry
+    const user = userEvent.setup();
+    diffState.workingFiles = [
+      {
+        id: 'vendor-lib',
+        bucket: 'working',
+        path: 'vendor/lib',
+        status: 'submodule',
+        kind: 'submodule',
+        displayPath: 'vendor/lib',
+        hunks: [],
+      },
+    ];
+    render(<Page />);
+
+    // When: the submodule is selected
+    await user.click(screen.getByRole('option', { name: /vendor\/lib/ }));
+
+    // Then: notes cannot be attached to submodules, so the action is hidden
+    // while other file actions remain available
+    expect(screen.queryByRole('button', { name: 'Add Note' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Stage file' })).toBeDefined();
+  });
+
+  it('hides an open file note editor when the same fileId resolves to a submodule in the other pane', async () => {
+    // Given: a type transition leaves the same path (same DiffFile.id) as a
+    // text file in working and a submodule in staged
+    const user = userEvent.setup();
+    diffState.workingFiles = [createFile('x', 'working')];
+    diffState.stagedFiles = [
+      {
+        id: 'x',
+        bucket: 'staged',
+        path: 'x.ts',
+        status: 'submodule',
+        kind: 'submodule',
+        displayPath: 'x.ts',
+        hunks: [],
+      },
+    ];
+    render(<Page />);
+
+    // When: the editor is opened on the eligible working entry
+    await user.click(within(screen.getAllByRole('listbox')[0]).getByRole('option'));
+    await user.click(screen.getByRole('button', { name: 'Add Note' }));
+    expect(screen.getByText('file note editor open')).toBeDefined();
+
+    // When: the same-id submodule entry is selected in the staged pane
+    await user.click(within(screen.getAllByRole('listbox')[1]).getByRole('option'));
+
+    // Then: the editor is not rendered on a file that cannot take notes
+    // (the fileId-keyed editor state alone would keep it open)
+    expect(screen.queryByText('file note editor open')).toBeNull();
   });
 
   it('closes the file note editor when the selected file changes', async () => {
@@ -667,6 +726,9 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
 
     // When: the app is rendered
@@ -696,6 +758,9 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
 
     // When: the app is re-rendered
@@ -727,6 +792,9 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
 
     const user = userEvent.setup();
@@ -771,6 +839,9 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
 
     const user = userEvent.setup();
@@ -789,6 +860,9 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
     rerender(<Page />);
 
@@ -819,6 +893,9 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
     });
 
     vi.useFakeTimers();

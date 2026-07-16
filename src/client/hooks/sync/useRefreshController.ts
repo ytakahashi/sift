@@ -9,7 +9,8 @@ export interface UseRefreshControllerOptions {
   workingFiles: DiffFile[];
   stagedFiles: DiffFile[];
   refresh: () => Promise<RepositoryDiff | null>;
-  clearNotes: () => void;
+  /** Picks up the server-side reconcile result after the diff content changed. */
+  refetchNotes: () => Promise<void> | void;
 }
 
 export interface UseRefreshControllerResult {
@@ -20,7 +21,7 @@ export function useRefreshController({
   workingFiles,
   stagedFiles,
   refresh,
-  clearNotes,
+  refetchNotes,
 }: UseRefreshControllerOptions): UseRefreshControllerResult {
   const latestHashRef = useRef(computeDiffRefreshHash(workingFiles, stagedFiles));
 
@@ -37,10 +38,10 @@ export function useRefreshController({
       latestHashRef.current = decision.nextHash;
     }
 
-    if (decision.shouldClearNotes) {
-      clearNotes();
+    if (decision.shouldRefetchNotes) {
+      await refetchNotes();
     }
-  }, [clearNotes, refresh]);
+  }, [refetchNotes, refresh]);
 
   return { refreshAll };
 }

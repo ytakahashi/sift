@@ -5,7 +5,9 @@ import { formatNotesForClipboard } from '../../../domain/notes/format';
 interface NotesListModalProps {
   notes: Note[];
   onClose: () => void;
-  onDeleteNote: (id: string) => void;
+  onDeleteNote: (id: string) => void | Promise<void>;
+  /** Disables Delete while another notes mutation is in flight. */
+  deleteDisabled?: boolean;
   resolveFilePath: (fileId: string) => string;
 }
 
@@ -13,6 +15,7 @@ export function NotesListModal({
   notes,
   onClose,
   onDeleteNote,
+  deleteDisabled = false,
   resolveFilePath,
 }: NotesListModalProps): ReactElement {
   const [copied, setCopied] = useState(false);
@@ -131,12 +134,14 @@ export function NotesListModal({
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
                     <button
-                      onClick={() => onDeleteNote(note.id)}
+                      disabled={deleteDisabled}
+                      onClick={() => void onDeleteNote(note.id)}
                       style={{
                         background: 'transparent',
                         color: '#f85149',
                         border: 'none',
-                        cursor: 'pointer',
+                        cursor: deleteDisabled ? 'default' : 'pointer',
+                        opacity: deleteDisabled ? 0.5 : 1,
                         padding: 0,
                         fontSize: '0.75rem',
                       }}

@@ -6,7 +6,9 @@ interface NoteViewerProps {
   note: Note;
   resolveFilePath: (fileId: string) => string;
   onEdit: () => void;
-  onDelete?: (id: string) => void;
+  onDelete?: (id: string) => void | Promise<void>;
+  /** Disables Delete while another notes mutation is in flight. */
+  deleteDisabled?: boolean;
 }
 
 export function NoteViewer({
@@ -14,6 +16,7 @@ export function NoteViewer({
   resolveFilePath,
   onEdit,
   onDelete,
+  deleteDisabled = false,
 }: NoteViewerProps): ReactElement {
   const [copied, setCopied] = useState(false);
 
@@ -91,12 +94,14 @@ export function NoteViewer({
           </button>
         </div>
         <button
-          onClick={() => onDelete?.(note.id)}
+          disabled={deleteDisabled}
+          onClick={() => void onDelete?.(note.id)}
           style={{
             background: 'transparent',
             color: '#f85149',
             border: 'none',
-            cursor: 'pointer',
+            cursor: deleteDisabled ? 'default' : 'pointer',
+            opacity: deleteDisabled ? 0.5 : 1,
             padding: 0,
           }}
         >
