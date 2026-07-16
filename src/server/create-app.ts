@@ -3,8 +3,11 @@ import { logger } from 'hono/logger';
 import { healthRoutes } from './routes/health';
 import { createDiffRoutes } from './routes/diff';
 import { createActionRoutes } from './routes/actions';
+import { createHostGuard } from './routes/host-guard';
+import { createNotesRoutes } from './routes/notes';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
+import type { NotesStore } from './services/notes-store';
 import type { RepositoryConfigUpdater } from './services/repository-config';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
 import {
@@ -17,6 +20,8 @@ import {
   type RepositoryValidator,
 } from './infrastructure/repository-validator';
 import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
+import { WorktreeFileGenerationProvider } from './infrastructure/git/worktree-file-generation-provider';
+import { InMemoryNotesStore } from './infrastructure/notes/in-memory-notes-store';
 import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 
@@ -27,6 +32,8 @@ export interface CreateAppOptions {
   readConfig?: () => Promise<RepositoryConfigReadResult>;
   repositoryConfigUpdater?: RepositoryConfigUpdater;
   validateRepository?: RepositoryValidator;
+  /** Injectable for route tests; defaults to the in-memory store. */
+  notesStore?: NotesStore;
 }
 
 export function createApp(options: CreateAppOptions): Hono<Env> {
@@ -36,8 +43,11 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
   const resolver = createRepositoryResolver(readConfig, validateRepository);
   const repositoryConfigUpdater =
     options.repositoryConfigUpdater ?? createRepositoryConfigUpdater({ validateRepository });
+  const notesStore = options.notesStore ?? new InMemoryNotesStore();
 
   app.use('*', logger());
+  // DNS rebinding protection for every API and SSE route.
+  app.use('*', createHostGuard());
 
   // Mount API routes
   app.route('/api/health', healthRoutes);
@@ -67,6 +77,18 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
     createWatchRoutes({
       repoWatchManager: options.repoWatchManager,
       repositoryResolver: resolver,
+    }),
+  );
+  app.route(
+    '/api',
+    createNotesRoutes({
+      repositoryResolver: resolver,
+      notesStore,
+      // Reconcile deletes notes for files absent from the diff, so a transient
+      // Git/filesystem failure must abort the request rather than look empty.
+      createDiffProvider: (path) => new RepositoryDiffProvider(path, { errorMode: 'throw' }),
+      createFileGenerationProvider: (path) => new WorktreeFileGenerationProvider(path),
+      notifyNotesChanged: (repoId) => options.repoWatchManager.broadcastNotesChanged(repoId),
     }),
   );
 

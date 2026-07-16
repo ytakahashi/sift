@@ -31,6 +31,16 @@ function createProvider(untrackedFiles: string[]): RepositoryDiffProvider {
   return provider;
 }
 
+function createStrictProvider(gitClientMock: {
+  repoRoot: string;
+  getDiffOutput: ReturnType<typeof vi.fn>;
+  getUntrackedFiles: ReturnType<typeof vi.fn>;
+}): RepositoryDiffProvider {
+  const provider = new RepositoryDiffProvider('/repo/root', { errorMode: 'throw' });
+  (provider as unknown as { gitClient: typeof gitClientMock }).gitClient = gitClientMock;
+  return provider;
+}
+
 describe('RepositoryDiffProvider', () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -137,5 +147,45 @@ describe('RepositoryDiffProvider', () => {
       kind: 'binary',
       hunks: [],
     });
+  });
+
+  it('propagates Git diff failures in strict mode', async () => {
+    // Given: a strict provider whose diff command fails
+    const error = new Error('git diff failed');
+    const provider = createStrictProvider({
+      repoRoot: '/repo/root',
+      getDiffOutput: vi.fn().mockRejectedValue(error),
+      getUntrackedFiles: vi.fn().mockResolvedValue([]),
+    });
+
+    // When / Then: the failure is exposed instead of becoming an empty diff
+    await expect(provider.getFiles('staged')).rejects.toBe(error);
+  });
+
+  it('propagates untracked-file discovery failures in strict mode', async () => {
+    // Given: tracked diff loading succeeds but untracked discovery fails
+    const error = new Error('git ls-files failed');
+    const provider = createStrictProvider({
+      repoRoot: '/repo/root',
+      getDiffOutput: vi.fn().mockResolvedValue(''),
+      getUntrackedFiles: vi.fn().mockRejectedValue(error),
+    });
+
+    // When / Then: the working pane is not returned as a trustworthy empty result
+    await expect(provider.getFiles('working')).rejects.toBe(error);
+  });
+
+  it('propagates untracked-file read failures in strict mode', async () => {
+    // Given: an untracked file is discovered but cannot be inspected
+    const error = new Error('stat failed');
+    statMock.mockRejectedValue(error);
+    const provider = createStrictProvider({
+      repoRoot: '/repo/root',
+      getDiffOutput: vi.fn().mockResolvedValue(''),
+      getUntrackedFiles: vi.fn().mockResolvedValue(['notes.txt']),
+    });
+
+    // When / Then: reconcile callers can abort instead of losing the line anchor
+    await expect(provider.getFiles('working')).rejects.toBe(error);
   });
 });
