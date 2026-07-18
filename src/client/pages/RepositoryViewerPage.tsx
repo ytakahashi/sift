@@ -434,6 +434,7 @@ function RepositoryWorkspace({
               </div>
             ) : (
               <UnifiedDiffViewer
+                key={`${paneMode}:${selectedFile.id}`}
                 file={selectedFile}
                 paneMode={paneMode}
                 onStageHunk={(id) => stageHunk(selectedFile.path, id)}

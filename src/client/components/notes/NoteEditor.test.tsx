@@ -8,6 +8,16 @@ describe('NoteEditor', () => {
     cleanup();
   });
 
+  it('shows an optional context label', () => {
+    // Given: an editor with line-range context
+    render(<NoteEditor contextLabel="Lines 12–18" onSave={vi.fn()} onCancel={vi.fn()} />);
+
+    // When: the editor is rendered
+
+    // Then: the context is visible above the input
+    expect(screen.getByText('Lines 12–18')).toBeDefined();
+  });
+
   it('awaits onSave so the caller can close only after persistence', async () => {
     // Given: an editor whose save resolves
     const user = userEvent.setup();

@@ -2,6 +2,7 @@ import { useState, type ReactElement } from 'react';
 
 interface NoteEditorProps {
   initialValue?: string;
+  contextLabel?: string;
   /**
    * Resolves when the note is persisted; the caller closes the editor only
    * then. On rejection the editor keeps the draft and shows the error inline
@@ -11,7 +12,12 @@ interface NoteEditorProps {
   onCancel: () => void;
 }
 
-export function NoteEditor({ initialValue = '', onSave, onCancel }: NoteEditorProps): ReactElement {
+export function NoteEditor({
+  initialValue = '',
+  contextLabel,
+  onSave,
+  onCancel,
+}: NoteEditorProps): ReactElement {
   const [val, setVal] = useState(initialValue);
   const [isSaving, setIsSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -40,6 +46,11 @@ export function NoteEditor({ initialValue = '', onSave, onCancel }: NoteEditorPr
         margin: '4px 0',
       }}
     >
+      {contextLabel && (
+        <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: '0.35rem' }}>
+          {contextLabel}
+        </div>
+      )}
       <textarea
         value={val}
         onChange={(e) => setVal(e.target.value)}

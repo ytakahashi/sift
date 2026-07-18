@@ -72,6 +72,29 @@ describe('NoteCard', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
   });
 
+  it('keeps the optional context label in view and edit modes', async () => {
+    // Given: a labeled line note card
+    const user = userEvent.setup();
+    const note = createNote();
+    render(
+      <NoteCard
+        note={note}
+        resolveFilePath={resolveFilePath}
+        contextLabel="Lines 10–12"
+        onUpdate={vi.fn()}
+      />,
+    );
+
+    // When: the card is initially viewed
+    expect(screen.getByText('Lines 10–12')).toBeDefined();
+
+    // When: the card switches to its editor
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+
+    // Then: the same context remains visible
+    expect(screen.getByText('Lines 10–12')).toBeDefined();
+  });
+
   it('calls onUpdate and returns to NoteViewer when Save is clicked with non-empty value', async () => {
     // Given: a NoteCard in edit mode
     const user = userEvent.setup();

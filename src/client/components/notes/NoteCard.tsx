@@ -6,6 +6,7 @@ import { NoteViewer } from './NoteViewer';
 interface NoteCardProps {
   note: Note;
   resolveFilePath: (fileId: string) => string;
+  contextLabel?: string;
   onUpdate?: (id: string, body: string) => Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
   /** Disables Delete while another notes mutation is in flight. */
@@ -15,6 +16,7 @@ interface NoteCardProps {
 export function NoteCard({
   note,
   resolveFilePath,
+  contextLabel,
   onUpdate,
   onDelete,
   deleteDisabled,
@@ -42,6 +44,7 @@ export function NoteCard({
       {isEditing ? (
         <NoteEditor
           initialValue={note.body}
+          contextLabel={contextLabel}
           onSave={handleSave}
           onCancel={() => setIsEditing(false)}
         />
@@ -49,6 +52,7 @@ export function NoteCard({
         <NoteViewer
           note={note}
           resolveFilePath={resolveFilePath}
+          contextLabel={contextLabel}
           onEdit={() => setIsEditing(true)}
           onDelete={onDelete}
           deleteDisabled={deleteDisabled}

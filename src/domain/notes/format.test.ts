@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { formatNoteForClipboard, formatNotesForClipboard } from './format';
+import { formatNoteForClipboard, formatNoteLocation, formatNotesForClipboard } from './format';
 
 import type { Note } from './types';
 
@@ -82,6 +82,30 @@ describe('formatNoteForClipboard', () => {
     expect(result).toBe('> path/to/file.ts#L10\nMy note');
   });
 
+  it('formats a range note with both endpoints', () => {
+    // Given: a note covering multiple lines
+    const note: Note = {
+      id: 'n1',
+      target: {
+        kind: 'line',
+        fileId: 'file-1',
+        bucket: 'working',
+        hunkId: 'h1',
+        startNewLineNumber: 10,
+        endNewLineNumber: 12,
+      },
+      body: 'My range note',
+      createdAt: 1000,
+    };
+    const resolveFilePath = (_fileId: string): string => 'path/to/file.ts';
+
+    // When: the note is formatted
+    const result = formatNoteForClipboard(note, resolveFilePath);
+
+    // Then: the clipboard location preserves the complete range
+    expect(result).toBe('> path/to/file.ts#L10-L12\nMy range note');
+  });
+
   it('formats a file note without a line number', () => {
     // Given
     const note: Note = {
@@ -100,5 +124,48 @@ describe('formatNoteForClipboard', () => {
 
     // Then
     expect(result).toBe('> path/to/file.ts\nMy file note');
+  });
+});
+
+describe('formatNoteLocation', () => {
+  it('formats file, single-line, and range locations', () => {
+    // Given: each supported note target
+    const fileNote: Note = {
+      id: 'file',
+      target: { kind: 'file', fileId: 'file-1' },
+      body: 'file',
+      createdAt: 1,
+    };
+    const singleLineNote: Note = {
+      id: 'single',
+      target: {
+        kind: 'line',
+        fileId: 'file-1',
+        bucket: 'working',
+        hunkId: 'h1',
+        startNewLineNumber: 4,
+        endNewLineNumber: 4,
+      },
+      body: 'single',
+      createdAt: 1,
+    };
+    const rangeNote: Note = {
+      ...singleLineNote,
+      id: 'range',
+      target: {
+        kind: 'line',
+        fileId: 'file-1',
+        bucket: 'working',
+        hunkId: 'h1',
+        startNewLineNumber: 4,
+        endNewLineNumber: 6,
+      },
+    };
+    const resolveFilePath = (_fileId: string): string => 'src/a.ts';
+
+    // When / Then: each target keeps its appropriate location detail
+    expect(formatNoteLocation(fileNote, resolveFilePath)).toBe('src/a.ts');
+    expect(formatNoteLocation(singleLineNote, resolveFilePath)).toBe('src/a.ts#L4');
+    expect(formatNoteLocation(rangeNote, resolveFilePath)).toBe('src/a.ts#L4-L6');
   });
 });

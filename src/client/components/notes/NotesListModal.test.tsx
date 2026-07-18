@@ -57,7 +57,19 @@ describe('NotesListModal', () => {
 
   it('shows line and file note locations with the correct line suffix', () => {
     // Given: line and file notes are mixed in the list
-    const notes = [createLineNote(), createFileNote()];
+    const notes = [
+      createLineNote({
+        target: {
+          kind: 'line',
+          fileId: 'file-1',
+          bucket: 'working',
+          hunkId: 'h1',
+          startNewLineNumber: 10,
+          endNewLineNumber: 12,
+        },
+      }),
+      createFileNote(),
+    ];
 
     // When: the modal is rendered
     render(
@@ -70,7 +82,7 @@ describe('NotesListModal', () => {
     );
 
     // Then: line notes include a line suffix and file notes show only the path
-    expect(screen.getByText('src/line.ts#L10')).toBeDefined();
+    expect(screen.getByText('src/line.ts#L10-L12')).toBeDefined();
     expect(screen.getByText('src/file.ts')).toBeDefined();
     expect(screen.queryByText('src/file.ts#L10')).toBeNull();
   });
@@ -111,7 +123,19 @@ describe('NotesListModal', () => {
       writable: true,
       configurable: true,
     });
-    const notes = [createLineNote(), createFileNote()];
+    const notes = [
+      createLineNote({
+        target: {
+          kind: 'line',
+          fileId: 'file-1',
+          bucket: 'working',
+          hunkId: 'h1',
+          startNewLineNumber: 10,
+          endNewLineNumber: 12,
+        },
+      }),
+      createFileNote(),
+    ];
     render(
       <NotesListModal
         notes={notes}
@@ -128,7 +152,7 @@ describe('NotesListModal', () => {
 
     // Then: the clipboard text keeps the line suffix only for line notes
     expect(writeText).toHaveBeenCalledWith(
-      '> src/line.ts#L10\nline note body\n\n> src/file.ts\nfile note body',
+      '> src/line.ts#L10-L12\nline note body\n\n> src/file.ts\nfile note body',
     );
   });
 });

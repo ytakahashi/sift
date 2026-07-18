@@ -1,9 +1,18 @@
-import React, { useMemo, useState, type ReactElement } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
+import { findHunkContainingRange } from '../../../domain/notes/resolve-line-note-target';
+import { formatLineRange } from '../../presentation/notes/line-range';
 import { NoteEditor } from '../notes/NoteEditor';
 import { NoteCard } from '../notes/NoteCard';
 import { SyntaxHighlightedLine } from './SyntaxHighlightedLine';
+
+type LineInteraction =
+  | { type: 'idle' }
+  | { type: 'selecting'; anchor: number }
+  | { type: 'editing'; startLine: number; endLine: number };
+
+const RANGE_SELECTION_ERROR = 'Select lines within a single diff hunk.';
 
 export function UnifiedDiffViewer({
   file,
@@ -20,8 +29,67 @@ export function UnifiedDiffViewer({
   onCloseFileNoteEditor,
 }: BaseDiffViewerProps): ReactElement {
   const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
-  const [activeEditorLine, setActiveEditorLine] = useState<number | null>(null);
+  const viewerRef = useRef<HTMLDivElement>(null);
+  const [interaction, setInteraction] = useState<LineInteraction>({ type: 'idle' });
+  const [rangeSelectionError, setRangeSelectionError] = useState<string | null>(null);
   const fileNotes = notes.filter((note) => note.target.kind === 'file');
+  const paneLineNotes = notes.filter(
+    (note) => note.target.kind === 'line' && note.target.bucket === paneMode,
+  );
+
+  useEffect(() => {
+    if (interaction.type !== 'selecting') {
+      return;
+    }
+
+    const handleKeyDown = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') {
+        setInteraction({ type: 'idle' });
+      }
+    };
+    const handleDocumentClick = (event: MouseEvent): void => {
+      const target = event.target;
+      const isOwnGutter =
+        target instanceof Element &&
+        viewerRef.current?.contains(target) === true &&
+        target.closest('[data-note-range-gutter="true"]') !== null;
+      if (!isOwnGutter) {
+        setInteraction({ type: 'idle' });
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    document.addEventListener('click', handleDocumentClick);
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+      document.removeEventListener('click', handleDocumentClick);
+    };
+  }, [interaction.type]);
+
+  useEffect(() => {
+    if (rangeSelectionError === null) {
+      return;
+    }
+    const timer = window.setTimeout(() => setRangeSelectionError(null), 3000);
+    return () => window.clearTimeout(timer);
+  }, [rangeSelectionError]);
+
+  const handleGutterClick = (lineNumber: number): void => {
+    setRangeSelectionError(null);
+    if (interaction.type !== 'selecting') {
+      setInteraction({ type: 'selecting', anchor: lineNumber });
+      return;
+    }
+
+    const startLine = Math.min(interaction.anchor, lineNumber);
+    const endLine = Math.max(interaction.anchor, lineNumber);
+    if (!findHunkContainingRange(file.hunks, startLine, endLine)) {
+      setRangeSelectionError(RANGE_SELECTION_ERROR);
+      setInteraction({ type: 'idle' });
+      return;
+    }
+    setInteraction({ type: 'editing', startLine, endLine });
+  };
 
   const renderFileNotes = (): ReactElement | null => {
     if (!isFileNoteEditorOpen && fileNotes.length === 0) {
@@ -75,6 +143,7 @@ export function UnifiedDiffViewer({
 
   return (
     <div
+      ref={viewerRef}
       className="unified-diff-viewer"
       style={{
         fontFamily:
@@ -82,6 +151,14 @@ export function UnifiedDiffViewer({
         fontSize: '0.8rem',
       }}
     >
+      {rangeSelectionError && (
+        <div
+          role="alert"
+          style={{ color: '#f85149', padding: '0.4rem 1rem', whiteSpace: 'pre-wrap' }}
+        >
+          {rangeSelectionError}
+        </div>
+      )}
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: '40px' }} />
@@ -103,20 +180,53 @@ export function UnifiedDiffViewer({
             if (row.type === 'delete') bgColor = 'rgba(248, 81, 73, 0.15)';
             if (row.type === 'hunk-header') bgColor = 'rgba(56, 139, 253, 0.15)';
 
-            // Anchor line notes to this pane only: the same path and line
-            // number can hold different content in the other pane.
-            const lineNotes =
-              notes.filter(
-                (n) =>
-                  n.target.kind === 'line' &&
-                  n.target.bucket === paneMode &&
-                  n.target.startNewLineNumber === row.newLineNumber &&
-                  row.type !== 'hunk-header',
-              ) || [];
+            // Anchor line notes to this pane only: the same path and range can
+            // hold different content in the other pane.
+            const rowLineNumber = row.type === 'hunk-header' ? undefined : row.newLineNumber;
+            const highlightedByNote =
+              rowLineNumber !== undefined &&
+              paneLineNotes.some(
+                (note) =>
+                  note.target.kind === 'line' &&
+                  note.target.startNewLineNumber <= rowLineNumber &&
+                  rowLineNumber <= note.target.endNewLineNumber,
+              );
+            const endingLineNotes =
+              rowLineNumber === undefined
+                ? []
+                : paneLineNotes.filter(
+                    (note) =>
+                      note.target.kind === 'line' && note.target.endNewLineNumber === rowLineNumber,
+                  );
+            const isRangeAnchor =
+              interaction.type === 'selecting' && interaction.anchor === rowLineNumber;
+            const isEditingRange =
+              interaction.type === 'editing' &&
+              rowLineNumber !== undefined &&
+              interaction.startLine <= rowLineNumber &&
+              rowLineNumber <= interaction.endLine;
+            const rangeIndicatorColor = isRangeAnchor
+              ? '#d29922'
+              : isEditingRange
+                ? '#58a6ff'
+                : highlightedByNote
+                  ? '#3fb950'
+                  : undefined;
 
             return (
               <React.Fragment key={row.id}>
-                <tr style={{ backgroundColor: bgColor }}>
+                <tr
+                  data-new-line-number={rowLineNumber}
+                  data-note-highlighted={highlightedByNote || undefined}
+                  data-range-anchor={isRangeAnchor || undefined}
+                  data-range-editing={isEditingRange || undefined}
+                  style={{
+                    backgroundColor: bgColor,
+                    boxShadow: rangeIndicatorColor
+                      ? `inset 3px 0 0 ${rangeIndicatorColor}`
+                      : undefined,
+                  }}
+                >
                   <td
                     style={{
                       textAlign: 'right',
@@ -172,7 +282,9 @@ export function UnifiedDiffViewer({
                   >
                     {row.type !== 'hunk-header' && row.newLineNumber !== undefined && (
                       <button
-                        onClick={() => setActiveEditorLine(row.newLineNumber!)}
+                        aria-label={`Select line ${row.newLineNumber} for note`}
+                        data-note-range-gutter="true"
+                        onClick={() => handleGutterClick(row.newLineNumber!)}
                         style={{
                           background: 'transparent',
                           color: '#8b949e',
@@ -182,7 +294,11 @@ export function UnifiedDiffViewer({
                           width: '100%',
                           opacity: 0.5,
                         }}
-                        title="Add note"
+                        title={
+                          interaction.type === 'selecting'
+                            ? `Click to end the note range at line ${row.newLineNumber}`
+                            : `Click to start a note at line ${row.newLineNumber} (click another line for a range)`
+                        }
                       >
                         +
                       </button>
@@ -207,10 +323,11 @@ export function UnifiedDiffViewer({
                     </span>
                   </td>
                 </tr>
-                {activeEditorLine === row.newLineNumber && (
+                {interaction.type === 'editing' && interaction.endLine === row.newLineNumber && (
                   <tr>
                     <td colSpan={4} style={{ padding: '0.2rem 1rem 0.5rem 6.5rem' }}>
                       <NoteEditor
+                        contextLabel={formatLineRange(interaction.startLine, interaction.endLine)}
                         onSave={async (val) => {
                           if (val.trim()) {
                             // Close only after the server accepted the note; a
@@ -219,27 +336,35 @@ export function UnifiedDiffViewer({
                               {
                                 kind: 'line',
                                 path: file.path,
-                                startLine: row.newLineNumber!,
-                                endLine: row.newLineNumber!,
+                                startLine: interaction.startLine,
+                                endLine: interaction.endLine,
                                 bucket: paneMode,
                               },
                               val,
                             );
                           }
-                          setActiveEditorLine(null);
+                          setInteraction({ type: 'idle' });
                         }}
-                        onCancel={() => setActiveEditorLine(null)}
+                        onCancel={() => setInteraction({ type: 'idle' })}
                       />
                     </td>
                   </tr>
                 )}
-                {lineNotes.map((note) => (
+                {endingLineNotes.map((note) => (
                   <tr key={note.id} style={{ backgroundColor: 'rgba(255, 255, 255, 0.05)' }}>
                     <td colSpan={4} style={{ padding: '0.2rem 1rem 0.5rem 6.5rem' }}>
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                         <NoteCard
                           note={note}
                           resolveFilePath={resolveFilePath}
+                          contextLabel={
+                            note.target.kind === 'line'
+                              ? formatLineRange(
+                                  note.target.startNewLineNumber,
+                                  note.target.endNewLineNumber,
+                                )
+                              : undefined
+                          }
                           onUpdate={onUpdateNote}
                           onDelete={onDeleteNote}
                           deleteDisabled={notesDeleteDisabled}
