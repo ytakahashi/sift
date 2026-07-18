@@ -5,6 +5,7 @@ import { formatNoteForClipboard } from '../../../domain/notes/format';
 interface NoteViewerProps {
   note: Note;
   resolveFilePath: (fileId: string) => string;
+  contextLabel?: string;
   onEdit: () => void;
   onDelete?: (id: string) => void | Promise<void>;
   /** Disables Delete while another notes mutation is in flight. */
@@ -14,6 +15,7 @@ interface NoteViewerProps {
 export function NoteViewer({
   note,
   resolveFilePath,
+  contextLabel,
   onEdit,
   onDelete,
   deleteDisabled = false,
@@ -39,6 +41,11 @@ export function NoteViewer({
 
   return (
     <>
+      {contextLabel && (
+        <div style={{ color: '#8b949e', fontSize: '0.75rem', marginBottom: '0.35rem' }}>
+          {contextLabel}
+        </div>
+      )}
       <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9' }}>{note.body}</div>
       <div
         style={{

@@ -13,7 +13,7 @@ export class NoteNotFoundError extends Error {
 
 /**
  * The creation target could not be resolved against the current diff:
- * file or line not present, ambiguous across panes, or a submodule.
+ * file or line range not present, ambiguous across panes, or a submodule.
  * The message distinguishes the cases and guides recovery (e.g. suggesting
  * a file note or an explicit bucket).
  */
@@ -47,8 +47,8 @@ export class NoteGenerationUnavailableError extends Error {
 export interface NoteAnchor {
   /** Worktree generation of the target file at creation time. */
   generation: ConfirmedFileGeneration;
-  /** For line notes: content of the anchored line (re-anchoring baseline). */
-  lineContent?: string;
+  /** For line notes: contents of the anchored range (re-anchoring baseline). */
+  lineContents?: string[];
 }
 
 export interface NotesStore {

@@ -1,4 +1,4 @@
-import type { DiffFile } from '../diff/types';
+import type { DiffFile, DiffHunk } from '../diff/types';
 import { isNoteEligibleFile } from './note-eligibility';
 import type { NoteBucket } from './types';
 
@@ -6,8 +6,8 @@ export interface ResolvedLineNoteTarget {
   fileId: string;
   hunkId: string;
   bucket: NoteBucket;
-  /** Content of the matched diff line, recorded as the re-anchoring baseline. */
-  lineContent: string;
+  /** Content of the matched diff lines, recorded as the re-anchoring baseline. */
+  lineContents: string[];
 }
 
 export type LineNoteTargetResolution =
@@ -30,24 +30,95 @@ export interface ResolveLineNoteTargetOptions {
   stagedFiles: DiffFile[];
   /** Repository-relative path, as displayed by the diff. */
   path: string;
-  /** New-file-side line number (worktree for working, index for staged). */
-  line: number;
+  /** Inclusive new-file-side range (worktree for working, index for staged). */
+  startLine: number;
+  endLine: number;
   /** Omit to search both panes; ambiguous when both match. */
   bucketConstraint?: BucketConstraint;
   /**
-   * When set, a candidate line matches only if its content equals this value.
-   * Re-anchoring passes the stored content so a note never re-attaches to
-   * different content that happens to sit at the same line number.
+   * When set, a candidate range matches only if every line equals the
+   * corresponding value. Re-anchoring passes the stored contents so a note
+   * never re-attaches to a partially changed range.
    */
-  requiredLineContent?: string;
+  requiredLineContents?: string[];
 }
 
 /**
- * Resolves a (path, line) pair against the current diff.
+ * Maps each new-file-side line in a hunk to its content. The single source
+ * of truth for "which lines does this hunk actually have", shared by range
+ * containment checks and content extraction so the two can never drift apart.
+ */
+function buildLineContentMap(hunk: DiffHunk): Map<number, string> {
+  const contentByLine = new Map<number, string>();
+  for (const line of hunk.lines) {
+    if (line.newLineNumber !== undefined) {
+      contentByLine.set(line.newLineNumber, line.content);
+    }
+  }
+  return contentByLine;
+}
+
+/**
+ * Extracts the contents of an inclusive line range from a hunk's line map,
+ * in order, or undefined if the range is invalid or any line in it is absent
+ * from the hunk. Actual diff lines are checked instead of trusting hunk
+ * header arithmetic.
+ */
+function extractRangeContents(
+  contentByLine: Map<number, string>,
+  startLine: number,
+  endLine: number,
+): string[] | undefined {
+  if (
+    !Number.isSafeInteger(startLine) ||
+    !Number.isSafeInteger(endLine) ||
+    startLine < 1 ||
+    endLine < startLine
+  ) {
+    return undefined;
+  }
+
+  // Bound the walk by the hunk's own line count so an unreasonable request
+  // range (e.g. startLine=5, endLine=1_000_000) cannot loop unbounded.
+  const rangeLength = endLine - startLine + 1;
+  if (rangeLength > contentByLine.size) {
+    return undefined;
+  }
+
+  const contents: string[] = [];
+  for (let lineNumber = startLine; lineNumber <= endLine; lineNumber += 1) {
+    const content = contentByLine.get(lineNumber);
+    if (content === undefined) {
+      return undefined;
+    }
+    contents.push(content);
+  }
+  return contents;
+}
+
+/**
+ * Finds the hunk containing every new-file-side line in an inclusive range.
+ */
+export function findHunkContainingRange(
+  hunks: DiffHunk[],
+  startLine: number,
+  endLine: number,
+): DiffHunk | undefined {
+  for (const hunk of hunks) {
+    if (extractRangeContents(buildLineContentMap(hunk), startLine, endLine) !== undefined) {
+      return hunk;
+    }
+  }
+
+  return undefined;
+}
+
+/**
+ * Resolves a (path, line range) pair against the current diff.
  *
  * The resolution unit is the whole target, not the file: a pane matches only
- * if it contains the line itself. This lets "the file exists in working but
- * the line only in staged" fall through to staged instead of failing.
+ * if one hunk contains the complete range. This lets "the file exists in
+ * working but the range only in staged" fall through to staged instead of failing.
  * Only note-eligible files are considered (submodules never match).
  *
  * Shared by creation and reconcile re-anchoring so the resolution rules have
@@ -94,30 +165,40 @@ function resolveInPane(
     }
 
     for (const hunk of file.hunks) {
-      // Check actual line presence rather than the hunk header range, matching
-      // the anchor criterion the UI uses to render notes (row.newLineNumber).
-      for (const line of hunk.lines) {
-        if (line.newLineNumber !== options.line) {
-          continue;
-        }
-        if (
-          options.requiredLineContent !== undefined &&
-          line.content !== options.requiredLineContent
-        ) {
-          continue;
-        }
-        return {
-          kind: 'resolved',
-          target: {
-            fileId: file.id,
-            hunkId: hunk.id,
-            bucket,
-            lineContent: line.content,
-          },
-        };
+      const lineContents = extractRangeContents(
+        buildLineContentMap(hunk),
+        options.startLine,
+        options.endLine,
+      );
+      if (lineContents === undefined) {
+        continue;
       }
+
+      if (
+        options.requiredLineContents !== undefined &&
+        !hasEqualLineContents(lineContents, options.requiredLineContents)
+      ) {
+        continue;
+      }
+
+      return {
+        kind: 'resolved',
+        target: {
+          fileId: file.id,
+          hunkId: hunk.id,
+          bucket,
+          lineContents,
+        },
+      };
     }
   }
 
   return null;
+}
+
+function hasEqualLineContents(actual: string[], required: string[]): boolean {
+  return (
+    actual.length === required.length &&
+    actual.every((content, index) => content === required[index])
+  );
 }

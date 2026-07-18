@@ -9,9 +9,10 @@ export interface BaseDiffViewerProps {
   onUnstageHunk?: (hunkId: string) => void;
   notes?: Note[];
   /**
-   * Notes are created by path + line number; fileId/hunkId/bucket resolution
-   * happens on the server so UI- and agent-created notes share one code path.
-   * The promises resolve after persistence: editors close only on success.
+   * Notes are created by path + inclusive line range; fileId/hunkId/bucket
+   * resolution happens on the server so UI- and agent-created notes share one
+   * code path. The promises resolve after persistence: editors close only on
+   * success.
    */
   onAddNote?: (target: NoteCreateTarget, body: string) => Promise<void>;
   onUpdateNote?: (id: string, body: string) => Promise<void>;

@@ -16,7 +16,7 @@ import { NoteNotFoundError } from '../../services/notes-store';
  * improvement. Swapping in a persistent implementation only requires
  * replacing this class behind the NotesStore port.
  *
- * The anchor (creation-time generation and line content) is recorded per
+ * The anchor (creation-time generation and line contents) is recorded per
  * note, so notes created at different times are each validated against their
  * own baseline.
  */
@@ -68,7 +68,7 @@ export class InMemoryNotesStore implements NotesStore {
     const record: NoteReconcileRecord = {
       note,
       generation: anchor.generation,
-      lineContent: anchor.lineContent,
+      lineContents: anchor.lineContents,
     };
 
     const existing = this.records.get(repoId) ?? [];

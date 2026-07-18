@@ -50,8 +50,9 @@ interface LineRecordOptions {
   path: string;
   bucket: NoteBucket;
   line: number;
+  endLine?: number;
   hunkId?: string;
-  lineContent?: string;
+  lineContents?: string[];
   generation?: ConfirmedFileGeneration;
 }
 
@@ -65,13 +66,13 @@ function createLineRecord(options: LineRecordOptions): NoteReconcileRecord {
         bucket: options.bucket,
         hunkId: options.hunkId ?? `hunk-${options.path}-0`,
         startNewLineNumber: options.line,
-        endNewLineNumber: options.line,
+        endNewLineNumber: options.endLine ?? options.line,
       },
       body: `note-${options.id}`,
       createdAt: 1,
     },
     generation: options.generation ?? fileGeneration('blob-1'),
-    lineContent: options.lineContent,
+    lineContents: options.lineContents,
   };
 }
 
@@ -98,6 +99,94 @@ function generationsOf(
 }
 
 describe('reconcileNotes', () => {
+  it('keeps a range note when every anchored line is unchanged', () => {
+    // Given: a two-line note whose complete range and contents remain intact
+    const record = createLineRecord({
+      id: 'range',
+      path: 'a.ts',
+      bucket: 'working',
+      line: 5,
+      endLine: 6,
+      lineContents: ['first', 'second'],
+    });
+    const workingFiles = [
+      createFile({
+        path: 'a.ts',
+        lines: [
+          { line: 5, content: 'first' },
+          { line: 6, content: 'second' },
+        ],
+      }),
+    ];
+
+    // When: reconcile validates the range
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: the original record survives without a reported change
+    expect(result).toEqual({ records: [record], changed: false });
+  });
+
+  it('discards a range note when one anchored line changes', () => {
+    // Given: the second line of an anchored range no longer matches
+    const record = createLineRecord({
+      id: 'range',
+      path: 'a.ts',
+      bucket: 'working',
+      line: 5,
+      endLine: 6,
+      lineContents: ['first', 'second'],
+    });
+    const workingFiles = [
+      createFile({
+        path: 'a.ts',
+        lines: [
+          { line: 5, content: 'first' },
+          { line: 6, content: 'changed' },
+        ],
+      }),
+    ];
+
+    // When: reconcile validates the complete content baseline
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: the note is discarded instead of partially re-anchored
+    expect(result).toEqual({ records: [], changed: true });
+  });
+
+  it('discards a range note when part of the range is no longer in one hunk', () => {
+    // Given: the stored range expects two lines, but only its first line remains
+    const record = createLineRecord({
+      id: 'range',
+      path: 'a.ts',
+      bucket: 'working',
+      line: 5,
+      endLine: 6,
+      lineContents: ['first', 'second'],
+    });
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'first' }] })];
+
+    // When: reconcile can no longer resolve the complete range
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: shortening the anchor is rejected
+    expect(result).toEqual({ records: [], changed: true });
+  });
+
   it('keeps notes untouched when the worktree is unchanged', () => {
     // Given: a line note whose file, generation and anchor are all intact
     const record = createLineRecord({
@@ -105,7 +194,7 @@ describe('reconcileNotes', () => {
       path: 'a.ts',
       bucket: 'working',
       line: 5,
-      lineContent: 'x',
+      lineContents: ['x'],
     });
     const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'x' }] })];
 
@@ -131,7 +220,7 @@ describe('reconcileNotes', () => {
       path: 'a.ts',
       bucket: 'working',
       line: 5,
-      lineContent: 'x',
+      lineContents: ['x'],
     });
     const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'x' }] })];
 
@@ -193,7 +282,7 @@ describe('reconcileNotes', () => {
       path: 'a.ts',
       bucket: 'staged',
       line: 1,
-      lineContent: 'b',
+      lineContents: ['b'],
       generation: fileGeneration('blob-c'),
     });
     const stagedFiles = [createFile({ path: 'a.ts', lines: [{ line: 1, content: 'c' }] })];
@@ -221,7 +310,7 @@ describe('reconcileNotes', () => {
       bucket: 'working',
       line: 5,
       hunkId: 'hunk-a.ts-0',
-      lineContent: 'x',
+      lineContents: ['x'],
     });
     const stagedFiles = [
       createFile({ path: 'a.ts', hunkId: 'hunk-a.ts-9', lines: [{ line: 5, content: 'x' }] }),
@@ -250,7 +339,7 @@ describe('reconcileNotes', () => {
       path: 'a.ts',
       bucket: 'working',
       line: 5,
-      lineContent: 'x',
+      lineContents: ['x'],
     });
     const missingRecord = createFileRecord('n2', 'b.ts');
     const workingFiles = [
@@ -308,7 +397,7 @@ describe('reconcileNotes', () => {
   });
 
   it('discards a line record that lost its content baseline', () => {
-    // Given: a line record without lineContent (invalid store state); it
+    // Given: a line record without lineContents (invalid store state); it
     // cannot be re-anchored safely
     const record = createLineRecord({ id: 'n1', path: 'a.ts', bucket: 'working', line: 5 });
     const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'x' }] })];

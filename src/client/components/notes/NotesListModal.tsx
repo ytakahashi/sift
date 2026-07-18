@@ -1,6 +1,6 @@
 import { useState, useEffect, type ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
-import { formatNotesForClipboard } from '../../../domain/notes/format';
+import { formatNoteLocation, formatNotesForClipboard } from '../../../domain/notes/format';
 
 interface NotesListModalProps {
   notes: Note[];
@@ -110,11 +110,7 @@ export function NotesListModal({
           }}
         >
           {notes.map((note) => {
-            const filePath = resolveFilePath(note.target.fileId);
-            const location =
-              note.target.kind === 'line'
-                ? `${filePath}#L${note.target.startNewLineNumber}`
-                : filePath;
+            const location = formatNoteLocation(note, resolveFilePath);
             return (
               <div
                 key={note.id}

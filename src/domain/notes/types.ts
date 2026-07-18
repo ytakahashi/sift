@@ -14,7 +14,10 @@ export type LineNoteTarget = {
   bucket: NoteBucket;
   /** The hunk the note belongs to. Always resolved by the server at creation and refreshed by reconcile. */
   hunkId: string;
-  /** Range of lines for the note (new file side). For MVP, start === end. */
+  /**
+   * Inclusive range of lines for the note (new file side).
+   * A single-line note has equal start and end values.
+   */
   startNewLineNumber: number;
   endNewLineNumber: number;
 };
