@@ -157,8 +157,12 @@ describe('notesRoutes', () => {
       // When: notes are listed for an unconfigured repoId
       const response = await app.request('/api/repositories/missing/notes');
 
-      // Then: the resolver error maps to 404
+      // Then: the resolver error maps to 404 with a stable classification
       expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toEqual({
+        error: 'not configured',
+        code: 'REPOSITORY_NOT_FOUND',
+      });
     });
 
     it('does not reconcile when a pane diff cannot be loaded', async () => {
@@ -285,8 +289,9 @@ describe('notesRoutes', () => {
 
       // Then: the error guides the agent toward a file note
       expect(response.status).toBe(422);
-      const payload = (await response.json()) as { error: string };
+      const payload = (await response.json()) as { error: string; code: string };
       expect(payload.error).toContain('kind "file"');
+      expect(payload.code).toBe('NOTE_TARGET_NOT_FOUND');
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
@@ -361,8 +366,9 @@ describe('notesRoutes', () => {
 
       // Then: the error names the required parameter
       expect(response.status).toBe(422);
-      const payload = (await response.json()) as { error: string };
+      const payload = (await response.json()) as { error: string; code: string };
       expect(payload.error).toContain('"bucket"');
+      expect(payload.code).toBe('NOTE_TARGET_AMBIGUOUS');
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
@@ -413,8 +419,9 @@ describe('notesRoutes', () => {
 
       // Then: the error explains submodules are not note targets
       expect(response.status).toBe(422);
-      const payload = (await response.json()) as { error: string };
+      const payload = (await response.json()) as { error: string; code: string };
       expect(payload.error).toContain('submodule');
+      expect(payload.code).toBe('NOTE_TARGET_INELIGIBLE');
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
@@ -450,6 +457,9 @@ describe('notesRoutes', () => {
 
       // Then: the request fails as retryable and nothing is stored
       expect(response.status).toBe(503);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_GENERATION_UNAVAILABLE',
+      });
       expect(notesStore.add).not.toHaveBeenCalled();
     });
   });
@@ -550,6 +560,7 @@ describe('notesRoutes', () => {
 
       // Then: it is rejected before resolution and nothing is stored
       expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_REQUEST_INVALID' });
       expect(notesStore.add).not.toHaveBeenCalled();
     });
   });
@@ -582,6 +593,7 @@ describe('notesRoutes', () => {
 
       // Then: the typed error maps to 404
       expect(response.status).toBe(404);
+      await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_NOT_FOUND' });
     });
   });
 

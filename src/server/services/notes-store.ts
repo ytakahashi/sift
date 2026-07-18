@@ -14,11 +14,16 @@ export class NoteNotFoundError extends Error {
 /**
  * The creation target could not be resolved against the current diff:
  * file or line range not present, ambiguous across panes, or a submodule.
- * The message distinguishes the cases and guides recovery (e.g. suggesting
- * a file note or an explicit bucket).
+ * The kind provides a stable classification while the message guides human
+ * recovery (e.g. suggesting a file note or an explicit bucket).
  */
+export type NoteTargetResolutionKind = 'not-found' | 'ambiguous' | 'ineligible';
+
 export class NoteTargetResolutionError extends Error {
-  constructor(message: string) {
+  constructor(
+    message: string,
+    public readonly kind: NoteTargetResolutionKind,
+  ) {
     super(message);
     this.name = 'NoteTargetResolutionError';
   }
