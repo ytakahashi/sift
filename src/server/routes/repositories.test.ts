@@ -185,7 +185,10 @@ describe('repositoryRoutes', () => {
 
     // Then
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+    expect(data).toEqual({
+      error: 'Repository id "missing" is not configured.',
+      code: 'REPOSITORY_NOT_FOUND',
+    });
   });
 
   it('returns an error by repoId when config is invalid', async () => {
@@ -586,6 +589,7 @@ describe('repositoryRoutes', () => {
     expect(response.status).toBe(422);
     expect(data).toEqual({
       error: 'Repository path is not a Git repository.',
+      code: 'REPOSITORY_INVALID',
     });
   });
 

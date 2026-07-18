@@ -44,7 +44,10 @@ describe('watchRoutes', () => {
 
     // Then
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+    expect(data).toEqual({
+      error: 'Repository id "missing" is not configured.',
+      code: 'REPOSITORY_NOT_FOUND',
+    });
   });
 
   it('returns 422 when the repository path is not a valid Git repository', async () => {
@@ -65,7 +68,10 @@ describe('watchRoutes', () => {
 
     // Then
     expect(response.status).toBe(422);
-    expect(data).toEqual({ error: 'Repository path is not a Git repository.' });
+    expect(data).toEqual({
+      error: 'Repository path is not a Git repository.',
+      code: 'REPOSITORY_INVALID',
+    });
   });
 
   it('returns 400 when the repository config is invalid', async () => {

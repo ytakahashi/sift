@@ -89,7 +89,10 @@ describe('actionRoutes discard-working-file', () => {
 
     // Then
     expect(response.status).toBe(404);
-    expect(data).toEqual({ error: 'Repository id "missing" is not configured.' });
+    expect(data).toEqual({
+      error: 'Repository id "missing" is not configured.',
+      code: 'REPOSITORY_NOT_FOUND',
+    });
   });
 
   it('returns 500 with error message when discard fails', async () => {

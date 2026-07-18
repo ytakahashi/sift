@@ -167,9 +167,13 @@ function resolveCreateTarget(
       if (hasOnlySubmoduleAtPath(context, request.path)) {
         throw new NoteTargetResolutionError(
           `"${request.path}" is a submodule; notes cannot be attached to submodules.`,
+          'ineligible',
         );
       }
-      throw new NoteTargetResolutionError(`"${request.path}" is not part of the current diff.`);
+      throw new NoteTargetResolutionError(
+        `"${request.path}" is not part of the current diff.`,
+        'not-found',
+      );
     }
     return {
       target: { kind: 'file', fileId: file.id },
@@ -192,12 +196,14 @@ function resolveCreateTarget(
     throw new NoteTargetResolutionError(
       `${requestedRange} of "${request.path}" ${verb} in both the working and staged diffs. ` +
         'Specify "bucket": "working" or "staged".',
+      'ambiguous',
     );
   }
   if (resolution.kind === 'not-found') {
     if (hasOnlySubmoduleAtPath(context, request.path)) {
       throw new NoteTargetResolutionError(
         `"${request.path}" is a submodule; notes cannot be attached to submodules.`,
+        'ineligible',
       );
     }
     const requestedRange = formatRequestedLineRange(request.startLine, request.endLine);
@@ -208,6 +214,7 @@ function resolveCreateTarget(
           'of the current diff. ';
     throw new NoteTargetResolutionError(
       message + 'For a file-level comment, use target kind "file".',
+      'not-found',
     );
   }
 
