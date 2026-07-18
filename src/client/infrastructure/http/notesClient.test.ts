@@ -51,7 +51,13 @@ describe('httpNotesGateway', () => {
   it('creates a note with the path-addressed target', async () => {
     // Given
     const fetchMock = stubFetchOk(NOTE, 201);
-    const target = { kind: 'line' as const, path: 'a.ts', line: 5, bucket: 'working' as const };
+    const target = {
+      kind: 'line' as const,
+      path: 'a.ts',
+      startLine: 5,
+      endLine: 7,
+      bucket: 'working' as const,
+    };
 
     // When
     const note = await httpNotesGateway.addNote('my-app', target, 'note body');

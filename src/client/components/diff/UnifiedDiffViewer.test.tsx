@@ -129,7 +129,7 @@ describe('UnifiedDiffViewer', () => {
     );
   });
 
-  it('adds a line note addressed by path, line and pane', async () => {
+  it('adds a line note addressed by path, range and pane', async () => {
     // Given: the diff is rendered in the staged pane
     const user = userEvent.setup();
     const onAddNote = vi.fn(async () => {});
@@ -147,10 +147,16 @@ describe('UnifiedDiffViewer', () => {
     await user.type(screen.getByRole('textbox'), 'line comment');
     await user.click(screen.getByRole('button', { name: 'Save' }));
 
-    // Then: the target carries path + line + the current pane; the server
-    // resolves fileId/hunkId from it
+    // Then: the target carries path + a single-line range + the current pane;
+    // the server resolves fileId/hunkId from it
     expect(onAddNote).toHaveBeenCalledWith(
-      { kind: 'line', path: 'src/file.ts', line: 1, bucket: 'staged' },
+      {
+        kind: 'line',
+        path: 'src/file.ts',
+        startLine: 1,
+        endLine: 1,
+        bucket: 'staged',
+      },
       'line comment',
     );
   });

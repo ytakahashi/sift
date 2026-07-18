@@ -219,7 +219,8 @@ export function UnifiedDiffViewer({
                               {
                                 kind: 'line',
                                 path: file.path,
-                                line: row.newLineNumber!,
+                                startLine: row.newLineNumber!,
+                                endLine: row.newLineNumber!,
                                 bucket: paneMode,
                               },
                               val,

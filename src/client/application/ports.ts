@@ -78,14 +78,20 @@ export interface WorkspaceActions {
 }
 
 /**
- * Creation request for a note, addressed by path and line number. Distinct
- * from the domain NoteTarget: fileId/hunkId resolution and validation happen
- * on the server so UI- and agent-created notes share one code path. The UI
- * always sets the line-note bucket explicitly (it knows its pane), avoiding
+ * Creation request for a note, addressed by path and inclusive line range.
+ * Distinct from the domain NoteTarget: fileId/hunkId resolution and validation
+ * happen on the server so UI- and agent-created notes share one code path. The
+ * UI always sets the line-note bucket explicitly (it knows its pane), avoiding
  * the ambiguity 422 that agents may hit.
  */
 export type NoteCreateTarget =
-  | { kind: 'line'; path: string; line: number; bucket: NoteBucket }
+  | {
+      kind: 'line';
+      path: string;
+      startLine: number;
+      endLine: number;
+      bucket: NoteBucket;
+    }
   | { kind: 'file'; path: string };
 
 export interface NotesGateway {
