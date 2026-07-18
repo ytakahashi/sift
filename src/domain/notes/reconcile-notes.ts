@@ -12,8 +12,8 @@ export interface NoteReconcileRecord {
    * Always confirmed: creation rejects notes whose generation is unavailable.
    */
   generation: ConfirmedFileGeneration;
-  /** For line notes: content of the anchored line at creation (re-anchoring baseline). */
-  lineContent?: string;
+  /** For line notes: contents of the anchored range at creation (re-anchoring baseline). */
+  lineContents?: string[];
 }
 
 export interface ReconcileNotesInput {
@@ -43,7 +43,7 @@ export interface ReconcileNotesResult {
  *    indeterminate, never "changed": the note is kept as-is.
  *    Stage/unstage/commit do not touch the worktree, so they pass here.
  * 3. Re-anchor (line notes) — the target must re-resolve with path, line
- *    number and line content all matching, preferring the stored bucket.
+ *    range and all line contents matching, preferring the stored bucket.
  *    Content moved to the other pane is followed by rewriting bucket/hunkId;
  *    an unresolvable target (e.g. line shifts from partial staging) is
  *    discarded rather than mis-anchored.
@@ -89,7 +89,7 @@ function reconcileRecord(
 
   // A line record without its content baseline cannot be re-anchored safely;
   // treat it as invalid rather than risk attaching to the wrong content.
-  if (record.lineContent === undefined) {
+  if (record.lineContents === undefined) {
     return null;
   }
 
@@ -97,9 +97,10 @@ function reconcileRecord(
     workingFiles: input.workingFiles,
     stagedFiles: input.stagedFiles,
     path: paneFile.path,
-    line: record.note.target.startNewLineNumber,
+    startLine: record.note.target.startNewLineNumber,
+    endLine: record.note.target.endNewLineNumber,
     bucketConstraint: { kind: 'preferred', bucket: record.note.target.bucket },
-    requiredLineContent: record.lineContent,
+    requiredLineContents: record.lineContents,
   });
   if (resolution.kind !== 'resolved') {
     return null;

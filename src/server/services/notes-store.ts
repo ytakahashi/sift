@@ -47,8 +47,8 @@ export class NoteGenerationUnavailableError extends Error {
 export interface NoteAnchor {
   /** Worktree generation of the target file at creation time. */
   generation: ConfirmedFileGeneration;
-  /** For line notes: content of the anchored line (re-anchoring baseline). */
-  lineContent?: string;
+  /** For line notes: contents of the anchored range (re-anchoring baseline). */
+  lineContents?: string[];
 }
 
 export interface NotesStore {

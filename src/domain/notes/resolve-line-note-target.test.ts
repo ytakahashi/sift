@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffFile, DiffLine } from '../diff/types';
-import { resolveLineNoteTarget } from './resolve-line-note-target';
+import { findHunkContainingRange, resolveLineNoteTarget } from './resolve-line-note-target';
 
 interface FileFixtureOptions {
   path: string;
@@ -39,7 +39,144 @@ function createFile(options: FileFixtureOptions): DiffFile {
   };
 }
 
+describe('findHunkContainingRange', () => {
+  it('returns the hunk containing every line in the range', () => {
+    // Given: one hunk containing three consecutive new-side lines
+    const file = createFile({
+      path: 'a.ts',
+      lines: [
+        { line: 10, content: 'first' },
+        { line: 11, content: 'second' },
+        { line: 12, content: 'third' },
+      ],
+    });
+
+    // When: a range wholly inside the hunk is searched
+    const result = findHunkContainingRange(file.hunks, 10, 12);
+
+    // Then: the containing hunk is returned
+    expect(result).toBe(file.hunks[0]);
+  });
+
+  it('returns undefined when a range spans separate hunks', () => {
+    // Given: the endpoints exist, but in different hunks
+    const firstHunk = createFile({
+      path: 'a.ts',
+      hunkId: 'hunk-1',
+      lines: [
+        { line: 1, content: 'a' },
+        { line: 2, content: 'b' },
+      ],
+    }).hunks[0];
+    const secondHunk = createFile({
+      path: 'a.ts',
+      hunkId: 'hunk-2',
+      lines: [
+        { line: 4, content: 'd' },
+        { line: 5, content: 'e' },
+      ],
+    }).hunks[0];
+
+    // When: the requested range crosses the hunk boundary
+    const result = findHunkContainingRange([firstHunk, secondHunk], 2, 4);
+
+    // Then: neither partial match is accepted
+    expect(result).toBeUndefined();
+  });
+
+  it('returns undefined when a line inside the range is absent', () => {
+    // Given: one hunk with a gap in its actual new-side line numbers
+    const file = createFile({
+      path: 'a.ts',
+      lines: [
+        { line: 1, content: 'a' },
+        { line: 3, content: 'c' },
+      ],
+    });
+
+    // When: the range includes the missing line
+    const result = findHunkContainingRange(file.hunks, 1, 3);
+
+    // Then: hunk header arithmetic is not used to invent the missing line
+    expect(result).toBeUndefined();
+  });
+
+  it('supports a single-line range and rejects invalid ranges', () => {
+    // Given: a hunk containing line 5
+    const file = createFile({ path: 'a.ts', lines: [{ line: 5, content: 'x' }] });
+
+    // When / Then: equal endpoints retain single-line behavior
+    expect(findHunkContainingRange(file.hunks, 5, 5)).toBe(file.hunks[0]);
+
+    // When / Then: reversed, non-positive, and unsafe ranges never resolve
+    expect(findHunkContainingRange(file.hunks, 6, 5)).toBeUndefined();
+    expect(findHunkContainingRange(file.hunks, 0, 5)).toBeUndefined();
+    expect(findHunkContainingRange(file.hunks, 5, Number.MAX_VALUE)).toBeUndefined();
+  });
+});
+
 describe('resolveLineNoteTarget', () => {
+  it('resolves a complete range and returns its contents in line order', () => {
+    // Given: one pane contains the requested range in a single hunk
+    const workingFiles = [
+      createFile({
+        path: 'a.ts',
+        lines: [
+          { line: 7, content: 'first' },
+          { line: 8, content: 'second' },
+          { line: 9, content: 'third' },
+        ],
+      }),
+    ];
+
+    // When: the complete range is resolved
+    const result = resolveLineNoteTarget({
+      workingFiles,
+      stagedFiles: [],
+      path: 'a.ts',
+      startLine: 7,
+      endLine: 9,
+    });
+
+    // Then: all contents are returned from start to end
+    expect(result).toEqual({
+      kind: 'resolved',
+      target: {
+        fileId: 'file-a.ts',
+        hunkId: 'hunk-a.ts-0',
+        bucket: 'working',
+        lineContents: ['first', 'second', 'third'],
+      },
+    });
+  });
+
+  it('rejects a range when one required line content differs', () => {
+    // Given: the range exists but its middle line changed
+    const workingFiles = [
+      createFile({
+        path: 'a.ts',
+        lines: [
+          { line: 7, content: 'first' },
+          { line: 8, content: 'changed' },
+          { line: 9, content: 'third' },
+        ],
+      }),
+    ];
+
+    // When: reconcile requires the original complete contents
+    const result = resolveLineNoteTarget({
+      workingFiles,
+      stagedFiles: [],
+      path: 'a.ts',
+      startLine: 7,
+      endLine: 9,
+      requiredLineContents: ['first', 'second', 'third'],
+    });
+
+    // Then: a partial content match is not accepted
+    expect(result).toEqual({ kind: 'not-found' });
+  });
+
   it('resolves in the specified pane only when bucket constraint is "only"', () => {
     // Given: the target line exists in both panes
     const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'w' }] })];
@@ -50,14 +187,15 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles,
       path: 'a.ts',
-      line: 5,
+      startLine: 5,
+      endLine: 5,
       bucketConstraint: { kind: 'only', bucket: 'staged' },
     });
 
     // Then: the staged pane is resolved without ambiguity
     expect(result).toEqual({
       kind: 'resolved',
-      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContent: 's' },
+      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContents: ['s'] },
     });
   });
 
@@ -71,7 +209,8 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles,
       path: 'a.ts',
-      line: 5,
+      startLine: 5,
+      endLine: 5,
       bucketConstraint: { kind: 'only', bucket: 'working' },
     });
 
@@ -87,12 +226,18 @@ describe('resolveLineNoteTarget', () => {
     const stagedFiles = [createFile({ path: 'a.ts', lines: [{ line: 9, content: 's' }] })];
 
     // When: line 9 is resolved without a bucket constraint
-    const result = resolveLineNoteTarget({ workingFiles, stagedFiles, path: 'a.ts', line: 9 });
+    const result = resolveLineNoteTarget({
+      workingFiles,
+      stagedFiles,
+      path: 'a.ts',
+      startLine: 9,
+      endLine: 9,
+    });
 
     // Then: the staged pane is chosen because it is the unique match
     expect(result).toEqual({
       kind: 'resolved',
-      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContent: 's' },
+      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContents: ['s'] },
     });
   });
 
@@ -102,7 +247,13 @@ describe('resolveLineNoteTarget', () => {
     const stagedFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 's' }] })];
 
     // When: resolution runs without a bucket constraint
-    const result = resolveLineNoteTarget({ workingFiles, stagedFiles, path: 'a.ts', line: 5 });
+    const result = resolveLineNoteTarget({
+      workingFiles,
+      stagedFiles,
+      path: 'a.ts',
+      startLine: 5,
+      endLine: 5,
+    });
 
     // Then: the caller must ask for an explicit bucket
     expect(result).toEqual({ kind: 'ambiguous' });
@@ -118,14 +269,15 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles,
       path: 'a.ts',
-      line: 5,
+      startLine: 5,
+      endLine: 5,
       bucketConstraint: { kind: 'preferred', bucket: 'working' },
     });
 
     // Then: the staged pane is used as the fallback, never reported ambiguous
     expect(result).toEqual({
       kind: 'resolved',
-      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContent: 's' },
+      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContents: ['s'] },
     });
   });
 
@@ -139,7 +291,8 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles,
       path: 'a.ts',
-      line: 5,
+      startLine: 5,
+      endLine: 5,
       bucketConstraint: { kind: 'preferred', bucket: 'staged' },
     });
 
@@ -158,14 +311,20 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles,
       path: 'a.ts',
-      line: 5,
-      requiredLineContent: 'old',
+      startLine: 5,
+      endLine: 5,
+      requiredLineContents: ['old'],
     });
 
     // Then: only the content-matching pane resolves (no ambiguity)
     expect(result).toEqual({
       kind: 'resolved',
-      target: { fileId: 'file-a.ts', hunkId: 'hunk-a.ts-0', bucket: 'staged', lineContent: 'old' },
+      target: {
+        fileId: 'file-a.ts',
+        hunkId: 'hunk-a.ts-0',
+        bucket: 'staged',
+        lineContents: ['old'],
+      },
     });
   });
 
@@ -178,8 +337,9 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles: [],
       path: 'a.ts',
-      line: 5,
-      requiredLineContent: 'old',
+      startLine: 5,
+      endLine: 5,
+      requiredLineContents: ['old'],
     });
 
     // Then: the note target cannot be resolved
@@ -197,7 +357,8 @@ describe('resolveLineNoteTarget', () => {
       workingFiles,
       stagedFiles: [],
       path: 'vendor/lib',
-      line: 1,
+      startLine: 1,
+      endLine: 1,
     });
 
     // Then: submodules are not note-eligible
@@ -234,7 +395,8 @@ describe('resolveLineNoteTarget', () => {
       workingFiles: [untracked],
       stagedFiles: [],
       path: 'new.ts',
-      line: 2,
+      startLine: 2,
+      endLine: 2,
     });
 
     // Then: the synthetic hunk resolves like any other hunk
@@ -244,7 +406,7 @@ describe('resolveLineNoteTarget', () => {
         fileId: 'file-new.ts',
         hunkId: 'hunk-new.ts-untracked',
         bucket: 'working',
-        lineContent: 'second',
+        lineContents: ['second'],
       },
     });
   });

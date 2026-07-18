@@ -210,7 +210,7 @@ describe('notesRoutes', () => {
           endNewLineNumber: 5,
         },
         'needs a guard',
-        { generation: FILE_GENERATION, lineContent: 'alpha' },
+        { generation: FILE_GENERATION, lineContents: ['alpha'] },
       );
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
     });
@@ -332,7 +332,7 @@ describe('notesRoutes', () => {
         'my-repo',
         { kind: 'file', fileId: 'file-a.ts' },
         'about this file',
-        { generation: FILE_GENERATION, lineContent: undefined },
+        { generation: FILE_GENERATION, lineContents: undefined },
       );
     });
 

@@ -140,7 +140,7 @@ function requireConfirmedGeneration(
 function resolveCreateTarget(
   context: RepoNotesContext,
   request: NoteCreateRequest,
-): { target: NoteTarget; generation: ConfirmedFileGeneration; lineContent?: string } {
+): { target: NoteTarget; generation: ConfirmedFileGeneration; lineContents?: string[] } {
   if (request.kind === 'file') {
     const file = findEligibleFileByPath(context, request.path);
     if (!file) {
@@ -161,7 +161,8 @@ function resolveCreateTarget(
     workingFiles: context.workingFiles,
     stagedFiles: context.stagedFiles,
     path: request.path,
-    line: request.line,
+    startLine: request.line,
+    endLine: request.line,
     bucketConstraint: request.bucket ? { kind: 'only', bucket: request.bucket } : undefined,
   });
 
@@ -193,7 +194,7 @@ function resolveCreateTarget(
       endNewLineNumber: request.line,
     },
     generation: requireConfirmedGeneration(context, request.path),
-    lineContent: resolution.target.lineContent,
+    lineContents: resolution.target.lineContents,
   };
 }
 
@@ -257,7 +258,7 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       const resolved = resolveCreateTarget(context, request);
       const note = await options.notesStore.add(context.repoId, resolved.target, noteBody, {
         generation: resolved.generation,
-        lineContent: resolved.lineContent,
+        lineContents: resolved.lineContents,
       });
       options.notifyNotesChanged(context.repoId);
       return c.json(note, 201);

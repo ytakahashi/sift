@@ -68,7 +68,7 @@ export class InMemoryNotesStore implements NotesStore {
     const record: NoteReconcileRecord = {
       note,
       generation: anchor.generation,
-      lineContent: anchor.lineContent,
+      lineContents: anchor.lineContents,
     };
 
     const existing = this.records.get(repoId) ?? [];

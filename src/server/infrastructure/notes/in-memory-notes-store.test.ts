@@ -65,7 +65,7 @@ describe('InMemoryNotesStore', () => {
         endNewLineNumber: 1,
       },
       'the body',
-      { generation: fileGeneration('blob-1'), lineContent: 'x' },
+      { generation: fileGeneration('blob-1'), lineContents: ['x'] },
     );
 
     // Then: identity fields are generated and the note is listed
