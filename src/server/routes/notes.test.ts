@@ -190,7 +190,7 @@ describe('notesRoutes', () => {
     it('resolves a unique target without bucket and stores the anchor', async () => {
       // When: a line note is created for the only matching pane
       const response = await postNote({
-        target: { kind: 'line', path: 'a.ts', line: 5 },
+        target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 5 },
         body: 'needs a guard',
       });
 
@@ -215,6 +215,42 @@ describe('notesRoutes', () => {
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
     });
 
+    it('resolves a multi-line range in one hunk and stores all line contents', async () => {
+      // Given: one working hunk contains the complete requested range
+      workingFiles = [
+        createFile({
+          path: 'a.ts',
+          lines: [
+            { line: 5, content: 'first' },
+            { line: 6, content: 'second' },
+            { line: 7, content: 'third' },
+          ],
+        }),
+      ];
+
+      // When: a note is created for the complete range
+      const response = await postNote({
+        target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 7 },
+        body: 'review this block',
+      });
+
+      // Then: the resolved range and ordered content baseline are stored
+      expect(response.status).toBe(201);
+      expect(notesStore.add).toHaveBeenCalledWith(
+        'my-repo',
+        {
+          kind: 'line',
+          fileId: 'file-a.ts',
+          bucket: 'working',
+          hunkId: 'hunk-a.ts-0',
+          startNewLineNumber: 5,
+          endNewLineNumber: 7,
+        },
+        'review this block',
+        { generation: FILE_GENERATION, lineContents: ['first', 'second', 'third'] },
+      );
+    });
+
     it('respects an explicit bucket', async () => {
       // Given: the same line exists in both panes
       stagedFiles = [
@@ -223,7 +259,13 @@ describe('notesRoutes', () => {
 
       // When: the staged pane is requested explicitly
       const response = await postNote({
-        target: { kind: 'line', path: 'a.ts', line: 5, bucket: 'staged' },
+        target: {
+          kind: 'line',
+          path: 'a.ts',
+          startLine: 5,
+          endLine: 5,
+          bucket: 'staged',
+        },
         body: 'staged side',
       });
 
@@ -237,7 +279,7 @@ describe('notesRoutes', () => {
     it('returns 422 with a file-note hint when the line is not in the diff', async () => {
       // When: a note targets a line outside every hunk
       const response = await postNote({
-        target: { kind: 'line', path: 'a.ts', line: 99 },
+        target: { kind: 'line', path: 'a.ts', startLine: 99, endLine: 99 },
         body: 'x',
       });
 
@@ -248,13 +290,72 @@ describe('notesRoutes', () => {
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
+    it('returns 422 when a range spans separate hunks', async () => {
+      // Given: both endpoints exist, but no single hunk contains the range
+      const firstFile = createFile({
+        path: 'a.ts',
+        hunkId: 'hunk-first',
+        lines: [
+          { line: 5, content: 'first' },
+          { line: 6, content: 'second' },
+        ],
+      });
+      const secondHunk = createFile({
+        path: 'a.ts',
+        hunkId: 'hunk-second',
+        lines: [
+          { line: 8, content: 'third' },
+          { line: 9, content: 'fourth' },
+        ],
+      }).hunks[0];
+      workingFiles = [{ ...firstFile, hunks: [firstFile.hunks[0], secondHunk] }];
+
+      // When: the requested range crosses the gap between hunks
+      const response = await postNote({
+        target: { kind: 'line', path: 'a.ts', startLine: 6, endLine: 8 },
+        body: 'x',
+      });
+
+      // Then: target resolution rejects the range with a distinct hint
+      expect(response.status).toBe(422);
+      const payload = (await response.json()) as { error: string };
+      expect(payload.error).toContain('single hunk');
+      expect(payload.error).toContain('Lines 6-8');
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 when a line inside the requested range is absent', async () => {
+      // Given: one hunk contains the endpoints but not every line between them
+      workingFiles = [
+        createFile({
+          path: 'a.ts',
+          lines: [
+            { line: 5, content: 'first' },
+            { line: 7, content: 'third' },
+          ],
+        }),
+      ];
+
+      // When: the range includes the missing line 6
+      const response = await postNote({
+        target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 7 },
+        body: 'x',
+      });
+
+      // Then: the incomplete range is rejected as a target-resolution error
+      expect(response.status).toBe(422);
+      const payload = (await response.json()) as { error: string };
+      expect(payload.error).toContain('single hunk');
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
     it('returns 422 asking for a bucket when both panes match', async () => {
       // Given: the same line number exists in both panes
       stagedFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'beta' }] })];
 
       // When: no bucket is specified
       const response = await postNote({
-        target: { kind: 'line', path: 'a.ts', line: 5 },
+        target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 5 },
         body: 'x',
       });
 
@@ -265,13 +366,48 @@ describe('notesRoutes', () => {
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
+    it('returns 422 asking for a bucket when a range matches both panes', async () => {
+      // Given: both panes contain the complete requested range
+      workingFiles = [
+        createFile({
+          path: 'a.ts',
+          lines: [
+            { line: 5, content: 'working-first' },
+            { line: 6, content: 'working-second' },
+          ],
+        }),
+      ];
+      stagedFiles = [
+        createFile({
+          path: 'a.ts',
+          lines: [
+            { line: 5, content: 'staged-first' },
+            { line: 6, content: 'staged-second' },
+          ],
+        }),
+      ];
+
+      // When: the request omits the bucket
+      const response = await postNote({
+        target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 6 },
+        body: 'x',
+      });
+
+      // Then: the range is reported as ambiguous
+      expect(response.status).toBe(422);
+      const payload = (await response.json()) as { error: string };
+      expect(payload.error).toContain('Lines 5-6');
+      expect(payload.error).toContain('"bucket"');
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
     it('returns 422 when the path only matches a submodule', async () => {
       // Given: the path exists in the diff as a submodule entry
       workingFiles = [createFile({ path: 'vendor/lib', kind: 'submodule' })];
 
       // When: a line note targets the submodule
       const response = await postNote({
-        target: { kind: 'line', path: 'vendor/lib', line: 1 },
+        target: { kind: 'line', path: 'vendor/lib', startLine: 1, endLine: 1 },
         body: 'x',
       });
 
@@ -290,7 +426,7 @@ describe('notesRoutes', () => {
 
       // When: a line absent from the eligible file is requested
       const response = await postNote({
-        target: { kind: 'line', path: 'a.ts', line: 99 },
+        target: { kind: 'line', path: 'a.ts', startLine: 99, endLine: 99 },
         body: 'x',
       });
 
@@ -308,7 +444,7 @@ describe('notesRoutes', () => {
 
       // When: a line note is created
       const response = await postNote({
-        target: { kind: 'line', path: 'a.ts', line: 5 },
+        target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 5 },
         body: 'x',
       });
 
@@ -352,17 +488,62 @@ describe('notesRoutes', () => {
   describe('POST /notes (request validation)', () => {
     it.each([
       ['malformed JSON', 'not-json'],
-      ['empty body text', { target: { kind: 'line', path: 'a.ts', line: 5 }, body: '   ' }],
+      [
+        'empty body text',
+        {
+          target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 5 },
+          body: '   ',
+        },
+      ],
       [
         'invalid bucket',
-        { target: { kind: 'line', path: 'a.ts', line: 5, bucket: 'x' }, body: 'b' },
+        {
+          target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 5, bucket: 'x' },
+          body: 'b',
+        },
       ],
       [
         'bucket on a file note',
         { target: { kind: 'file', path: 'a.ts', bucket: 'working' }, body: 'b' },
       ],
       ['unknown target kind', { target: { kind: 'hunk', path: 'a.ts' }, body: 'b' }],
-      ['non-integer line', { target: { kind: 'line', path: 'a.ts', line: 1.5 }, body: 'b' }],
+      ['missing startLine', { target: { kind: 'line', path: 'a.ts', endLine: 5 }, body: 'b' }],
+      ['missing endLine', { target: { kind: 'line', path: 'a.ts', startLine: 5 }, body: 'b' }],
+      ['legacy line field', { target: { kind: 'line', path: 'a.ts', line: 5 }, body: 'b' }],
+      [
+        'non-integer startLine',
+        { target: { kind: 'line', path: 'a.ts', startLine: 1.5, endLine: 5 }, body: 'b' },
+      ],
+      [
+        'non-integer endLine',
+        { target: { kind: 'line', path: 'a.ts', startLine: 1, endLine: 1.5 }, body: 'b' },
+      ],
+      [
+        'non-positive startLine',
+        { target: { kind: 'line', path: 'a.ts', startLine: 0, endLine: 5 }, body: 'b' },
+      ],
+      [
+        'non-positive endLine',
+        { target: { kind: 'line', path: 'a.ts', startLine: 1, endLine: -1 }, body: 'b' },
+      ],
+      [
+        'unsafe startLine',
+        {
+          target: { kind: 'line', path: 'a.ts', startLine: Number.MAX_VALUE, endLine: 5 },
+          body: 'b',
+        },
+      ],
+      [
+        'unsafe endLine',
+        {
+          target: { kind: 'line', path: 'a.ts', startLine: 1, endLine: Number.MAX_VALUE },
+          body: 'b',
+        },
+      ],
+      [
+        'reversed range',
+        { target: { kind: 'line', path: 'a.ts', startLine: 6, endLine: 5 }, body: 'b' },
+      ],
     ] as Array<[string, unknown]>)('returns 400 for %s', async (_label, body) => {
       // When: an invalid creation request arrives
       const response = await postNote(body);

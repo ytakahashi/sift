@@ -34,7 +34,13 @@ interface RepoNotesContext {
 }
 
 type NoteCreateRequest =
-  | { kind: 'line'; path: string; line: number; bucket?: NoteBucket }
+  | {
+      kind: 'line';
+      path: string;
+      startLine: number;
+      endLine: number;
+      bucket?: NoteBucket;
+    }
   | { kind: 'file'; path: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -62,6 +68,15 @@ function readNoteBody(body: Record<string, unknown>): string {
   return noteBody;
 }
 
+function readPositiveLineNumber(value: unknown, fieldName: 'startLine' | 'endLine'): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value) || value < 1) {
+    throw new NoteRequestValidationError(
+      `Line note target requires a positive integer "${fieldName}" (new-file-side line number).`,
+    );
+  }
+  return value;
+}
+
 function readCreateTarget(body: Record<string, unknown>): NoteCreateRequest {
   const target = body.target;
   if (!isRecord(target)) {
@@ -83,10 +98,11 @@ function readCreateTarget(body: Record<string, unknown>): NoteCreateRequest {
   }
 
   if (target.kind === 'line') {
-    const line = target.line;
-    if (typeof line !== 'number' || !Number.isInteger(line) || line < 1) {
+    const startLine = readPositiveLineNumber(target.startLine, 'startLine');
+    const endLine = readPositiveLineNumber(target.endLine, 'endLine');
+    if (startLine > endLine) {
       throw new NoteRequestValidationError(
-        'Line note target requires a positive integer "line" (new-file-side line number).',
+        'Line note target requires "startLine" to be less than or equal to "endLine".',
       );
     }
     const bucket = target.bucket;
@@ -95,10 +111,14 @@ function readCreateTarget(body: Record<string, unknown>): NoteCreateRequest {
         'Line note "bucket" must be "working" or "staged" when specified.',
       );
     }
-    return { kind: 'line', path, line, bucket };
+    return { kind: 'line', path, startLine, endLine, bucket };
   }
 
   throw new NoteRequestValidationError('Note target kind must be "line" or "file".');
+}
+
+function formatRequestedLineRange(startLine: number, endLine: number): string {
+  return startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}-${endLine}`;
 }
 
 function hasSubmoduleAtPath(context: RepoNotesContext, path: string): boolean {
@@ -161,14 +181,16 @@ function resolveCreateTarget(
     workingFiles: context.workingFiles,
     stagedFiles: context.stagedFiles,
     path: request.path,
-    startLine: request.line,
-    endLine: request.line,
+    startLine: request.startLine,
+    endLine: request.endLine,
     bucketConstraint: request.bucket ? { kind: 'only', bucket: request.bucket } : undefined,
   });
 
   if (resolution.kind === 'ambiguous') {
+    const requestedRange = formatRequestedLineRange(request.startLine, request.endLine);
+    const verb = request.startLine === request.endLine ? 'exists' : 'exist';
     throw new NoteTargetResolutionError(
-      `Line ${request.line} of "${request.path}" exists in both the working and staged diffs. ` +
+      `${requestedRange} of "${request.path}" ${verb} in both the working and staged diffs. ` +
         'Specify "bucket": "working" or "staged".',
     );
   }
@@ -178,9 +200,14 @@ function resolveCreateTarget(
         `"${request.path}" is a submodule; notes cannot be attached to submodules.`,
       );
     }
+    const requestedRange = formatRequestedLineRange(request.startLine, request.endLine);
+    const message =
+      request.startLine === request.endLine
+        ? `${requestedRange} of "${request.path}" is not part of the current diff. `
+        : `${requestedRange} of "${request.path}" are not fully contained in a single hunk ` +
+          'of the current diff. ';
     throw new NoteTargetResolutionError(
-      `Line ${request.line} of "${request.path}" is not part of the current diff. ` +
-        'For a file-level comment, use target kind "file".',
+      message + 'For a file-level comment, use target kind "file".',
     );
   }
 
@@ -190,8 +217,8 @@ function resolveCreateTarget(
       fileId: resolution.target.fileId,
       bucket: resolution.target.bucket,
       hunkId: resolution.target.hunkId,
-      startNewLineNumber: request.line,
-      endNewLineNumber: request.line,
+      startNewLineNumber: request.startLine,
+      endNewLineNumber: request.endLine,
     },
     generation: requireConfirmedGeneration(context, request.path),
     lineContents: resolution.target.lineContents,

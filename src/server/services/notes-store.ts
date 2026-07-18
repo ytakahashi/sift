@@ -13,7 +13,7 @@ export class NoteNotFoundError extends Error {
 
 /**
  * The creation target could not be resolved against the current diff:
- * file or line not present, ambiguous across panes, or a submodule.
+ * file or line range not present, ambiguous across panes, or a submodule.
  * The message distinguishes the cases and guides recovery (e.g. suggesting
  * a file note or an explicit bucket).
  */
