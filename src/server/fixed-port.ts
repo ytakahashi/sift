@@ -1,45 +1,29 @@
-import { APP_INFO } from './app-info';
-
 export const DEFAULT_PORT = 49321;
-export const SIFT_HEALTH_PRODUCT = APP_INFO.name;
-export const SIFT_HEALTH_VERSION = APP_INFO.version;
 
-export type ExistingServerStatus = 'sift' | 'other' | 'unreachable';
-
-interface HealthFetchResponse {
-  json: () => Promise<unknown>;
-  ok: boolean;
-}
-
-export type HealthFetch = (url: string) => Promise<HealthFetchResponse>;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
+// The server binds this host exclusively (see listenOnPort in index.ts); the URL builder
+// below must target the same host so probes never race a "localhost" resolving to a
+// different address (e.g. IPv6 ::1) than the one the server actually listens on.
+export const LOOPBACK_HOST = '127.0.0.1';
 
 export function buildLocalServerUrl(port: number): string {
-  return `http://localhost:${port}`;
+  return `http://${LOOPBACK_HOST}:${port}`;
 }
 
-export async function checkExistingSiftServer(
-  port: number,
-  fetchHealth: HealthFetch = fetch,
-): Promise<ExistingServerStatus> {
-  let response: HealthFetchResponse;
-  try {
-    response = await fetchHealth(`${buildLocalServerUrl(port)}/api/health`);
-  } catch {
-    return 'unreachable';
+/**
+ * Validates the PORT environment variable strictly (decimal integer, 1..65535) instead of
+ * `parseInt`, which silently accepts values with trailing garbage (e.g. "49321x").
+ */
+export function resolvePort(env: NodeJS.ProcessEnv = process.env): number {
+  const raw = env.PORT;
+  if (raw === undefined) {
+    return DEFAULT_PORT;
   }
 
-  if (!response.ok) {
-    return 'other';
+  if (!/^\d+$/.test(raw) || Number(raw) < 1 || Number(raw) > 65535) {
+    throw new Error(
+      `Invalid PORT environment variable: "${raw}". Expected a decimal integer between 1 and 65535.`,
+    );
   }
 
-  try {
-    const body = await response.json();
-    return isRecord(body) && body.product === SIFT_HEALTH_PRODUCT ? 'sift' : 'other';
-  } catch {
-    return 'other';
-  }
+  return Number(raw);
 }

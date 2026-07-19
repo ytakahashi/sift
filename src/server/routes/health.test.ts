@@ -20,6 +20,7 @@ describe('healthRoutes', () => {
     expect(await response.json()).toEqual({
       product: 'sift',
       version: expect.stringMatching(/^\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?$/),
+      capabilities: ['notes-v1'],
     });
   });
 });

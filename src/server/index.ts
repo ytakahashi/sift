@@ -10,7 +10,8 @@ import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
 import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 import { validateRepositoryPath } from './infrastructure/repository-validator';
-import { checkExistingSiftServer, DEFAULT_PORT } from './fixed-port';
+import { buildLocalServerUrl, LOOPBACK_HOST, resolvePort } from './fixed-port';
+import { checkExistingSiftServer } from './health-probe';
 
 export interface StartedServer {
   url: string;
@@ -37,7 +38,7 @@ function isPortInUseError(error: unknown): boolean {
 function listenOnPort(
   app: Hono<Env>,
   port: number,
-  host = '127.0.0.1',
+  host = LOOPBACK_HOST,
 ): Promise<{ port: number; server: ServerType }> {
   return new Promise((resolve, reject) => {
     const server = createAdaptorServer({ fetch: app.fetch });
@@ -128,8 +129,7 @@ function buildServerApp(runtime: ServerRuntime, clientDir: string): Hono<Env> {
 export async function startServerWithHandle(options: {
   clientDir: string;
 }): Promise<StartedServer> {
-  const portEnv = process.env.PORT;
-  const port = portEnv ? parseInt(portEnv, 10) : DEFAULT_PORT;
+  const port = resolvePort();
 
   const runtime = createServerRuntime();
   const serverApp = buildServerApp(runtime, options.clientDir);
@@ -148,7 +148,7 @@ export async function startServerWithHandle(options: {
     throw error;
   });
 
-  const url = `http://127.0.0.1:${port}`;
+  const url = buildLocalServerUrl(port);
 
   if (!listenResult.server) {
     return { url, owned: false, stop: async () => {} };
