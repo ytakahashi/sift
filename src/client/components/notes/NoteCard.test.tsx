@@ -1,37 +1,34 @@
 import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Note } from '../../../domain/notes/types';
+import type { FileNote, LineNote } from '../../../domain/notes/types';
 import { NoteCard } from './NoteCard';
 
-function createNote(overrides?: Partial<Note>): Note {
+function createNote(overrides?: Partial<LineNote>): LineNote {
   return {
     id: 'n1',
-    target: {
-      kind: 'line',
-      fileId: 'file-1',
-      bucket: 'working',
-      hunkId: 'h1',
-      startNewLineNumber: 10,
-      endNewLineNumber: 10,
-    },
+    kind: 'line',
+    path: 'path/to/file.ts',
+    startLine: 10,
+    endLine: 10,
+    bucket: 'working',
     body: 'original body',
     createdAt: 1000,
     ...overrides,
   };
 }
 
-function createFileNote(overrides?: Partial<Note>): Note {
+function createFileNote(overrides?: Partial<FileNote>): FileNote {
   return {
     id: 'n1',
-    target: { kind: 'file', fileId: 'file-1' },
+    kind: 'file',
+    path: 'path/to/file.ts',
     body: 'original body',
     createdAt: 1000,
     ...overrides,
   };
 }
 
-const resolveFilePath = (_fileId: string): string => 'path/to/file.ts';
 const originalClipboard = navigator.clipboard;
 
 describe('NoteCard', () => {
@@ -47,7 +44,7 @@ describe('NoteCard', () => {
   it('shows NoteViewer with note body initially', () => {
     // Given: a NoteCard rendered with a note
     const note = createNote();
-    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={vi.fn()} />);
+    render(<NoteCard note={note} onUpdate={vi.fn()} />);
 
     // When: rendered without any interaction
 
@@ -61,7 +58,7 @@ describe('NoteCard', () => {
     // Given: a NoteCard in view mode
     const user = userEvent.setup();
     const note = createNote();
-    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={vi.fn()} />);
+    render(<NoteCard note={note} onUpdate={vi.fn()} />);
 
     // When: the user clicks Edit
     await user.click(screen.getByRole('button', { name: 'Edit' }));
@@ -76,14 +73,7 @@ describe('NoteCard', () => {
     // Given: a labeled line note card
     const user = userEvent.setup();
     const note = createNote();
-    render(
-      <NoteCard
-        note={note}
-        resolveFilePath={resolveFilePath}
-        contextLabel="Lines 10–12"
-        onUpdate={vi.fn()}
-      />,
-    );
+    render(<NoteCard note={note} contextLabel="Lines 10–12" onUpdate={vi.fn()} />);
 
     // When: the card is initially viewed
     expect(screen.getByText('Lines 10–12')).toBeDefined();
@@ -100,7 +90,7 @@ describe('NoteCard', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     const note = createNote();
-    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={onUpdate} />);
+    render(<NoteCard note={note} onUpdate={onUpdate} />);
     await user.click(screen.getByRole('button', { name: 'Edit' }));
 
     // When: the user clears the textarea, types a new body, and clicks Save
@@ -120,7 +110,7 @@ describe('NoteCard', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     const note = createNote();
-    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={onUpdate} />);
+    render(<NoteCard note={note} onUpdate={onUpdate} />);
     await user.click(screen.getByRole('button', { name: 'Edit' }));
 
     // When: the user clicks Cancel
@@ -137,7 +127,7 @@ describe('NoteCard', () => {
     const user = userEvent.setup();
     const onUpdate = vi.fn();
     const note = createNote();
-    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={onUpdate} />);
+    render(<NoteCard note={note} onUpdate={onUpdate} />);
     await user.click(screen.getByRole('button', { name: 'Edit' }));
     const textarea = screen.getByRole('textbox');
     await user.clear(textarea);
@@ -161,7 +151,7 @@ describe('NoteCard', () => {
       configurable: true,
     });
     const note = createFileNote({ body: 'file note body' });
-    render(<NoteCard note={note} resolveFilePath={resolveFilePath} onUpdate={vi.fn()} />);
+    render(<NoteCard note={note} onUpdate={vi.fn()} />);
 
     // When: the user clicks Copy
     await user.click(screen.getByRole('button', { name: 'Copy' }));

@@ -1,27 +1,16 @@
 import { act, renderHook } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { NotePathResolvableFile } from '../../../domain/notes/resolve-note-file-path';
 import type { Note } from '../../../domain/notes/types';
 import { useNotesPanel } from './useNotesPanel';
 
-function createFile(id: string, displayPath = `${id}.ts`): NotePathResolvableFile {
+function createNote(id: string, path: string): Note {
   return {
     id,
-    displayPath,
-  };
-}
-
-function createNote(id: string, fileId: string): Note {
-  return {
-    id,
-    target: {
-      kind: 'line',
-      fileId,
-      bucket: 'working',
-      hunkId: `h-${id}`,
-      startNewLineNumber: 1,
-      endNewLineNumber: 1,
-    },
+    kind: 'line',
+    path,
+    startLine: 1,
+    endLine: 1,
+    bucket: 'working',
     body: `note-${id}`,
     createdAt: 1,
   };
@@ -33,9 +22,7 @@ describe('useNotesPanel', () => {
     const { result } = renderHook(() =>
       useNotesPanel({
         notes: [],
-        workingFiles: [],
-        stagedFiles: [],
-        selectedFileId: null,
+        selectedFilePath: null,
       }),
     );
     // When: toggle is invoked on the panel
@@ -50,13 +37,11 @@ describe('useNotesPanel', () => {
 
   it('toggles open and closed when notes exist', () => {
     // Given: the hook is rendered with at least one note
-    const notes = [createNote('n1', 'file-a')];
+    const notes = [createNote('n1', 'a.ts')];
     const { result } = renderHook(() =>
       useNotesPanel({
         notes,
-        workingFiles: [],
-        stagedFiles: [],
-        selectedFileId: null,
+        selectedFilePath: null,
       }),
     );
 
@@ -80,14 +65,12 @@ describe('useNotesPanel', () => {
 
   it('closes automatically when notes become empty', () => {
     // Given: the panel is opened while notes are present
-    const notes = [createNote('n1', 'file-a')];
+    const notes = [createNote('n1', 'a.ts')];
     const { result, rerender } = renderHook(
       ({ currentNotes }: { currentNotes: Note[] }) =>
         useNotesPanel({
           notes: currentNotes,
-          workingFiles: [],
-          stagedFiles: [],
-          selectedFileId: 'file-a',
+          selectedFilePath: 'a.ts',
         }),
       { initialProps: { currentNotes: notes } },
     );
@@ -103,44 +86,18 @@ describe('useNotesPanel', () => {
     expect(result.current.isOpen).toBe(false);
   });
 
-  it('resolves file paths across working and staged lists', () => {
-    // Given: working and staged lists both contain distinct file IDs
-    const workingFiles = [createFile('file-a', 'src/file-a.ts')];
-    const stagedFiles = [createFile('file-b', 'src/file-b.ts')];
-    const { result } = renderHook(() =>
-      useNotesPanel({
-        notes: [createNote('n1', 'file-a')],
-        workingFiles,
-        stagedFiles,
-        selectedFileId: 'file-a',
-      }),
-    );
-
-    // When: each fileId is passed to resolveFilePath
-    // Then: known fileIds resolve to displayPath and unknown IDs return as-is
-    expect(result.current.resolveFilePath('file-a')).toBe('src/file-a.ts');
-    expect(result.current.resolveFilePath('file-b')).toBe('src/file-b.ts');
-    expect(result.current.resolveFilePath('missing')).toBe('missing');
-  });
-
-  it('returns notes for the selected file only', () => {
-    // Given: notes include multiple file IDs and selectedFileId is file-a
-    const notes = [
-      createNote('n1', 'file-a'),
-      createNote('n2', 'file-b'),
-      createNote('n3', 'file-a'),
-    ];
+  it('returns notes for the selected path only', () => {
+    // Given: notes include multiple paths and selectedFilePath is a.ts
+    const notes = [createNote('n1', 'a.ts'), createNote('n2', 'b.ts'), createNote('n3', 'a.ts')];
     const { result } = renderHook(() =>
       useNotesPanel({
         notes,
-        workingFiles: [],
-        stagedFiles: [],
-        selectedFileId: 'file-a',
+        selectedFilePath: 'a.ts',
       }),
     );
 
     // When: selectedFileNotes is read
-    // Then: only notes matching selectedFileId are returned
+    // Then: only notes matching selectedFilePath are returned
     expect(result.current.selectedFileNotes.map((note) => note.id)).toEqual(['n1', 'n3']);
   });
 });

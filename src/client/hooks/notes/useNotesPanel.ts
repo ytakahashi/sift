@@ -1,16 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  resolveNoteFilePath,
-  type NotePathResolvableFile,
-} from '../../../domain/notes/resolve-note-file-path';
-import { selectNotesForFile } from '../../../domain/notes/select-notes-for-file';
+import { selectNotesForPath } from '../../../domain/notes/select-notes-for-path';
 import type { Note } from '../../../domain/notes/types';
 
 export interface UseNotesPanelOptions {
   notes: Note[];
-  workingFiles: NotePathResolvableFile[];
-  stagedFiles: NotePathResolvableFile[];
-  selectedFileId: string | null;
+  selectedFilePath: string | null;
 }
 
 export interface UseNotesPanelResult {
@@ -19,15 +13,12 @@ export interface UseNotesPanelResult {
   open: () => void;
   close: () => void;
   toggle: () => void;
-  resolveFilePath: (fileId: string) => string;
   selectedFileNotes: Note[];
 }
 
 export function useNotesPanel({
   notes,
-  workingFiles,
-  stagedFiles,
-  selectedFileId,
+  selectedFilePath,
 }: UseNotesPanelOptions): UseNotesPanelResult {
   const [isOpen, setIsOpen] = useState(false);
 
@@ -60,14 +51,9 @@ export function useNotesPanel({
     setIsOpen((current) => !current);
   }, [canOpen]);
 
-  const resolveFilePath = useCallback(
-    (fileId: string) => resolveNoteFilePath(fileId, workingFiles, stagedFiles),
-    [workingFiles, stagedFiles],
-  );
-
   const selectedFileNotes = useMemo(
-    () => selectNotesForFile(notes, selectedFileId),
-    [notes, selectedFileId],
+    () => selectNotesForPath(notes, selectedFilePath),
+    [notes, selectedFilePath],
   );
 
   return {
@@ -76,7 +62,6 @@ export function useNotesPanel({
     open,
     close,
     toggle,
-    resolveFilePath,
     selectedFileNotes,
   };
 }

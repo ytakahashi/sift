@@ -4,7 +4,6 @@ import { formatNoteForClipboard } from '../../../domain/notes/format';
 
 interface NoteViewerProps {
   note: Note;
-  resolveFilePath: (fileId: string) => string;
   contextLabel?: string;
   onEdit: () => void;
   onDelete?: (id: string) => void | Promise<void>;
@@ -14,7 +13,6 @@ interface NoteViewerProps {
 
 export function NoteViewer({
   note,
-  resolveFilePath,
   contextLabel,
   onEdit,
   onDelete,
@@ -33,7 +31,7 @@ export function NoteViewer({
   }, [copied]);
 
   const handleCopy = (): void => {
-    const text = formatNoteForClipboard(note, resolveFilePath);
+    const text = formatNoteForClipboard(note);
     void navigator.clipboard.writeText(text).then(() => {
       setCopied(true);
     });

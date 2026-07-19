@@ -2,7 +2,7 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
-import type { Note } from '../../../domain/notes/types';
+import type { FileNote, LineNote } from '../../../domain/notes/types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
 
 function createTextFile(): DiffFile {
@@ -99,34 +99,30 @@ function createBinaryFile(): DiffFile {
   };
 }
 
-function createFileNote(overrides?: Partial<Note>): Note {
+function createFileNote(overrides?: Partial<FileNote>): FileNote {
   return {
     id: 'file-note',
-    target: { kind: 'file', fileId: 'file-1' },
+    kind: 'file',
+    path: 'src/file.ts',
     body: 'file note body',
     createdAt: 1000,
     ...overrides,
   };
 }
 
-function createLineNote(overrides?: Partial<Note>): Note {
+function createLineNote(overrides?: Partial<LineNote>): LineNote {
   return {
     id: 'line-note',
-    target: {
-      kind: 'line',
-      fileId: 'file-1',
-      bucket: 'working',
-      hunkId: 'hunk-1',
-      startNewLineNumber: 1,
-      endNewLineNumber: 1,
-    },
+    kind: 'line',
+    path: 'src/file.ts',
+    startLine: 1,
+    endLine: 1,
+    bucket: 'working',
     body: 'line note body',
     createdAt: 1000,
     ...overrides,
   };
 }
-
-const resolveFilePath = (_fileId: string): string => 'src/file.ts';
 
 describe('UnifiedDiffViewer', () => {
   afterEach(() => {
@@ -143,7 +139,6 @@ describe('UnifiedDiffViewer', () => {
         file={createTextFile()}
         paneMode="working"
         onAddNote={onAddNote}
-        resolveFilePath={resolveFilePath}
         isFileNoteEditorOpen
         onCloseFileNoteEditor={onCloseFileNoteEditor}
       />,
@@ -165,7 +160,6 @@ describe('UnifiedDiffViewer', () => {
         file={createTextFile()}
         paneMode="working"
         notes={[createFileNote(), createLineNote()]}
-        resolveFilePath={resolveFilePath}
       />,
     );
 
@@ -185,14 +179,7 @@ describe('UnifiedDiffViewer', () => {
     // Given: the diff is rendered in the staged pane
     const user = userEvent.setup();
     const onAddNote = vi.fn(async () => {});
-    render(
-      <UnifiedDiffViewer
-        file={createTextFile()}
-        paneMode="staged"
-        onAddNote={onAddNote}
-        resolveFilePath={resolveFilePath}
-      />,
-    );
+    render(<UnifiedDiffViewer file={createTextFile()} paneMode="staged" onAddNote={onAddNote} />);
 
     // When: the user selects the same line twice and saves a note
     const lineButton = screen.getByRole('button', { name: 'Select line 1 for note' });
@@ -220,12 +207,7 @@ describe('UnifiedDiffViewer', () => {
     const user = userEvent.setup();
     const onAddNote = vi.fn(async () => {});
     const { container } = render(
-      <UnifiedDiffViewer
-        file={createTextFile()}
-        paneMode="working"
-        onAddNote={onAddNote}
-        resolveFilePath={resolveFilePath}
-      />,
+      <UnifiedDiffViewer file={createTextFile()} paneMode="working" onAddNote={onAddNote} />,
     );
 
     // When: the user selects the last line first and the first line second
@@ -259,13 +241,7 @@ describe('UnifiedDiffViewer', () => {
   it('cancels range selection with Escape or a non-gutter click', async () => {
     // Given: a diff with an active range anchor
     const user = userEvent.setup();
-    const { container } = render(
-      <UnifiedDiffViewer
-        file={createTextFile()}
-        paneMode="working"
-        resolveFilePath={resolveFilePath}
-      />,
-    );
+    const { container } = render(<UnifiedDiffViewer file={createTextFile()} paneMode="working" />);
     const firstLineButton = screen.getByRole('button', { name: 'Select line 1 for note' });
     const firstLineRow = container.querySelector('tr[data-new-line-number="1"]');
     await user.click(firstLineButton);
@@ -289,13 +265,7 @@ describe('UnifiedDiffViewer', () => {
   it('rejects a range that spans separate hunks', async () => {
     // Given: selectable endpoints in two different hunks
     const user = userEvent.setup();
-    render(
-      <UnifiedDiffViewer
-        file={createTwoHunkFile()}
-        paneMode="working"
-        resolveFilePath={resolveFilePath}
-      />,
-    );
+    render(<UnifiedDiffViewer file={createTwoHunkFile()} paneMode="working" />);
 
     // When: the endpoints cross the hunk boundary
     await user.click(screen.getByRole('button', { name: 'Select line 2 for note' }));
@@ -310,22 +280,11 @@ describe('UnifiedDiffViewer', () => {
     // Given: one stored note covering all three lines
     const rangeNote = createLineNote({
       body: 'range note body',
-      target: {
-        kind: 'line',
-        fileId: 'file-1',
-        bucket: 'working',
-        hunkId: 'hunk-1',
-        startNewLineNumber: 1,
-        endNewLineNumber: 3,
-      },
+      startLine: 1,
+      endLine: 3,
     });
     const { container } = render(
-      <UnifiedDiffViewer
-        file={createTextFile()}
-        paneMode="working"
-        notes={[rangeNote]}
-        resolveFilePath={resolveFilePath}
-      />,
+      <UnifiedDiffViewer file={createTextFile()} paneMode="working" notes={[rangeNote]} />,
     );
 
     // When: the diff is rendered
@@ -349,12 +308,7 @@ describe('UnifiedDiffViewer', () => {
 
     // When: the file is rendered in the staged pane
     const staged = render(
-      <UnifiedDiffViewer
-        file={createTextFile()}
-        paneMode="staged"
-        notes={notes}
-        resolveFilePath={resolveFilePath}
-      />,
+      <UnifiedDiffViewer file={createTextFile()} paneMode="staged" notes={notes} />,
     );
 
     // Then: the working-anchored line note is hidden (the same line number can
@@ -365,12 +319,7 @@ describe('UnifiedDiffViewer', () => {
 
     // When: the same notes render in the working pane
     const working = render(
-      <UnifiedDiffViewer
-        file={createTextFile()}
-        paneMode="working"
-        notes={notes}
-        resolveFilePath={resolveFilePath}
-      />,
+      <UnifiedDiffViewer file={createTextFile()} paneMode="working" notes={notes} />,
     );
 
     // Then: the line note is anchored in its own pane
@@ -381,12 +330,7 @@ describe('UnifiedDiffViewer', () => {
   it('renders file notes for non-text files', () => {
     // Given: a binary file has a file-level note
     const { container } = render(
-      <UnifiedDiffViewer
-        file={createBinaryFile()}
-        paneMode="working"
-        notes={[createFileNote()]}
-        resolveFilePath={resolveFilePath}
-      />,
+      <UnifiedDiffViewer file={createBinaryFile()} paneMode="working" notes={[createFileNote()]} />,
     );
 
     // When: the binary diff placeholder is rendered

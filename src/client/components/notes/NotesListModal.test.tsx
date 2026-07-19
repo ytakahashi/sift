@@ -1,48 +1,33 @@
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { Note } from '../../../domain/notes/types';
+import type { FileNote, LineNote } from '../../../domain/notes/types';
 import { NotesListModal } from './NotesListModal';
 
 const originalClipboard = navigator.clipboard;
 
-function createLineNote(overrides?: Partial<Note>): Note {
+function createLineNote(overrides?: Partial<LineNote>): LineNote {
   return {
     id: 'line-note',
-    target: {
-      kind: 'line',
-      fileId: 'file-1',
-      bucket: 'working',
-      hunkId: 'h1',
-      startNewLineNumber: 10,
-      endNewLineNumber: 10,
-    },
+    kind: 'line',
+    path: 'src/line.ts',
+    startLine: 10,
+    endLine: 10,
+    bucket: 'working',
     body: 'line note body',
     createdAt: 1000,
     ...overrides,
   };
 }
 
-function createFileNote(overrides?: Partial<Note>): Note {
+function createFileNote(overrides?: Partial<FileNote>): FileNote {
   return {
     id: 'file-note',
-    target: {
-      kind: 'file',
-      fileId: 'file-2',
-    },
+    kind: 'file',
+    path: 'src/file.ts',
     body: 'file note body',
     createdAt: 2000,
     ...overrides,
   };
-}
-
-function resolveFilePath(fileId: string): string {
-  if (fileId === 'file-1') {
-    return 'src/line.ts';
-  }
-  if (fileId === 'file-2') {
-    return 'src/file.ts';
-  }
-  return fileId;
 }
 
 describe('NotesListModal', () => {
@@ -57,29 +42,10 @@ describe('NotesListModal', () => {
 
   it('shows line and file note locations with the correct line suffix', () => {
     // Given: line and file notes are mixed in the list
-    const notes = [
-      createLineNote({
-        target: {
-          kind: 'line',
-          fileId: 'file-1',
-          bucket: 'working',
-          hunkId: 'h1',
-          startNewLineNumber: 10,
-          endNewLineNumber: 12,
-        },
-      }),
-      createFileNote(),
-    ];
+    const notes = [createLineNote({ startLine: 10, endLine: 12 }), createFileNote()];
 
     // When: the modal is rendered
-    render(
-      <NotesListModal
-        notes={notes}
-        onClose={vi.fn()}
-        onDeleteNote={vi.fn()}
-        resolveFilePath={resolveFilePath}
-      />,
-    );
+    render(<NotesListModal notes={notes} onClose={vi.fn()} onDeleteNote={vi.fn()} />);
 
     // Then: line notes include a line suffix and file notes show only the path
     expect(screen.getByText('src/line.ts#L10-L12')).toBeDefined();
@@ -94,14 +60,7 @@ describe('NotesListModal', () => {
     );
 
     // When: the modal is rendered
-    render(
-      <NotesListModal
-        notes={notes}
-        onClose={vi.fn()}
-        onDeleteNote={vi.fn()}
-        resolveFilePath={resolveFilePath}
-      />,
-    );
+    render(<NotesListModal notes={notes} onClose={vi.fn()} onDeleteNote={vi.fn()} />);
 
     // Then: only the notes list scrolls; the Copy action sits outside it and
     // is always visible regardless of scroll position
@@ -123,27 +82,8 @@ describe('NotesListModal', () => {
       writable: true,
       configurable: true,
     });
-    const notes = [
-      createLineNote({
-        target: {
-          kind: 'line',
-          fileId: 'file-1',
-          bucket: 'working',
-          hunkId: 'h1',
-          startNewLineNumber: 10,
-          endNewLineNumber: 12,
-        },
-      }),
-      createFileNote(),
-    ];
-    render(
-      <NotesListModal
-        notes={notes}
-        onClose={vi.fn()}
-        onDeleteNote={vi.fn()}
-        resolveFilePath={resolveFilePath}
-      />,
-    );
+    const notes = [createLineNote({ startLine: 10, endLine: 12 }), createFileNote()];
+    render(<NotesListModal notes={notes} onClose={vi.fn()} onDeleteNote={vi.fn()} />);
 
     // When: Copy is clicked
     await act(async () => {

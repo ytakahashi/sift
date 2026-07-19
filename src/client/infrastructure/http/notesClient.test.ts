@@ -26,7 +26,8 @@ function stubFetchError(status: number, errorMessage: string): void {
 
 const NOTE = {
   id: 'n1',
-  target: { kind: 'file' as const, fileId: 'file-a.ts' },
+  kind: 'file' as const,
+  path: 'a.ts',
   body: 'note body',
   createdAt: 100,
 };
