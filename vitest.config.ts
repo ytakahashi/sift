@@ -16,7 +16,18 @@ export default defineConfig({
           name: 'node',
           environment: 'node',
           include: ['src/**/*.test.ts'],
-          exclude: ['src/client/**'],
+          exclude: ['src/client/**', 'src/**/*.integration.test.ts'],
+        },
+      },
+      {
+        test: {
+          // For tests that can take longer than an in-process unit test,
+          // such as spawning a real child process, so that budget doesn't
+          // apply to the rest of the suite.
+          name: 'integration',
+          environment: 'node',
+          include: ['src/**/*.integration.test.ts'],
+          testTimeout: 10000,
         },
       },
     ],
