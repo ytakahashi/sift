@@ -1,6 +1,11 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { APP_INFO } from '../server/app-info';
+import { resolvePort } from '../server/fixed-port';
+import { createRegisteredRepositoryLister } from '../server/index';
+import { checkNotesApiCompatibility } from './notes-compatibility';
+import { createNote, getNotes } from './notes-http-client';
+import { registerNotesTools } from './register-notes-tools';
 import { createRepoRootResolver, type RepoRootResolver } from './repo-target';
 
 export interface StartMcpServerOptions {
@@ -15,9 +20,8 @@ export interface McpServerHandle {
 }
 
 /**
- * Connects an MCP server to the current process's stdio. Tools are
- * registered separately (`list_notes`/`add_note`); this only sets up the
- * transport and the lazy repo-root resolver those tools will share.
+ * Builds the McpServer, registers the Notes tools against it, and connects
+ * it to the current process's stdio.
  *
  * `StdioServerTransport` defaults to serving 2025-era (legacy) openings,
  * which matches the current MCP host compatibility target.
@@ -25,6 +29,17 @@ export interface McpServerHandle {
 export async function startMcpServer(options: StartMcpServerOptions): Promise<McpServerHandle> {
   const repoRootResolver = createRepoRootResolver(options.repoPath, options.resolveRepoRoot);
   const server = new McpServer({ name: APP_INFO.name, version: APP_INFO.version });
+
+  registerNotesTools(server, {
+    repoPath: options.repoPath,
+    repoRootResolver,
+    findRegisteredRepositoryByPath:
+      createRegisteredRepositoryLister().findRegisteredRepositoryByPath,
+    resolvePort,
+    checkNotesApiCompatibility,
+    getNotes,
+    createNote,
+  });
 
   await server.connect(new StdioServerTransport());
 

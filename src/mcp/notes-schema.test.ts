@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { noteSchema, notesListResponseSchema } from './notes-schema';
+import { listNotesInputSchema, noteSchema, notesListResponseSchema } from './notes-schema';
 
 const lineNote = {
   id: 'n1',
@@ -19,6 +19,24 @@ const fileNote = {
   body: 'needs an update',
   createdAt: 1700000000001,
 };
+
+describe('listNotesInputSchema', () => {
+  it('accepts an empty object', () => {
+    // Given / When
+    const result = listNotesInputSchema.safeParse({});
+
+    // Then
+    expect(result.success).toBe(true);
+  });
+
+  it('rejects unknown arguments', () => {
+    // Given / When
+    const result = listNotesInputSchema.safeParse({ extra: true });
+
+    // Then
+    expect(result.success).toBe(false);
+  });
+});
 
 describe('noteSchema', () => {
   it('accepts a valid line note', () => {

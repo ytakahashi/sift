@@ -1,6 +1,8 @@
 import { z } from 'zod';
 import type { Note } from '../domain/notes/types';
 
+export const listNotesInputSchema = z.object({}).strict();
+
 const lineNoteSchema = z
   .object({
     id: z.string(),

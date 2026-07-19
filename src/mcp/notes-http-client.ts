@@ -3,32 +3,38 @@ import { buildLocalServerUrl } from '../server/fixed-port';
 import { errorResponseSchema } from './error-response-schema';
 import { noteSchema, notesListResponseSchema } from './notes-schema';
 
-const UNREADABLE_ERROR_MESSAGE = 'Sift server returned an unreadable error response.';
-
 function notesUrl(port: number, repoId: string): string {
   return `${buildLocalServerUrl(port)}/api/repositories/${encodeURIComponent(repoId)}/notes`;
 }
 
-async function parseKnownError(
-  response: Response,
-): Promise<{ status: number; code?: string; message: string }> {
+type ParsedErrorResponse =
+  | { kind: 'valid'; status: number; code?: string; message: string }
+  | { kind: 'invalid' };
+
+async function parseErrorResponse(response: Response): Promise<ParsedErrorResponse> {
   let body: unknown;
   try {
     body = await response.json();
   } catch (_error: unknown) {
-    return { status: response.status, message: UNREADABLE_ERROR_MESSAGE };
+    return { kind: 'invalid' };
   }
 
   const parsed = errorResponseSchema.safeParse(body);
   return parsed.success
-    ? { status: response.status, code: parsed.data.code, message: parsed.data.error }
-    : { status: response.status, message: UNREADABLE_ERROR_MESSAGE };
+    ? {
+        kind: 'valid',
+        status: response.status,
+        code: parsed.data.code,
+        message: parsed.data.error,
+      }
+    : { kind: 'invalid' };
 }
 
 export type GetNotesResult =
   | { kind: 'success'; notes: Note[] }
   | { kind: 'http-error'; status: number; code?: string; message: string }
   | { kind: 'invalid-response' }
+  | { kind: 'invalid-error-response' }
   | { kind: 'network-error' };
 
 export async function getNotes(
@@ -50,7 +56,16 @@ export async function getNotes(
     if (response.ok) {
       return { kind: 'invalid-response' };
     }
-    return { kind: 'http-error', ...(await parseKnownError(response)) };
+    const parsedError = await parseErrorResponse(response);
+    if (parsedError.kind === 'invalid') {
+      return { kind: 'invalid-error-response' };
+    }
+    return {
+      kind: 'http-error',
+      status: parsedError.status,
+      code: parsedError.code,
+      message: parsedError.message,
+    };
   }
 
   let body: unknown;
@@ -69,6 +84,7 @@ export async function getNotes(
 export type CreateNoteResult =
   | { kind: 'success'; note: Note }
   | { kind: 'known-error'; status: number; code?: string; message: string }
+  | { kind: 'invalid-error-response' }
   | { kind: 'uncertain' };
 
 export async function createNote(
@@ -105,7 +121,16 @@ export async function createNote(
     if (response.ok) {
       return { kind: 'uncertain' };
     }
-    return { kind: 'known-error', ...(await parseKnownError(response)) };
+    const parsedError = await parseErrorResponse(response);
+    if (parsedError.kind === 'invalid') {
+      return { kind: 'invalid-error-response' };
+    }
+    return {
+      kind: 'known-error',
+      status: parsedError.status,
+      code: parsedError.code,
+      message: parsedError.message,
+    };
   }
 
   let responseBody: unknown;

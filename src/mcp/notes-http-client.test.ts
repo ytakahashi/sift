@@ -114,7 +114,7 @@ describe('getNotes', () => {
     });
   });
 
-  it('returns http-error with a generic message when a non-2xx body is not valid JSON', async () => {
+  it('returns invalid-error-response when a non-2xx body is not valid JSON', async () => {
     // Given
     const fetchImpl = vi.fn().mockResolvedValue(unparseableResponse(502));
 
@@ -122,11 +122,18 @@ describe('getNotes', () => {
     const result = await getNotes(49321, 'sift-repo', fetchImpl);
 
     // Then
-    expect(result).toEqual({
-      kind: 'http-error',
-      status: 502,
-      message: 'Sift server returned an unreadable error response.',
-    });
+    expect(result).toEqual({ kind: 'invalid-error-response' });
+  });
+
+  it('returns invalid-error-response when a non-2xx body is valid JSON but does not match the error schema', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(502, { unexpected: 'shape' }));
+
+    // When
+    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-error-response' });
   });
 
   it('returns network-error when the request cannot connect', async () => {
@@ -199,7 +206,7 @@ describe('createNote', () => {
     });
   });
 
-  it('returns known-error with a generic message when a non-2xx body is not valid JSON', async () => {
+  it('returns invalid-error-response when a non-2xx body is not valid JSON', async () => {
     // Given
     const fetchImpl = vi.fn().mockResolvedValue(unparseableResponse(503));
 
@@ -207,11 +214,18 @@ describe('createNote', () => {
     const result = await createNote(49321, 'sift-repo', target, 'a note', fetchImpl);
 
     // Then
-    expect(result).toEqual({
-      kind: 'known-error',
-      status: 503,
-      message: 'Sift server returned an unreadable error response.',
-    });
+    expect(result).toEqual({ kind: 'invalid-error-response' });
+  });
+
+  it('returns invalid-error-response when a non-2xx body is valid JSON but does not match the error schema', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(503, { unexpected: 'shape' }));
+
+    // When
+    const result = await createNote(49321, 'sift-repo', target, 'a note', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-error-response' });
   });
 
   it('returns uncertain for a 2xx other than the documented 201, even with a valid note body', async () => {
