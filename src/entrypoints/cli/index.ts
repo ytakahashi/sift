@@ -6,6 +6,7 @@ import {
   createRepositoryConfigUpdater,
   startServer,
 } from '../../server/index';
+import { startMcpServer } from '../../mcp/start-mcp-server';
 import { resolveRepositoryIdForOpen } from './resolve-repository-for-open';
 import { selectRepositoryInteractively } from './select-repository';
 import { createCliProgram } from './program';
@@ -18,6 +19,7 @@ const program = createCliProgram({
   resolveRepoRoot,
   resolveRepositoryIdForOpen,
   selectRepository: selectRepositoryInteractively,
+  startMcpServer,
   startServer,
 });
 

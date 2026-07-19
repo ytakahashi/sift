@@ -18,6 +18,10 @@ function createDependencies(): CliDependencies {
     resolveRepoRoot: vi.fn().mockReturnValue('/repo/sift'),
     resolveRepositoryIdForOpen: vi.fn().mockResolvedValue('repo-123'),
     selectRepository: vi.fn().mockResolvedValue(null),
+    startMcpServer: vi.fn().mockResolvedValue({
+      server: {},
+      repoRootResolver: { resolve: vi.fn() },
+    }),
     startServer: vi.fn().mockResolvedValue({ owned: true, url: 'http://127.0.0.1:49321' }),
   };
 }
@@ -80,10 +84,12 @@ describe('createCliProgram', () => {
     expect(helpText).toContain('open');
     expect(helpText).toContain('add');
     expect(helpText).toContain('serve');
+    expect(helpText).toContain('mcp');
     expect(helpText).toContain('-h, --help');
     expect(dependencies.resolveRepoRoot).not.toHaveBeenCalled();
     expect(dependencies.resolveRepositoryIdForOpen).not.toHaveBeenCalled();
     expect(dependencies.startServer).not.toHaveBeenCalled();
+    expect(dependencies.startMcpServer).not.toHaveBeenCalled();
     expect(dependencies.openApp).not.toHaveBeenCalled();
     expect(dependencies.openBrowser).not.toHaveBeenCalled();
   });
@@ -106,7 +112,9 @@ describe('createCliProgram', () => {
     expect(helpText).toContain('open');
     expect(helpText).toContain('add');
     expect(helpText).toContain('serve');
+    expect(helpText).toContain('mcp');
     expect(dependencies.startServer).not.toHaveBeenCalled();
+    expect(dependencies.startMcpServer).not.toHaveBeenCalled();
     expect(dependencies.openApp).not.toHaveBeenCalled();
     expect(dependencies.openBrowser).not.toHaveBeenCalled();
   });
@@ -182,6 +190,25 @@ describe('createCliProgram', () => {
 
     // Then
     expect(dependencies.startServer).toHaveBeenCalledOnce();
+    expect(dependencies.resolveRepositoryIdForOpen).not.toHaveBeenCalled();
+    expect(dependencies.openBrowser).not.toHaveBeenCalled();
+    expect(dependencies.openApp).not.toHaveBeenCalled();
+  });
+
+  it('routes to the mcp command', async () => {
+    // Given
+    const dependencies = createDependencies();
+    const program = createTestProgram(dependencies);
+
+    // When
+    await program.parseAsync(['mcp', '--repo', '/path'], { from: 'user' });
+
+    // Then
+    expect(dependencies.startMcpServer).toHaveBeenCalledWith({
+      repoPath: '/path',
+      resolveRepoRoot: dependencies.resolveRepoRoot,
+    });
+    expect(dependencies.startServer).not.toHaveBeenCalled();
     expect(dependencies.resolveRepositoryIdForOpen).not.toHaveBeenCalled();
     expect(dependencies.openBrowser).not.toHaveBeenCalled();
     expect(dependencies.openApp).not.toHaveBeenCalled();
