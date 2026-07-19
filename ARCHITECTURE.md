@@ -7,8 +7,8 @@ The application consists of:
 - A Hono-based server that reads local Git state through CLI adapters
 - A React frontend for visualizing diffs and repository state
 - A CLI entry point that resolves repositories, starts the server, and opens the browser
-- An MCP server (`sift mcp`) that exposes Notes to AI agent hosts over stdio, as a thin client of the
-  same Hono server's HTTP API
+- An MCP server that exposes Notes to AI agent hosts over stdio, as a thin client of the same Hono
+  server's HTTP API
 
 ## Repository Layout
 
@@ -27,14 +27,14 @@ src/
 Code shared between sibling entry points lives in `entrypoints/shared/`, keeping such cross-host
 contracts out of `domain/` (which is reserved for pure business logic shared by `server`/`client`).
 
-`domain/`, `server/`, `mcp/`, and `client/` are the building-block libraries; `entrypoints/*` are the
-runnable deliverables that compose them for a specific runtime (CLI today, Electron desktop app, and
-potentially others such as a VS Code extension).
+`domain/`, `server/`, `mcp/`, and `client/` are the building-block libraries; `entrypoints/*` are
+the runnable deliverables that compose them for a specific runtime (CLI today, Electron desktop app,
+and potentially others such as a VS Code extension).
 
 `mcp/` sits alongside `server/` rather than under `entrypoints/`: it is not itself a process entry
-point (only `entrypoints/cli`'s `mcp` subcommand is), but a protocol adapter layer with the same role
-as `server/` — `server/` adapts `domain/` to HTTP, `mcp/` adapts the same functionality to the MCP
-stdio protocol by calling `server/`'s HTTP API. See the MCP Layer below.
+point (only `entrypoints/cli`'s `mcp` subcommand is), but a protocol adapter layer with the same
+role as `server/` — `server/` adapts `domain/` to HTTP, `mcp/` adapts the same functionality to the
+MCP stdio protocol by calling `server/`'s HTTP API. See the MCP Layer below.
 
 Top-level dependency rules:
 
@@ -45,9 +45,9 @@ Top-level dependency rules:
   `entrypoints/`.
 - `client/` depends on `domain/` and React. It must not import from `server/`, `mcp/`, or
   `entrypoints/`.
-- `entrypoints/` groups the program entry points. Each entry point wires together `server/` (and, for
-  GUI runtimes, renders `client/`) for one runtime; `entrypoints/cli` additionally wires `mcp/` for
-  the `mcp` subcommand. See the Entry Points Layer below for the rules among its subdirectories.
+- `entrypoints/` groups the program entry points. Each entry point wires together `server/` (and,
+  for GUI runtimes, renders `client/`) for one runtime; `entrypoints/cli` additionally wires `mcp/`
+  for the `mcp` subcommand. See the Entry Points Layer below for the rules among its subdirectories.
 
 ## Dependency Overview
 
@@ -232,17 +232,24 @@ diffing, etc.) of its own, and must not duplicate it. Its own responsibilities a
 translating between MCP tool calls and HTTP requests/responses, and the runtime validation at that
 transport boundary.
 
+Domain models remain plain TypeScript types owned by `domain/` (see Domain Layer). Zod schemas in
+`mcp/` mirror those models because MCP tools must publish runtime input and output schemas. The same
+schemas validate HTTP responses before they are exposed as MCP tool results, ensuring that
+`structuredContent` conforms to the advertised contract. Adopting Zod in `mcp/` does not obligate
+`client/` or `server/` to use it too; client and server may introduce their own boundary-specific
+validation when required. Transport rules such as rejecting additional properties belong to the
+schema at the relevant boundary, not to the domain model.
+
 - `repo-target.ts` holds the repository path candidate the process was started with (from `--repo`,
-  or the working directory as a fallback, decided by `entrypoints/cli`) and resolves it to a git root
-  lazily, on first use, caching a successful result for the process lifetime. This lets MCP
+  or the working directory as a fallback, decided by `entrypoints/cli`) and resolves it to a git
+  root lazily, on first use, caching a successful result for the process lifetime. This lets MCP
   initialization and `tools/list` succeed even before the candidate path is confirmed to be a git
   repository; only an actual tool call pays for, and can fail on, that resolution.
 - `start-mcp-server.ts` builds the `McpServer` instance and connects it to a stdio transport. Tool
   registration (`list_notes`/`add_note`) is added here as those tools are implemented.
 
 Allowed dependencies: `domain/`, `server/` (as an HTTP client, and for shared utilities such as the
-port resolver and health probe), Node.js APIs, and within `mcp/`.
-Disallowed dependencies: `client/`, any `entrypoints/*` subdirectory. Concrete values that originate
-from the CLI layer (e.g. the `--repo`/cwd candidate path, `resolveRepoRoot`) are passed in by the
-`entrypoints/cli` composition root rather than imported, so the dependency stays one-directional
-(`entrypoints/cli` → `mcp` → `server`/`domain`).
+port resolver and health probe), Node.js APIs, and within `mcp/`. Disallowed dependencies:
+`client/`, any `entrypoints/*` subdirectory. Concrete values that originate from the CLI layer are
+passed in by the `entrypoints/cli` composition root rather than imported, so the dependency stays
+one-directional (`entrypoints/cli` → `mcp` → `server`/`domain`).
