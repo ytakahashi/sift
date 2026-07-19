@@ -10,12 +10,8 @@ import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
 import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 import { validateRepositoryPath } from './infrastructure/repository-validator';
-import {
-  buildLocalServerUrl,
-  checkExistingSiftServer,
-  LOOPBACK_HOST,
-  resolvePort,
-} from './fixed-port';
+import { buildLocalServerUrl, LOOPBACK_HOST, resolvePort } from './fixed-port';
+import { checkExistingSiftServer } from './health-probe';
 
 export interface StartedServer {
   url: string;
