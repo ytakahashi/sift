@@ -742,14 +742,11 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            bucket: 'working',
-            hunkId: 'h1',
-            startNewLineNumber: 1,
-            endNewLineNumber: 1,
-          },
+          kind: 'line',
+          path: 'f1',
+          startLine: 1,
+          endLine: 1,
+          bucket: 'working',
           body: 'hello',
           createdAt: 100,
         },
@@ -776,14 +773,11 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            bucket: 'working',
-            hunkId: 'h1',
-            startNewLineNumber: 1,
-            endNewLineNumber: 1,
-          },
+          kind: 'line',
+          path: 'f1',
+          startLine: 1,
+          endLine: 1,
+          bucket: 'working',
           body: 'hello note',
           createdAt: 100,
         },
@@ -823,14 +817,11 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            bucket: 'working',
-            hunkId: 'h1',
-            startNewLineNumber: 1,
-            endNewLineNumber: 1,
-          },
+          kind: 'line',
+          path: 'f1',
+          startLine: 1,
+          endLine: 1,
+          bucket: 'working',
           body: 'hello note',
           createdAt: 100,
         },
@@ -877,14 +868,11 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       notes: [
         {
           id: 'n1',
-          target: {
-            kind: 'line',
-            fileId: 'f1',
-            bucket: 'working',
-            hunkId: 'h1',
-            startNewLineNumber: 10,
-            endNewLineNumber: 10,
-          },
+          kind: 'line',
+          path: 'f1',
+          startLine: 10,
+          endLine: 10,
+          bucket: 'working',
           body: 'hello clipboard',
           createdAt: 100,
         },

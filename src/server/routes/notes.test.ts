@@ -2,6 +2,7 @@ import { Hono } from 'hono';
 import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
+import type { AnchoredNote } from '../../domain/notes/anchored-note';
 import type { Note } from '../../domain/notes/types';
 import type { Env } from '../create-app';
 import { NoteNotFoundError } from '../services/notes-store';
@@ -42,13 +43,18 @@ function createFile(options: FileFixtureOptions): DiffFile {
   };
 }
 
-function createStoredNote(id: string): Note {
+function createStoredNote(id: string): AnchoredNote {
   return {
     id,
     target: { kind: 'file', fileId: 'file-a.ts' },
     body: `note-${id}`,
     createdAt: 100,
   };
+}
+
+/** The public shape a store-returned file note (fileId "file-a.ts") maps to against the default `a.ts` fixture. */
+function createPublicFileNote(id: string, path = 'a.ts'): Note {
+  return { id, kind: 'file', path, body: `note-${id}`, createdAt: 100 };
 }
 
 const FILE_GENERATION: FileGeneration = { kind: 'file', blobId: 'blob-1', mode: '100644' };
@@ -180,27 +186,70 @@ describe('notesRoutes', () => {
   });
 
   describe('GET /notes', () => {
-    it('returns the reconciled notes', async () => {
+    it('returns the reconciled notes in their public, path-based shape', async () => {
       // When: notes are listed
       const response = await app.request('/api/repositories/my-repo/notes');
 
-      // Then: the store contents are returned under "notes"
+      // Then: the store contents are mapped to path-based notes; no fileId leaks
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ notes: [createStoredNote('n1')] });
+      const payload = (await response.json()) as { notes: Note[] };
+      expect(payload).toEqual({ notes: [createPublicFileNote('n1')] });
+      expect(JSON.stringify(payload)).not.toContain('fileId');
+    });
+
+    it('returns 500 when a stored note cannot be resolved against the current diff', async () => {
+      // Given: the stored note's fileId matches no eligible file in either pane
+      workingFiles = [];
+      stagedFiles = [];
+
+      // When: notes are listed
+      const response = await app.request('/api/repositories/my-repo/notes');
+
+      // Then: the request fails instead of silently dropping the note or leaking its fileId
+      expect(response.status).toBe(500);
+      const payload = (await response.json()) as { error: string };
+      expect(payload.error).not.toContain('file-a.ts');
     });
   });
 
   describe('POST /notes (line note)', () => {
     it('resolves a unique target without bucket and stores the anchor', async () => {
+      // Given: the store returns the created note anchored to the resolved
+      // line target (not the default file-note fixture), so the response
+      // assertion below actually exercises the line-note mapping
+      notesStore.add.mockResolvedValue({
+        id: 'created',
+        target: {
+          kind: 'line',
+          fileId: 'file-a.ts',
+          bucket: 'working',
+          hunkId: 'hunk-a.ts-0',
+          startNewLineNumber: 5,
+          endNewLineNumber: 5,
+        },
+        body: 'needs a guard',
+        createdAt: 100,
+      });
+
       // When: a line note is created for the only matching pane
       const response = await postNote({
         target: { kind: 'line', path: 'a.ts', startLine: 5, endLine: 5 },
         body: 'needs a guard',
       });
 
-      // Then: the created note is returned
+      // Then: the created note is returned in its public, path-based shape —
+      // startLine/endLine/the resolved bucket, not fileId/hunkId/target
       expect(response.status).toBe(201);
-      await expect(response.json()).resolves.toEqual(createStoredNote('created'));
+      await expect(response.json()).resolves.toEqual({
+        id: 'created',
+        kind: 'line',
+        path: 'a.ts',
+        startLine: 5,
+        endLine: 5,
+        bucket: 'working',
+        body: 'needs a guard',
+        createdAt: 100,
+      });
 
       // Then: the server-resolved target and anchor are stored
       expect(notesStore.add).toHaveBeenCalledWith(
@@ -493,6 +542,29 @@ describe('notesRoutes', () => {
       expect(response.status).toBe(422);
       expect(notesStore.add).not.toHaveBeenCalled();
     });
+
+    it('returns 500 without leaking fileId when the stored note cannot be mapped back', async () => {
+      // Given: the store (mocked) returns a note anchored to a fileId absent
+      // from the current diff — a server invariant violation, since creation
+      // just resolved this same target successfully
+      notesStore.add.mockResolvedValue({
+        id: 'created',
+        target: { kind: 'file', fileId: 'file-unknown.ts' },
+        body: 'about this file',
+        createdAt: 100,
+      });
+
+      // When: a file note is created
+      const response = await postNote({
+        target: { kind: 'file', path: 'a.ts' },
+        body: 'about this file',
+      });
+
+      // Then: the response is a 500 invariant error, not a note exposing fileId
+      expect(response.status).toBe(500);
+      const payload = (await response.json()) as { error: string };
+      expect(payload.error).not.toContain('file-unknown.ts');
+    });
   });
 
   describe('POST /notes (request validation)', () => {
@@ -574,8 +646,11 @@ describe('notesRoutes', () => {
         body: JSON.stringify({ body: 'revised' }),
       });
 
-      // Then: the updated note is returned and subscribers are notified
+      // Then: the updated note is returned in its public, path-based shape
+      // (not the internal target the mocked store resolved to), and
+      // subscribers are notified
       expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(createPublicFileNote('updated'));
       expect(notesStore.updateBody).toHaveBeenCalledWith('my-repo', 'n1', 'revised');
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
     });

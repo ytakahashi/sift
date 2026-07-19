@@ -2,9 +2,10 @@ import { Hono, type Context } from 'hono';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
 import type { ConfirmedFileGeneration, FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
+import type { AnchoredNote, AnchoredNoteTarget } from '../../domain/notes/anchored-note';
 import { isNoteEligibleFile } from '../../domain/notes/note-eligibility';
 import { resolveLineNoteTarget } from '../../domain/notes/resolve-line-note-target';
-import type { NoteBucket, NoteTarget } from '../../domain/notes/types';
+import type { Note, NoteBucket } from '../../domain/notes/types';
 import type { RepositoryId } from '../../domain/repository/repository';
 import type { Env } from '../create-app';
 import type { FileGenerationProvider } from '../services/file-generation-provider';
@@ -15,6 +16,7 @@ import {
   NoteTargetResolutionError,
 } from '../services/notes-store';
 import type { RepositoryResolver } from '../services/repository-resolver';
+import { NotePresentationError, toNoteResponse } from './note-response';
 import { handleRouteError } from './route-error';
 
 export interface CreateNotesRoutesOptions {
@@ -160,7 +162,7 @@ function requireConfirmedGeneration(
 function resolveCreateTarget(
   context: RepoNotesContext,
   request: NoteCreateRequest,
-): { target: NoteTarget; generation: ConfirmedFileGeneration; lineContents?: string[] } {
+): { target: AnchoredNoteTarget; generation: ConfirmedFileGeneration; lineContents?: string[] } {
   if (request.kind === 'file') {
     const file = findEligibleFileByPath(context, request.path);
     if (!file) {
@@ -232,6 +234,19 @@ function resolveCreateTarget(
   };
 }
 
+/**
+ * Converts a stored AnchoredNote to the public Note shape, or fails the
+ * request as a 500 invariant error rather than exposing internal ids or
+ * silently dropping the note from the response.
+ */
+function toPublicNote(note: AnchoredNote, context: RepoNotesContext): Note {
+  const publicNote = toNoteResponse(note, context);
+  if (!publicNote) {
+    throw new NotePresentationError(`Could not resolve the current path for note "${note.id}".`);
+  }
+  return publicNote;
+}
+
 export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> {
   const notesRoutes = new Hono<Env>();
   const resolver = options.repositoryResolver;
@@ -276,7 +291,7 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
     try {
       const context = await reconcileRepo(c);
       const notes = await options.notesStore.list(context.repoId);
-      return c.json({ notes });
+      return c.json({ notes: notes.map((note) => toPublicNote(note, context)) });
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }
@@ -295,7 +310,7 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
         lineContents: resolved.lineContents,
       });
       options.notifyNotesChanged(context.repoId);
-      return c.json(note, 201);
+      return c.json(toPublicNote(note, context), 201);
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }
@@ -313,7 +328,7 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
         noteBody,
       );
       options.notifyNotesChanged(context.repoId);
-      return c.json(note);
+      return c.json(toPublicNote(note, context));
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }

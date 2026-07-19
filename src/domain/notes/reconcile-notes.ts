@@ -1,12 +1,12 @@
 import type { ConfirmedFileGeneration, FileGeneration } from '../diff/file-generation';
 import { serializeFileGeneration } from '../diff/file-generation';
 import type { DiffFile } from '../diff/types';
+import type { AnchoredNote } from './anchored-note';
 import { isNoteEligibleFile } from './note-eligibility';
 import { resolveLineNoteTarget } from './resolve-line-note-target';
-import type { Note } from './types';
 
 export interface NoteReconcileRecord {
-  note: Note;
+  note: AnchoredNote;
   /**
    * Worktree generation of the target file when the note was created.
    * Always confirmed: creation rejects notes whose generation is unavailable.

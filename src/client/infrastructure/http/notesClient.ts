@@ -1,10 +1,6 @@
-import type { Note } from '../../../domain/notes/types';
+import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
-import {
-  NotesActionError,
-  type NoteCreateTarget,
-  type NotesGateway,
-} from '../../application/ports';
+import { NotesActionError, type NotesGateway } from '../../application/ports';
 import { readErrorMessage } from './errorResponse';
 
 function notesUrl(repoId: RepositoryId, noteId?: string): string {

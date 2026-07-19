@@ -24,7 +24,6 @@ export function UnifiedDiffViewer({
   onUpdateNote,
   onDeleteNote,
   notesDeleteDisabled,
-  resolveFilePath,
   isFileNoteEditorOpen = false,
   onCloseFileNoteEditor,
 }: BaseDiffViewerProps): ReactElement {
@@ -32,10 +31,8 @@ export function UnifiedDiffViewer({
   const viewerRef = useRef<HTMLDivElement>(null);
   const [interaction, setInteraction] = useState<LineInteraction>({ type: 'idle' });
   const [rangeSelectionError, setRangeSelectionError] = useState<string | null>(null);
-  const fileNotes = notes.filter((note) => note.target.kind === 'file');
-  const paneLineNotes = notes.filter(
-    (note) => note.target.kind === 'line' && note.target.bucket === paneMode,
-  );
+  const fileNotes = notes.filter((note) => note.kind === 'file');
+  const paneLineNotes = notes.filter((note) => note.kind === 'line' && note.bucket === paneMode);
 
   useEffect(() => {
     if (interaction.type !== 'selecting') {
@@ -116,7 +113,6 @@ export function UnifiedDiffViewer({
           <NoteCard
             key={note.id}
             note={note}
-            resolveFilePath={resolveFilePath}
             onUpdate={onUpdateNote}
             onDelete={onDeleteNote}
             deleteDisabled={notesDeleteDisabled}
@@ -187,16 +183,15 @@ export function UnifiedDiffViewer({
               rowLineNumber !== undefined &&
               paneLineNotes.some(
                 (note) =>
-                  note.target.kind === 'line' &&
-                  note.target.startNewLineNumber <= rowLineNumber &&
-                  rowLineNumber <= note.target.endNewLineNumber,
+                  note.kind === 'line' &&
+                  note.startLine <= rowLineNumber &&
+                  rowLineNumber <= note.endLine,
               );
             const endingLineNotes =
               rowLineNumber === undefined
                 ? []
                 : paneLineNotes.filter(
-                    (note) =>
-                      note.target.kind === 'line' && note.target.endNewLineNumber === rowLineNumber,
+                    (note) => note.kind === 'line' && note.endLine === rowLineNumber,
                   );
             const isRangeAnchor =
               interaction.type === 'selecting' && interaction.anchor === rowLineNumber;
@@ -356,13 +351,9 @@ export function UnifiedDiffViewer({
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                         <NoteCard
                           note={note}
-                          resolveFilePath={resolveFilePath}
                           contextLabel={
-                            note.target.kind === 'line'
-                              ? formatLineRange(
-                                  note.target.startNewLineNumber,
-                                  note.target.endNewLineNumber,
-                                )
+                            note.kind === 'line'
+                              ? formatLineRange(note.startLine, note.endLine)
                               : undefined
                           }
                           onUpdate={onUpdateNote}

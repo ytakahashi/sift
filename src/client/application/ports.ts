@@ -1,5 +1,5 @@
 import type { RepositoryDiff } from '../../domain/diff/types';
-import type { Note, NoteBucket } from '../../domain/notes/types';
+import type { Note, NoteCreateTarget } from '../../domain/notes/types';
 import type {
   RepositoryId,
   RepositoryList,
@@ -76,23 +76,6 @@ export interface WorkspaceActions {
   stageHunk(repoId: RepositoryId, path: string, hunkId: string): Promise<void>;
   unstageHunk(repoId: RepositoryId, path: string, hunkId: string): Promise<void>;
 }
-
-/**
- * Creation request for a note, addressed by path and inclusive line range.
- * Distinct from the domain NoteTarget: fileId/hunkId resolution and validation
- * happen on the server so UI- and agent-created notes share one code path. The
- * UI always sets the line-note bucket explicitly (it knows its pane), avoiding
- * the ambiguity 422 that agents may hit.
- */
-export type NoteCreateTarget =
-  | {
-      kind: 'line';
-      path: string;
-      startLine: number;
-      endLine: number;
-      bucket: NoteBucket;
-    }
-  | { kind: 'file'; path: string };
 
 export interface NotesGateway {
   fetchNotes(repoId: RepositoryId): Promise<Note[]>;

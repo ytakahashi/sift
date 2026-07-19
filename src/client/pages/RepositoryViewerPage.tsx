@@ -236,9 +236,7 @@ function RepositoryWorkspace({
   });
   const notesPanel = useNotesPanel({
     notes,
-    workingFiles,
-    stagedFiles,
-    selectedFileId: selectedFile?.id ?? null,
+    selectedFilePath: selectedFile?.path ?? null,
   });
   const fileNoteEditor = useFileNoteEditor(selectedFile?.id ?? null);
 
@@ -298,7 +296,6 @@ function RepositoryWorkspace({
             onClose={notesPanel.close}
             onDeleteNote={deleteNote}
             deleteDisabled={notesMutating}
-            resolveFilePath={notesPanel.resolveFilePath}
           />
         )}
         {isFileListOpen && (
@@ -444,7 +441,6 @@ function RepositoryWorkspace({
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}
                 notesDeleteDisabled={notesMutating}
-                resolveFilePath={notesPanel.resolveFilePath}
                 // The editor state is keyed by DiffFile.id, which does not
                 // distinguish panes; a same-path entry in the other pane can be
                 // a submodule (type transition), where notes are not allowed.

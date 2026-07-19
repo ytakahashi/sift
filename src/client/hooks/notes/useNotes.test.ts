@@ -8,7 +8,8 @@ import { useNotes } from './useNotes';
 function createNote(id: string): Note {
   return {
     id,
-    target: { kind: 'file', fileId: 'file-a.ts' },
+    kind: 'file',
+    path: 'a.ts',
     body: `note-${id}`,
     createdAt: 100,
   };

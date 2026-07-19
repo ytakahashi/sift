@@ -8,7 +8,6 @@ interface NotesListModalProps {
   onDeleteNote: (id: string) => void | Promise<void>;
   /** Disables Delete while another notes mutation is in flight. */
   deleteDisabled?: boolean;
-  resolveFilePath: (fileId: string) => string;
 }
 
 export function NotesListModal({
@@ -16,7 +15,6 @@ export function NotesListModal({
   onClose,
   onDeleteNote,
   deleteDisabled = false,
-  resolveFilePath,
 }: NotesListModalProps): ReactElement {
   const [copied, setCopied] = useState(false);
 
@@ -30,7 +28,7 @@ export function NotesListModal({
   }, [copied]);
 
   const handleCopy = async (): Promise<void> => {
-    const text = formatNotesForClipboard(notes, resolveFilePath);
+    const text = formatNotesForClipboard(notes);
     try {
       await navigator.clipboard.writeText(text);
       setCopied(true);
@@ -110,7 +108,7 @@ export function NotesListModal({
           }}
         >
           {notes.map((note) => {
-            const location = formatNoteLocation(note, resolveFilePath);
+            const location = formatNoteLocation(note);
             return (
               <div
                 key={note.id}

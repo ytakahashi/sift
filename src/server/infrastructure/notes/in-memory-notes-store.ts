@@ -1,9 +1,9 @@
 import { randomUUID } from 'node:crypto';
 import type { FileGeneration } from '../../../domain/diff/file-generation';
 import type { DiffFile } from '../../../domain/diff/types';
+import type { AnchoredNote, AnchoredNoteTarget } from '../../../domain/notes/anchored-note';
 import type { NoteReconcileRecord } from '../../../domain/notes/reconcile-notes';
 import { reconcileNotes } from '../../../domain/notes/reconcile-notes';
-import type { Note, NoteTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type { NoteAnchor, NotesStore } from '../../services/notes-store';
 import { NoteNotFoundError } from '../../services/notes-store';
@@ -49,17 +49,17 @@ export class InMemoryNotesStore implements NotesStore {
     return result.changed;
   }
 
-  async list(repoId: RepositoryId): Promise<Note[]> {
+  async list(repoId: RepositoryId): Promise<AnchoredNote[]> {
     return (this.records.get(repoId) ?? []).map((record) => record.note);
   }
 
   async add(
     repoId: RepositoryId,
-    target: NoteTarget,
+    target: AnchoredNoteTarget,
     body: string,
     anchor: NoteAnchor,
-  ): Promise<Note> {
-    const note: Note = {
+  ): Promise<AnchoredNote> {
+    const note: AnchoredNote = {
       id: randomUUID(),
       target,
       body,
@@ -76,7 +76,7 @@ export class InMemoryNotesStore implements NotesStore {
     return note;
   }
 
-  async updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<Note> {
+  async updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<AnchoredNote> {
     const existing = this.records.get(repoId) ?? [];
     const index = existing.findIndex((record) => record.note.id === noteId);
     if (index < 0) {

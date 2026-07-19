@@ -5,7 +5,6 @@ import { NoteViewer } from './NoteViewer';
 
 interface NoteCardProps {
   note: Note;
-  resolveFilePath: (fileId: string) => string;
   contextLabel?: string;
   onUpdate?: (id: string, body: string) => Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
@@ -15,7 +14,6 @@ interface NoteCardProps {
 
 export function NoteCard({
   note,
-  resolveFilePath,
   contextLabel,
   onUpdate,
   onDelete,
@@ -51,7 +49,6 @@ export function NoteCard({
       ) : (
         <NoteViewer
           note={note}
-          resolveFilePath={resolveFilePath}
           contextLabel={contextLabel}
           onEdit={() => setIsEditing(true)}
           onDelete={onDelete}

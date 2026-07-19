@@ -1,6 +1,6 @@
 import type { ConfirmedFileGeneration, FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
-import type { Note, NoteTarget } from '../../domain/notes/types';
+import type { AnchoredNote, AnchoredNoteTarget } from '../../domain/notes/anchored-note';
 import type { RepositoryId } from '../../domain/repository/repository';
 
 /** The requested note does not exist (including notes just discarded by reconcile). */
@@ -73,9 +73,14 @@ export interface NotesStore {
       generations: ReadonlyMap<string, FileGeneration>;
     },
   ): Promise<boolean>;
-  list(repoId: RepositoryId): Promise<Note[]>;
-  add(repoId: RepositoryId, target: NoteTarget, body: string, anchor: NoteAnchor): Promise<Note>;
-  updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<Note>;
+  list(repoId: RepositoryId): Promise<AnchoredNote[]>;
+  add(
+    repoId: RepositoryId,
+    target: AnchoredNoteTarget,
+    body: string,
+    anchor: NoteAnchor,
+  ): Promise<AnchoredNote>;
+  updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<AnchoredNote>;
   remove(repoId: RepositoryId, noteId: string): Promise<void>;
   clear(repoId: RepositoryId): Promise<void>;
 }

@@ -1,6 +1,5 @@
-import type { Note } from '../../../domain/notes/types';
 import type { DiffFile } from '../../../domain/diff/types';
-import type { NoteCreateTarget } from '../../application/ports';
+import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 
 export interface BaseDiffViewerProps {
   file: DiffFile;
@@ -19,7 +18,6 @@ export interface BaseDiffViewerProps {
   onDeleteNote?: (id: string) => Promise<void>;
   /** Disables note Delete buttons while another notes mutation is in flight. */
   notesDeleteDisabled?: boolean;
-  resolveFilePath: (fileId: string) => string;
   isFileNoteEditorOpen?: boolean;
   onCloseFileNoteEditor?: () => void;
 }

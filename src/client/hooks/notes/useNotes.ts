@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import type { Note } from '../../../domain/notes/types';
+import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
-import type { NoteCreateTarget, NotesGateway } from '../../application/ports';
+import type { NotesGateway } from '../../application/ports';
 
 export interface UseNotesResult {
   notes: Note[];
