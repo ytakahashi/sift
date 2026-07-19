@@ -3,6 +3,8 @@ import { APP_INFO } from './app-info';
 export const DEFAULT_PORT = 49321;
 export const SIFT_HEALTH_PRODUCT = APP_INFO.name;
 export const SIFT_HEALTH_VERSION = APP_INFO.version;
+export const NOTES_V1_CAPABILITY = 'notes-v1';
+export const SIFT_HEALTH_CAPABILITIES: readonly string[] = [NOTES_V1_CAPABILITY];
 
 export type ExistingServerStatus = 'sift' | 'other' | 'unreachable';
 
