@@ -19,6 +19,6 @@
     "src/entrypoints/shared",
     "src/server",
     "src/domain",
-    "src/local-config"
+    "src/mcp"
   ]
 }

@@ -7,16 +7,19 @@ The application consists of:
 - A Hono-based server that reads local Git state through CLI adapters
 - A React frontend for visualizing diffs and repository state
 - A CLI entry point that resolves repositories, starts the server, and opens the browser
+- An MCP server that exposes Notes to AI agent hosts over stdio, as a thin client of the same Hono
+  server's HTTP API
 
 ## Repository Layout
 
 ```text
 src/
 ├── entrypoints/  # Program entry points that host the product on a runtime
-│   ├── cli/        # CLI entry point (commander, repo resolution, browser opener)
+│   ├── cli/        # CLI entry point (commander, repo resolution, browser opener, mcp wiring)
 │   ├── electron/   # Electron main process entry point (standalone GUI app)
 │   └── shared/     # Contract shared between entry points (no runtime-specific code)
 ├── server/       # Hono HTTP server (routes, services, watch, infrastructure)
+├── mcp/          # MCP stdio protocol adapter; a thin client of server/'s HTTP API
 ├── client/       # React frontend (application ports, infrastructure, hooks, components, styles)
 └── domain/       # Pure business logic and models shared across server and client
 ```
@@ -24,18 +27,27 @@ src/
 Code shared between sibling entry points lives in `entrypoints/shared/`, keeping such cross-host
 contracts out of `domain/` (which is reserved for pure business logic shared by `server`/`client`).
 
-`domain/`, `server/`, and `client/` are the building-block libraries; `entrypoints/*` are the
-runnable deliverables that compose them for a specific runtime (CLI today, Electron desktop app, and
-potentially others such as a VS Code extension).
+`domain/`, `server/`, `mcp/`, and `client/` are the building-block libraries; `entrypoints/*` are
+the runnable deliverables that compose them for a specific runtime (CLI today, Electron desktop app,
+and potentially others such as a VS Code extension).
+
+`mcp/` sits alongside `server/` rather than under `entrypoints/`: it is not itself a process entry
+point (only `entrypoints/cli`'s `mcp` subcommand is), but a protocol adapter layer with the same
+role as `server/` — `server/` adapts `domain/` to HTTP, `mcp/` adapts the same functionality to the
+MCP stdio protocol by calling `server/`'s HTTP API. See the MCP Layer below.
 
 Top-level dependency rules:
 
 - `domain/` contains pure logic with no framework, Node.js, browser, or infrastructure dependencies.
-- `server/` depends on `domain/` and Node.js APIs. It must not import from `client/`.
-- `client/` depends on `domain/` and React. It must not import from `server/` or `entrypoints/`.
-- `entrypoints/` groups the program entry points. Each entry point wires together `server/` (and, for
-  GUI runtimes, renders `client/`) for one runtime. See the Entry Points Layer below for the rules
-  among its subdirectories.
+- `server/` depends on `domain/` and Node.js APIs. It must not import from `client/` or `mcp/`.
+- `mcp/` depends on `domain/` and `server/` (as an HTTP client and for shared utilities such as the
+  port resolver and health probe), and Node.js APIs. It must not import from `client/` or
+  `entrypoints/`.
+- `client/` depends on `domain/` and React. It must not import from `server/`, `mcp/`, or
+  `entrypoints/`.
+- `entrypoints/` groups the program entry points. Each entry point wires together `server/` (and,
+  for GUI runtimes, renders `client/`) for one runtime; `entrypoints/cli` additionally wires `mcp/`
+  for the `mcp` subcommand. See the Entry Points Layer below for the rules among its subdirectories.
 
 ## Dependency Overview
 
@@ -43,6 +55,7 @@ Top-level dependency rules:
 graph TD
     domain
     server
+    mcp
     client
 
     subgraph entrypoints
@@ -53,9 +66,12 @@ graph TD
 
     client --> domain
     server --> domain
+    mcp --> domain
+    mcp --> server
     shared --> domain
     cli --> domain
     cli --> server
+    cli --> mcp
     cli --> shared
     electron --> domain
     electron --> server
@@ -104,10 +120,10 @@ by `electron/`).
 
 ### `entrypoints/cli/`
 
-The command-line entry point: repository resolution, local config editing, and browser/server
-startup wiring.
+The command-line entry point: repository resolution, local config editing, browser/server startup
+wiring, and the `mcp` subcommand's stdio startup wiring.
 
-- Allowed dependencies: `entrypoints/shared/`, `domain/`, `server/`, Node.js APIs.
+- Allowed dependencies: `entrypoints/shared/`, `domain/`, `server/`, `mcp/`, Node.js APIs.
 - Disallowed dependencies: other entry-point subdirectories (e.g. `electron/`), `client/`.
 
 ### `entrypoints/electron/`
@@ -207,3 +223,34 @@ The Electron main process entry point. It starts the Hono server via `startServe
   implementations.
 - Avoid tests that require real Git repositories or filesystem access. Infrastructure tests should
   mock Node.js APIs, Git CLI adapters, filesystem calls, chokidar, and other runtime dependencies.
+
+## MCP Layer
+
+`mcp/` exposes Notes to MCP hosts (AI agents) over stdio as a thin client of `server/`'s HTTP API.
+
+### MCP Responsibilities And Import Restrictions
+
+- Thin Protocol Adapter: Holds no Notes business logic (target resolution, reconcile, generation
+  diffing, etc.). Its role is protocol translation between MCP tool calls and HTTP API
+  requests/responses.
+- Runtime Boundary Validation: Uses Zod schemas to validate MCP tool inputs/outputs and HTTP
+  responses, ensuring transport contracts without leaking schema validation rules into `domain/`.
+- Lazy Repository Resolution: `repo-target.ts` holds the repository path candidate (from `--repo` or
+  working directory) and lazily resolves/caches the git root on the first tool invocation. This
+  allows MCP initialization and `tools/list` to succeed without a confirmed git repository.
+- Server Lifecycle & Transport: `start-mcp-server.ts` builds the `McpServer` instance, wires stdio
+  transport, and registers tools (`list_notes`/`add_note`).
+- Server Lifecycle Independence: Connects to an existing Sift HTTP server; it does not start, stop,
+  or manage the lifecycle of the HTTP server process.
+
+Allowed dependencies:
+
+- `domain/`
+- `server/` (as an HTTP client and for shared utilities such as the port resolver and health probe)
+- Node.js APIs
+
+Disallowed dependencies:
+
+- `client/`
+- Any `entrypoints/*` subdirectory (`entrypoints/cli` injects CLI-level values into `mcp/` to
+  maintain one-directional dependencies)
