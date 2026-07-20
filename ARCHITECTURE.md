@@ -226,30 +226,31 @@ The Electron main process entry point. It starts the Hono server via `startServe
 
 ## MCP Layer
 
-`mcp/` exposes Notes to MCP hosts (AI agent CLIs) over stdio. It is a thin client of `server/`'s
-existing HTTP API: it holds no Notes business logic (target resolution, reconcile, generation
-diffing, etc.) of its own, and must not duplicate it. Its own responsibilities are protocol-level:
-translating between MCP tool calls and HTTP requests/responses, and the runtime validation at that
-transport boundary.
+`mcp/` exposes Notes to MCP hosts (AI agents) over stdio as a thin client of `server/`'s HTTP API.
 
-Domain models remain plain TypeScript types owned by `domain/` (see Domain Layer). Zod schemas in
-`mcp/` mirror those models because MCP tools must publish runtime input and output schemas. The same
-schemas validate HTTP responses before they are exposed as MCP tool results, ensuring that
-`structuredContent` conforms to the advertised contract. Adopting Zod in `mcp/` does not obligate
-`client/` or `server/` to use it too; client and server may introduce their own boundary-specific
-validation when required. Transport rules such as rejecting additional properties belong to the
-schema at the relevant boundary, not to the domain model.
+### MCP Responsibilities And Import Restrictions
 
-- `repo-target.ts` holds the repository path candidate the process was started with (from `--repo`,
-  or the working directory as a fallback, decided by `entrypoints/cli`) and resolves it to a git
-  root lazily, on first use, caching a successful result for the process lifetime. This lets MCP
-  initialization and `tools/list` succeed even before the candidate path is confirmed to be a git
-  repository; only an actual tool call pays for, and can fail on, that resolution.
-- `start-mcp-server.ts` builds the `McpServer` instance and connects it to a stdio transport. Tool
-  registration (`list_notes`/`add_note`) is added here as those tools are implemented.
+- Thin Protocol Adapter: Holds no Notes business logic (target resolution, reconcile, generation
+  diffing, etc.). Its role is protocol translation between MCP tool calls and HTTP API
+  requests/responses.
+- Runtime Boundary Validation: Uses Zod schemas to validate MCP tool inputs/outputs and HTTP
+  responses, ensuring transport contracts without leaking schema validation rules into `domain/`.
+- Lazy Repository Resolution: `repo-target.ts` holds the repository path candidate (from `--repo` or
+  working directory) and lazily resolves/caches the git root on the first tool invocation. This
+  allows MCP initialization and `tools/list` to succeed without a confirmed git repository.
+- Server Lifecycle & Transport: `start-mcp-server.ts` builds the `McpServer` instance, wires stdio
+  transport, and registers tools (`list_notes`/`add_note`).
+- Server Lifecycle Independence: Connects to an existing Sift HTTP server; it does not start, stop,
+  or manage the lifecycle of the HTTP server process.
 
-Allowed dependencies: `domain/`, `server/` (as an HTTP client, and for shared utilities such as the
-port resolver and health probe), Node.js APIs, and within `mcp/`. Disallowed dependencies:
-`client/`, any `entrypoints/*` subdirectory. Concrete values that originate from the CLI layer are
-passed in by the `entrypoints/cli` composition root rather than imported, so the dependency stays
-one-directional (`entrypoints/cli` → `mcp` → `server`/`domain`).
+Allowed dependencies:
+
+- `domain/`
+- `server/` (as an HTTP client and for shared utilities such as the port resolver and health probe)
+- Node.js APIs
+
+Disallowed dependencies:
+
+- `client/`
+- Any `entrypoints/*` subdirectory (`entrypoints/cli` injects CLI-level values into `mcp/` to
+  maintain one-directional dependencies)
