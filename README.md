@@ -9,11 +9,11 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **3-Pane Interface**: Easily navigate between your Working Directory changes and Staged Changes,
   while viewing the diff in the main viewer.
 - **Granular Git Actions**: Stage and unstage changes directly from the UI.
-- **Ephemeral Notes**: Add in-memory, session-only notes to specific lines, line ranges, or entire
-  files. This is perfect for jotting down self-reminders and double-checking your work before it
-  gets etched into your Git history.
-- **Notes MCP**: Let MCP-compatible AI agents read unresolved Notes and add review findings while
-  keeping repository data on your machine.
+- **Ephemeral Notes**: Add in-memory notes to specific lines, line ranges, or entire files. This is
+  perfect for jotting down self-reminders and double-checking your work before it gets etched into
+  your Git history.
+- **Notes MCP**: Let MCP-compatible AI agents read unresolved Notes and add review findings directly
+  within your local environment.
 - **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
   locked to your Git repository.
 
@@ -59,13 +59,13 @@ launched by an MCP host rather than run directly in a terminal.
 Configure your MCP host with `sift` as the command and pass the repository if needed. The exact
 configuration format depends on the host, but the example commands are below:
 
-Codex CLI
+[Codex CLI](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)
 
 ```sh
 $ codex mcp add sift -- sift mcp
 ```
 
-Claude Code
+[Claude Code](https://code.claude.com/docs/en/mcp)
 
 ```sh
 $ claude mcp add --transport stdio sift -- sift mcp
@@ -74,9 +74,6 @@ $ claude mcp add --transport stdio sift-my-project -- sift mcp --repo /absolute/
 ```
 
 The `--repo` option defaults to the MCP process's startup working directory.
-
-> **Prerequisite**: A Sift HTTP server must be running for the target repository (e.g., via
-> `sift open [path]` or `sift serve`).
 
 Notes and operational details:
 
@@ -88,8 +85,14 @@ Notes and operational details:
 
 Example requests after the MCP server is connected:
 
-- "Check Sift Notes and address the review comments for this repository."
-- "Review the local diff and record each finding as a Sift Note."
+<!-- prettier-ignore-start -->
+> [!NOTE]
+> A Sift HTTP server must be running and the target repository must be registered in Sift (e.g., via
+> `sift add [path]` or `sift open [path]`).
+<!-- prettier-ignore-end -->
+
+- _"Check Sift Notes using Sift MCP and address the review comments for this repository."_
+- _"Review the local diff and record each finding as a Sift Note via Sift MCP."_
 
 ## Getting Started
 
@@ -134,9 +137,6 @@ repository on your machine:
 ```bash
 pnpm link --global
 ```
-
-> **Note**: If you change the source code, you only need to run `pnpm run build` in the project
-> directory for the global `sift` command to pick up the latest changes.
 
 ### Code Quality (Linting & Formatting)
 
