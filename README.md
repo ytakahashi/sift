@@ -2,26 +2,29 @@
 
 > **Sift before you commit.**
 
-A lightweight local diff viewer for inspecting changes
+A lightweight local diff viewer for inspecting changes with agent-aware ephemeral notes.
 
-## ✨ Features
+## Features
 
 - **3-Pane Interface**: Easily navigate between your Working Directory changes and Staged Changes,
   while viewing the diff in the main viewer.
 - **Granular Git Actions**: Stage and unstage changes directly from the UI.
-- **Ephemeral Notes**: Add in-memory, session-only notes to specific lines of code. This is perfect
-  for jotting down self-reminders and double-checking your work before it gets etched into your Git
-  history.
-- **Fast & Local**: Runs entirely locally. Data never leaves your computer, and directory traversal
-  is strictly locked to your Git repository.
+- **Ephemeral Notes**: Add in-memory, session-only notes to specific lines, line ranges, or entire
+  files. This is perfect for jotting down self-reminders and double-checking your work before it
+  gets etched into your Git history.
+- **Notes MCP**: Let MCP-compatible AI agents read unresolved Notes and add review findings while
+  keeping repository data on your machine.
+- **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
+  locked to your Git repository.
 
-## 📖 Usage
+## Usage
 
 ```sh
 sift open [path] [--app|--browser]
 sift open -i [--app|--browser]
 sift add  [path]
 sift serve
+sift mcp [--repo <path>]
 ```
 
 `-h, --help` is available on `sift` itself and on every subcommand (e.g. `sift open --help`) to show
@@ -48,7 +51,47 @@ Register a repository in the local Sift config without opening it.
 
 Start the local Sift server and print its URL, without opening any specific repository.
 
-## 🚀 Getting Started
+### `sift mcp [--repo <path>]`
+
+Start a stdio MCP server that exposes Sift Notes to an AI agent. This command is intended to be
+launched by an MCP host rather than run directly in a terminal.
+
+Configure your MCP host with `sift` as the command and pass the repository if needed. The exact
+configuration format depends on the host, but the example commands are below:
+
+Codex CLI
+
+```sh
+$ codex mcp add sift -- sift mcp
+```
+
+Claude Code
+
+```sh
+$ claude mcp add --transport stdio sift -- sift mcp
+## OR
+$ claude mcp add --transport stdio sift-my-project -- sift mcp --repo /absolute/path/to/my-project
+```
+
+The `--repo` option defaults to the MCP process's startup working directory.
+
+> **Prerequisite**: A Sift HTTP server must be running for the target repository (e.g., via
+> `sift open [path]` or `sift serve`).
+
+Notes and operational details:
+
+- The repository must be registered, but registration can happen after the MCP process starts. Run
+  `sift add <path>` and retry the tool; restarting the MCP process is not required.
+- Both processes use `PORT` (default: `49321`). If you override it, provide the same value to the
+  HTTP server and the MCP process.
+- Notes are stored in the HTTP server's memory and cleared when the server exits.
+
+Example requests after the MCP server is connected:
+
+- "Check Sift Notes and address the review comments for this repository."
+- "Review the local diff and record each finding as a Sift Note."
+
+## Getting Started
 
 ### Prerequisites
 
@@ -110,8 +153,10 @@ This project uses [Vitest](https://vitest.dev/) for unit testing.
 
 - **Run Tests**: `pnpm run test`
 
-## 🛠 Tech Stack
+## Tech Stack
 
 - **Server**: [Hono](https://hono.dev/) handling routing and static file serving on Node.js.
 - **Client**: [React](https://react.dev/) + [Vite](https://vitejs.dev/) with purely Vanilla CSS for
   modern, lightweight, and ultra-fast rendering.
+- **MCP Server**: [Model Context Protocol](https://modelcontextprotocol.io/) TypeScript SDK for
+  stdio-based AI agent integration.
