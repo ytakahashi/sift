@@ -1,6 +1,9 @@
-import { useEffect, useState, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import { formatNoteForClipboard } from '../../../domain/notes/format';
+import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
+import { NoteActionButton } from './NoteActionButton';
+import { useCopyFeedback } from './useCopyFeedback';
 
 interface NoteViewerProps {
   note: Note;
@@ -18,24 +21,7 @@ export function NoteViewer({
   onDelete,
   deleteDisabled = false,
 }: NoteViewerProps): ReactElement {
-  const [copied, setCopied] = useState(false);
-
-  // Auto-clear the "Copied!" feedback after 2 seconds
-  useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [copied]);
-
-  const handleCopy = (): void => {
-    const text = formatNoteForClipboard(note);
-    void navigator.clipboard.writeText(text).then(() => {
-      setCopied(true);
-    });
-  };
+  const { copied, copy } = useCopyFeedback();
 
   return (
     <>
@@ -54,64 +40,21 @@ export function NoteViewer({
           alignItems: 'center',
         }}
       >
-        <button
-          onClick={onEdit}
-          style={{
-            background: 'transparent',
-            color: '#79c0ff',
-            border: 'none',
-            cursor: 'pointer',
-            padding: 0,
-          }}
-        >
-          Edit
-        </button>
+        <NoteActionButton label="Edit" onClick={onEdit} variant="link" />
         <div style={{ position: 'relative' }}>
-          {copied && (
-            <span
-              style={{
-                position: 'absolute',
-                bottom: 'calc(100% + 4px)',
-                left: '50%',
-                transform: 'translateX(-50%)',
-                backgroundColor: '#373434ff',
-                color: '#ffffff',
-                padding: '0.2rem 0.4rem',
-                borderRadius: '4px',
-                whiteSpace: 'nowrap',
-                animation: 'fadeIn 0.2s ease-in-out',
-              }}
-            >
-              Copied!
-            </span>
-          )}
-          <button
-            onClick={handleCopy}
-            style={{
-              background: 'transparent',
-              color: '#8b949e',
-              border: 'none',
-              cursor: 'pointer',
-              padding: 0,
-            }}
-          >
-            Copy
-          </button>
+          <CopyFeedbackTooltip visible={copied} align="center" size="compact" />
+          <NoteActionButton
+            label="Copy"
+            onClick={() => copy(formatNoteForClipboard(note))}
+            variant="muted"
+          />
         </div>
-        <button
-          disabled={deleteDisabled}
+        <NoteActionButton
+          label="Delete"
           onClick={() => void onDelete?.(note.id)}
-          style={{
-            background: 'transparent',
-            color: '#f85149',
-            border: 'none',
-            cursor: deleteDisabled ? 'default' : 'pointer',
-            opacity: deleteDisabled ? 0.5 : 1,
-            padding: 0,
-          }}
-        >
-          Delete
-        </button>
+          variant="danger"
+          disabled={deleteDisabled}
+        />
       </div>
     </>
   );

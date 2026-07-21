@@ -1,6 +1,9 @@
-import { useState, useEffect, type ReactElement } from 'react';
+import type { ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import { formatNoteLocation, formatNotesForClipboard } from '../../../domain/notes/format';
+import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
+import { NoteActionButton } from './NoteActionButton';
+import { useCopyFeedback } from './useCopyFeedback';
 
 interface NotesListModalProps {
   notes: Note[];
@@ -16,28 +19,7 @@ export function NotesListModal({
   onDeleteNote,
   deleteDisabled = false,
 }: NotesListModalProps): ReactElement {
-  const [copied, setCopied] = useState(false);
-
-  useEffect(() => {
-    if (copied) {
-      const timer = setTimeout(() => {
-        setCopied(false);
-      }, 2000);
-      return () => clearTimeout(timer);
-    }
-  }, [copied]);
-
-  const handleCopy = async (): Promise<void> => {
-    const text = formatNotesForClipboard(notes);
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-    } catch (error: unknown) {
-      if (error instanceof Error) {
-        console.error('Failed to copy notes:', error.message);
-      }
-    }
-  };
+  const { copied, copy } = useCopyFeedback();
 
   return (
     <>
@@ -127,21 +109,12 @@ export function NotesListModal({
                     {note.body}
                   </div>
                   <div style={{ marginTop: '0.5rem' }}>
-                    <button
-                      disabled={deleteDisabled}
+                    <NoteActionButton
+                      label="Delete"
                       onClick={() => void onDeleteNote(note.id)}
-                      style={{
-                        background: 'transparent',
-                        color: '#f85149',
-                        border: 'none',
-                        cursor: deleteDisabled ? 'default' : 'pointer',
-                        opacity: deleteDisabled ? 0.5 : 1,
-                        padding: 0,
-                        fontSize: '0.75rem',
-                      }}
-                    >
-                      Delete
-                    </button>
+                      variant="danger"
+                      disabled={deleteDisabled}
+                    />
                   </div>
                 </div>
               </div>
@@ -158,27 +131,10 @@ export function NotesListModal({
           }}
         >
           <div style={{ position: 'relative' }}>
-            {copied && (
-              <span
-                style={{
-                  position: 'absolute',
-                  bottom: 'calc(100% + 8px)',
-                  right: 0,
-                  backgroundColor: '#373434ff',
-                  color: '#ffffff',
-                  padding: '0.4rem 0.6rem',
-                  borderRadius: '4px',
-                  fontSize: '0.75rem',
-                  whiteSpace: 'nowrap',
-                  animation: 'fadeIn 0.2s ease-in-out',
-                }}
-              >
-                Copied!
-              </span>
-            )}
+            <CopyFeedbackTooltip visible={copied} align="end" size="comfortable" />
             <button
               className="button button-primary"
-              onClick={() => void handleCopy()}
+              onClick={() => copy(formatNotesForClipboard(notes))}
               type="button"
             >
               Copy
