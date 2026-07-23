@@ -6,10 +6,9 @@
   "bin": {
     "sift": "./dist/cli/index.js"
   },
-  "files": [
-    "dist/cli/index.js",
-    "dist/client"
-  ],
+  "bugs": {
+    "url": "https://github.com/ytakahashi/sift/issues"
+  },
   "dependencies": {
     "@clack/prompts": "1.6.0",
     "@hono/node-server": "2.0.5",
@@ -50,14 +49,25 @@
     "vite": "8.0.16",
     "vitest": "4.1.9"
   },
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "files": [
+    "dist/cli/index.js",
+    "dist/client"
+  ],
+  "homepage": "https://github.com/ytakahashi/sift#readme",
   "keywords": [
     "diff",
     "git",
     "viewer"
   ],
   "license": "MIT",
-  "main": "dist/cli/index.js",
   "packageManager": "pnpm@11.1.3",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ytakahashi/sift.git"
+  },
   "scripts": {
     "build": "pnpm run build:client && pnpm run build:server && pnpm run build:electron",
     "build:client": "vite build",
