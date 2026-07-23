@@ -42,7 +42,7 @@ describe('startMcpServer', () => {
     const handle = await startMcpServer({ repoPath: '/repo/sift', resolveRepoRoot });
 
     // Then
-    expect(mcpServerCtor).toHaveBeenCalledWith({ name: APP_INFO.name, version: APP_INFO.version });
+    expect(mcpServerCtor).toHaveBeenCalledWith({ name: 'sift', version: APP_INFO.version });
     expect(registerToolMock).toHaveBeenCalledWith(
       'list_notes',
       expect.any(Object),

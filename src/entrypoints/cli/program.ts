@@ -16,7 +16,7 @@ export type CliDependencies = OpenCommandDependencies &
 
 export function createCliProgram(dependencies: CliDependencies): Command {
   const program = new Command()
-    .name(APP_INFO.name)
+    .name(APP_INFO.productName)
     .description(APP_INFO.description)
     .version(APP_INFO.version)
     .action(() => {

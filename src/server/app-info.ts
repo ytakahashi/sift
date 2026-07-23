@@ -1,5 +1,5 @@
 import { createRequire } from 'node:module';
-import type { AppInfo } from '../domain/app/app-info';
+import { SIFT_PRODUCT_NAME, type AppInfo } from '../domain/app/app-info';
 
 // Read app info from package.json at module load time.
 //
@@ -9,10 +9,13 @@ import type { AppInfo } from '../domain/app/app-info';
 // and dist/<layer>/index.js sit at the same depth. If the bundle output
 // directory ever changes depth, this relative path must be revisited.
 const require = createRequire(import.meta.url);
-const { name, version, description } = require('../../package.json') as {
-  name: string;
+const { version, description } = require('../../package.json') as {
   version: string;
   description: string;
 };
 
-export const APP_INFO: AppInfo = { name, version, description };
+export const APP_INFO: AppInfo = {
+  productName: SIFT_PRODUCT_NAME,
+  version,
+  description,
+};

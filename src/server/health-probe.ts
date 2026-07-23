@@ -1,7 +1,7 @@
 import { APP_INFO } from './app-info';
 import { buildLocalServerUrl } from './fixed-port';
 
-export const SIFT_HEALTH_PRODUCT = APP_INFO.name;
+export const SIFT_HEALTH_PRODUCT = APP_INFO.productName;
 export const SIFT_HEALTH_VERSION = APP_INFO.version;
 export const NOTES_V1_CAPABILITY = 'notes-v1';
 export const SIFT_HEALTH_CAPABILITIES: readonly string[] = [NOTES_V1_CAPABILITY];
