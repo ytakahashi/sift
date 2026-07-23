@@ -1,10 +1,13 @@
 /**
- * Application metadata shared between the CLI version flag and the server
- * health endpoint. The values are populated at runtime from `package.json`
- * by the server composition layer; the domain layer only owns the shape.
+ * Application metadata shared by Sift's runtime entry points.
+ *
+ * `productName` is the stable protocol and command identity, while version
+ * and description are populated from the npm package metadata.
  */
 export interface AppInfo {
-  name: string;
+  productName: string;
   version: string;
   description: string;
 }
+
+export const SIFT_PRODUCT_NAME = 'sift';

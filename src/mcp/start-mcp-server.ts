@@ -28,7 +28,7 @@ export interface McpServerHandle {
  */
 export async function startMcpServer(options: StartMcpServerOptions): Promise<McpServerHandle> {
   const repoRootResolver = createRepoRootResolver(options.repoPath, options.resolveRepoRoot);
-  const server = new McpServer({ name: APP_INFO.name, version: APP_INFO.version });
+  const server = new McpServer({ name: APP_INFO.productName, version: APP_INFO.version });
 
   registerNotesTools(server, {
     repoPath: options.repoPath,

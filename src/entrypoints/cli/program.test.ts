@@ -80,7 +80,7 @@ describe('createCliProgram', () => {
 
     // Then
     const helpText = getOutputText(output.writeOut);
-    expect(helpText).toContain('Usage:');
+    expect(helpText).toContain('Usage: sift');
     expect(helpText).toContain('open');
     expect(helpText).toContain('add');
     expect(helpText).toContain('serve');
