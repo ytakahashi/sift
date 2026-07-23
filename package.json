@@ -6,6 +6,10 @@
   "bin": {
     "sift": "./dist/cli/index.js"
   },
+  "files": [
+    "dist/cli/index.js",
+    "dist/client"
+  ],
   "dependencies": {
     "@clack/prompts": "1.6.0",
     "@hono/node-server": "2.0.5",
@@ -60,6 +64,7 @@
     "build:electron": "esbuild src/entrypoints/electron/main.ts --bundle --platform=node --format=esm --outdir=dist/electron --external:electron && esbuild src/entrypoints/electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist/electron/preload.cjs --external:electron",
     "build:mac": "pnpm run build && electron-builder --mac",
     "build:mac:dev": "pnpm run build && electron-builder --mac --dir -c electron-builder.dev.yml",
+    "build:npm": "pnpm run build:client && pnpm run build:server",
     "build:server": "esbuild src/entrypoints/cli/index.ts --bundle --platform=node --format=esm --outdir=dist/cli --packages=external --banner:js=\"#!/usr/bin/env node\"",
     "dev": "vite",
     "dev:cli": "pnpm run build:client && tsx src/entrypoints/cli/index.ts",
@@ -68,6 +73,8 @@
     "format:fix": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "package:check": "npm pack --dry-run --cache .npm",
+    "prepack": "pnpm run build:npm",
     "start": "node dist/cli/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit --project tsconfig.app.json && tsc --noEmit --project tsconfig.node.json && tsc --noEmit --project tsconfig.electron.json"
