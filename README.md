@@ -17,6 +17,36 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
   locked to your Git repository.
 
+## Requirements
+
+- Node.js >= 22.12.0
+- Git
+- Browser mode: macOS, Linux, Windows
+- Desktop app: macOS (Apple Silicon) only
+
+## Installation
+
+```bash
+npm install --global @ytakahashi/sift
+```
+
+### Update
+
+```bash
+npm update --global @ytakahashi/sift
+```
+
+### Uninstall
+
+```bash
+npm uninstall --global @ytakahashi/sift
+```
+
+### macOS App (optional)
+
+`sift open --app` requires the Sift macOS app. Download the latest `.dmg` from the
+[GitHub Releases page](https://github.com/ytakahashi/sift/releases) and install it.
+
 ## Usage
 
 ```sh
@@ -94,14 +124,13 @@ Example requests after the MCP server is connected:
 - _"Check Sift Notes using Sift MCP and address the review comments for this repository."_
 - _"Review the local diff and record each finding as a Sift Note via Sift MCP."_
 
-## Getting Started
+## Development
 
 ### Prerequisites
 
-- Node.js
 - [pnpm](https://pnpm.io/)
 
-### Installation
+### Setup
 
 ```bash
 pnpm install
@@ -129,10 +158,9 @@ Then you can run the compiled CLI application directly from the repository:
 pnpm run start
 ```
 
-### Installing Globally
+### Installing Globally (for local testing)
 
-For the best experience, you can link the CLI tool globally so you can run it from any Git
-repository on your machine:
+To try your local changes as the `sift` command from any Git repository on your machine:
 
 ```bash
 pnpm link --global

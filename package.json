@@ -1,6 +1,6 @@
 {
   "name": "@ytakahashi/sift",
-  "description": "Sift before you commit. A lightweight local diff viewer.",
+  "description": "A lightweight local diff viewer for inspecting changes with agent-aware ephemeral notes.",
   "version": "0.1.0",
   "author": "ytakahashi",
   "bin": {
