@@ -811,6 +811,51 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     expect(screen.queryByText('Your Notes (1)')).toBeNull();
   });
 
+  it("selects the note's file and closes the modal when its location is clicked", async () => {
+    // Given: a working file matching the note's path is available in the diff
+    vi.mocked(useDiffData).mockReturnValue({
+      repoRoot: '/Users/dev/projects/my-app',
+      workingFiles: [createFile('f1', 'working')],
+      stagedFiles: [],
+      loading: false,
+      initialized: true,
+      error: null,
+      refresh,
+    });
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'n1',
+          kind: 'line',
+          path: 'f1.ts',
+          startLine: 1,
+          endLine: 1,
+          bucket: 'working',
+          body: 'hello note',
+          createdAt: 100,
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
+    });
+
+    const user = userEvent.setup();
+    render(<Page />);
+
+    // When: the notes modal is opened and the note's location is clicked
+    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+    await user.click(screen.getByRole('button', { name: 'f1.ts#L1' }));
+
+    // Then: the modal closes and the main pane shows the note's file
+    expect(screen.queryByText('Your Notes (1)')).toBeNull();
+    expect(within(screen.getByTestId('diff-viewer')).getByText('f1.ts')).toBeDefined();
+  });
+
   it('closes the modal automatically when all notes are deleted', async () => {
     // Given: one note is available
     vi.mocked(useNotes).mockReturnValue({

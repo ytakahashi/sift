@@ -9,6 +9,8 @@ interface NotesListModalProps {
   notes: Note[];
   onClose: () => void;
   onDeleteNote: (id: string) => void | Promise<void>;
+  /** Jumps to the note's file/pane in the main diff pane. */
+  onSelectLocation: (note: Note) => void;
   /** Disables Delete while another notes mutation is in flight. */
   deleteDisabled?: boolean;
 }
@@ -17,6 +19,7 @@ export function NotesListModal({
   notes,
   onClose,
   onDeleteNote,
+  onSelectLocation,
   deleteDisabled = false,
 }: NotesListModalProps): ReactElement {
   const { copied, copy } = useCopyFeedback();
@@ -96,7 +99,21 @@ export function NotesListModal({
                 key={note.id}
                 style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}
               >
-                <div style={{ fontSize: '0.8rem', color: '#c9d1d9' }}>{location}</div>
+                <button
+                  onClick={() => onSelectLocation(note)}
+                  type="button"
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    padding: 0,
+                    textAlign: 'left',
+                    cursor: 'pointer',
+                    fontSize: '0.8rem',
+                    color: '#c9d1d9',
+                  }}
+                >
+                  {location}
+                </button>
                 <div
                   style={{
                     backgroundColor: '#0d1117',

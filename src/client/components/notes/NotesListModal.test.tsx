@@ -45,7 +45,14 @@ describe('NotesListModal', () => {
     const notes = [createLineNote({ startLine: 10, endLine: 12 }), createFileNote()];
 
     // When: the modal is rendered
-    render(<NotesListModal notes={notes} onClose={vi.fn()} onDeleteNote={vi.fn()} />);
+    render(
+      <NotesListModal
+        notes={notes}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onSelectLocation={vi.fn()}
+      />,
+    );
 
     // Then: line notes include a line suffix and file notes show only the path
     expect(screen.getByText('src/line.ts#L10-L12')).toBeDefined();
@@ -60,7 +67,14 @@ describe('NotesListModal', () => {
     );
 
     // When: the modal is rendered
-    render(<NotesListModal notes={notes} onClose={vi.fn()} onDeleteNote={vi.fn()} />);
+    render(
+      <NotesListModal
+        notes={notes}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onSelectLocation={vi.fn()}
+      />,
+    );
 
     // Then: only the notes list scrolls; the Copy action sits outside it and
     // is always visible regardless of scroll position
@@ -83,7 +97,14 @@ describe('NotesListModal', () => {
       configurable: true,
     });
     const notes = [createLineNote({ startLine: 10, endLine: 12 }), createFileNote()];
-    render(<NotesListModal notes={notes} onClose={vi.fn()} onDeleteNote={vi.fn()} />);
+    render(
+      <NotesListModal
+        notes={notes}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onSelectLocation={vi.fn()}
+      />,
+    );
 
     // When: Copy is clicked
     await act(async () => {
@@ -94,5 +115,25 @@ describe('NotesListModal', () => {
     expect(writeText).toHaveBeenCalledWith(
       '> src/line.ts#L10-L12\nline note body\n\n> src/file.ts\nfile note body',
     );
+  });
+
+  it('calls onSelectLocation with the note when its location is clicked', () => {
+    // Given: a rendered modal with a line note
+    const note = createLineNote({ startLine: 10, endLine: 12 });
+    const onSelectLocation = vi.fn();
+    render(
+      <NotesListModal
+        notes={[note]}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onSelectLocation={onSelectLocation}
+      />,
+    );
+
+    // When: the note's location is clicked
+    fireEvent.click(screen.getByRole('button', { name: 'src/line.ts#L10-L12' }));
+
+    // Then: onSelectLocation is called with the note
+    expect(onSelectLocation).toHaveBeenCalledWith(note);
   });
 });
