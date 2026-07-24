@@ -16,6 +16,8 @@ import { useWorkingPane } from '../hooks/panes/useWorkingPane';
 import { useStagedPane } from '../hooks/panes/useStagedPane';
 import { useFileSelection } from '../hooks/panes/useFileSelection';
 import { NotesListModal } from '../components/notes/NotesListModal';
+import { findDiffFileForNote } from '../../domain/notes/find-diff-file-for-note';
+import type { Note } from '../../domain/notes/types';
 import { useRepository } from '../hooks/repositories/useRepository';
 import { useRepositoryList } from '../hooks/repositories/useRepositoryList';
 import { usePaneResize } from '../hooks/layout/usePaneResize';
@@ -240,6 +242,15 @@ function RepositoryWorkspace({
   });
   const fileNoteEditor = useFileNoteEditor(selectedFile?.id ?? null);
 
+  const handleSelectNoteLocation = (note: Note): void => {
+    const match = findDiffFileForNote(workingFiles, stagedFiles, note);
+    if (!match) {
+      return;
+    }
+    select(match.file, match.pane);
+    notesPanel.close();
+  };
+
   const {
     appMainRef,
     sidebarRef,
@@ -295,6 +306,7 @@ function RepositoryWorkspace({
             notes={notes}
             onClose={notesPanel.close}
             onDeleteNote={deleteNote}
+            onSelectLocation={handleSelectNoteLocation}
             deleteDisabled={notesMutating}
           />
         )}
