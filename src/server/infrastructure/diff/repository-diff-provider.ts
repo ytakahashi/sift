@@ -80,36 +80,61 @@ export class RepositoryDiffProvider implements DiffProvider {
     const hunks: DiffHunk[] = [];
 
     try {
-      const stats = await fs.stat(absolutePath);
-      if (!stats.isFile() || stats.size > MAX_UNTRACKED_TEXT_DIFF_BYTES) {
-        return this.createUntrackedBinaryFile(file);
-      }
+      // lstat (not stat) so a symlink is classified as itself rather than
+      // followed to whatever it points at, which may sit outside the repo.
+      const stats = await fs.lstat(absolutePath);
 
-      const contentBuffer = await fs.readFile(absolutePath);
-      if (contentBuffer.includes(0)) {
-        return this.createUntrackedBinaryFile(file);
-      }
-
-      const content = contentBuffer.toString('utf8');
-      const lines = splitTextFileLines(content);
-      const diffLines: DiffLine[] = lines.map(
-        (line: string, idx: number): DiffLine => ({
-          id: `line-${file}-untracked-${idx}`,
-          type: 'add',
-          newLineNumber: idx + 1,
-          content: line,
-        }),
-      );
-      if (diffLines.length > 0) {
+      if (stats.isSymbolicLink()) {
+        // Mirror how tracked symlinks already render: the link target string
+        // as the file's single line of content, never the pointed-to file.
+        const target = await fs.readlink(absolutePath);
         hunks.push({
           id: `hunk-${file}-untracked`,
-          header: `@@ -0,0 +1,${lines.length} @@`,
+          header: '@@ -0,0 +1,1 @@',
           oldStart: 0,
           oldLines: 0,
           newStart: 1,
-          newLines: lines.length,
-          lines: diffLines,
+          newLines: 1,
+          lines: [
+            {
+              id: `line-${file}-untracked-0`,
+              type: 'add',
+              newLineNumber: 1,
+              content: target,
+            },
+          ],
         });
+      } else {
+        if (!stats.isFile() || stats.size > MAX_UNTRACKED_TEXT_DIFF_BYTES) {
+          return this.createUntrackedBinaryFile(file);
+        }
+
+        const contentBuffer = await fs.readFile(absolutePath);
+        if (contentBuffer.includes(0)) {
+          return this.createUntrackedBinaryFile(file);
+        }
+
+        const content = contentBuffer.toString('utf8');
+        const lines = splitTextFileLines(content);
+        const diffLines: DiffLine[] = lines.map(
+          (line: string, idx: number): DiffLine => ({
+            id: `line-${file}-untracked-${idx}`,
+            type: 'add',
+            newLineNumber: idx + 1,
+            content: line,
+          }),
+        );
+        if (diffLines.length > 0) {
+          hunks.push({
+            id: `hunk-${file}-untracked`,
+            header: `@@ -0,0 +1,${lines.length} @@`,
+            oldStart: 0,
+            oldLines: 0,
+            newStart: 1,
+            newLines: lines.length,
+            lines: diffLines,
+          });
+        }
       }
     } catch (error: unknown) {
       if (this.errorMode === 'throw') {

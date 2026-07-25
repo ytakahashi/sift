@@ -1,20 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { RepositoryDiffProvider } from './repository-diff-provider';
 
-const { readFileMock, statMock } = vi.hoisted(() => ({
+const { readFileMock, lstatMock, readlinkMock } = vi.hoisted(() => ({
   readFileMock: vi.fn(),
-  statMock: vi.fn(),
+  lstatMock: vi.fn(),
+  readlinkMock: vi.fn(),
 }));
 
 vi.mock('node:fs/promises', () => ({
   readFile: readFileMock,
-  stat: statMock,
+  lstat: lstatMock,
+  readlink: readlinkMock,
 }));
 
-function createStats(size: number): { isFile: () => boolean; size: number } {
+function createStats(size: number): {
+  isFile: () => boolean;
+  isSymbolicLink: () => boolean;
+  size: number;
+} {
   return {
     isFile: () => true,
+    isSymbolicLink: () => false,
     size,
+  };
+}
+
+function createSymlinkStats(): { isFile: () => boolean; isSymbolicLink: () => boolean } {
+  return {
+    isFile: () => false,
+    isSymbolicLink: () => true,
   };
 }
 
@@ -48,7 +62,7 @@ describe('RepositoryDiffProvider', () => {
 
   it('builds a text diff for small untracked text files', async () => {
     // Given: an untracked file is small enough to render and contains no NUL bytes
-    statMock.mockResolvedValue(createStats(11));
+    lstatMock.mockResolvedValue(createStats(11));
     readFileMock.mockResolvedValue(Buffer.from('hello\nworld', 'utf8'));
     const provider = createProvider(['notes.txt']);
 
@@ -67,7 +81,7 @@ describe('RepositoryDiffProvider', () => {
 
   it('does not render a trailing newline in an untracked text file as an extra blank line', async () => {
     // Given: an untracked text file ends with the conventional newline terminator
-    statMock.mockResolvedValue(createStats(12));
+    lstatMock.mockResolvedValue(createStats(12));
     readFileMock.mockResolvedValue(Buffer.from('hello\nworld\n', 'utf8'));
     const provider = createProvider(['notes.txt']);
 
@@ -81,7 +95,7 @@ describe('RepositoryDiffProvider', () => {
 
   it('preserves intentional blank lines before the trailing newline in untracked text files', async () => {
     // Given: the file has an actual blank line before the final newline terminator
-    statMock.mockResolvedValue(createStats(7));
+    lstatMock.mockResolvedValue(createStats(7));
     readFileMock.mockResolvedValue(Buffer.from('hello\n\n', 'utf8'));
     const provider = createProvider(['notes.txt']);
 
@@ -95,7 +109,7 @@ describe('RepositoryDiffProvider', () => {
 
   it('keeps empty untracked text files visible without adding a synthetic blank line', async () => {
     // Given: an untracked text file has no content
-    statMock.mockResolvedValue(createStats(0));
+    lstatMock.mockResolvedValue(createStats(0));
     readFileMock.mockResolvedValue(Buffer.from('', 'utf8'));
     const provider = createProvider(['empty.txt']);
 
@@ -114,7 +128,7 @@ describe('RepositoryDiffProvider', () => {
 
   it('marks untracked binary files as binary instead of rendering their bytes as text', async () => {
     // Given: an untracked file has binary-looking bytes
-    statMock.mockResolvedValue(createStats(5));
+    lstatMock.mockResolvedValue(createStats(5));
     readFileMock.mockResolvedValue(Buffer.from([0x50, 0x4b, 0x03, 0x04, 0x00]));
     const provider = createProvider(['build/app.jar']);
 
@@ -133,7 +147,7 @@ describe('RepositoryDiffProvider', () => {
 
   it('does not read oversized untracked files into the diff response', async () => {
     // Given: an untracked file is too large to safely render as a synthetic text diff
-    statMock.mockResolvedValue(createStats(1024 * 1024));
+    lstatMock.mockResolvedValue(createStats(1024 * 1024));
     const provider = createProvider(['target/app.jar']);
 
     // When
@@ -147,6 +161,40 @@ describe('RepositoryDiffProvider', () => {
       kind: 'binary',
       hunks: [],
     });
+  });
+
+  it('renders an untracked symlink as its link-target string instead of the linked file content', async () => {
+    // Given: an untracked symlink points at a file elsewhere in the repo
+    lstatMock.mockResolvedValue(createSymlinkStats());
+    readlinkMock.mockResolvedValue('target/real-file.txt');
+    const provider = createProvider(['link.txt']);
+
+    // When
+    const files = await provider.getFiles('working');
+
+    // Then: the link target string is the content, and the linked file is never read
+    expect(readFileMock).not.toHaveBeenCalled();
+    expect(files).toHaveLength(1);
+    expect(files[0]).toMatchObject({
+      path: 'link.txt',
+      status: 'untracked',
+      kind: 'text',
+    });
+    expect(files[0].hunks[0].lines.map((line) => line.content)).toEqual(['target/real-file.txt']);
+  });
+
+  it('renders an untracked symlink pointing outside the repository as its link-target string, not the external file content', async () => {
+    // Given: an untracked symlink escapes the repository root
+    lstatMock.mockResolvedValue(createSymlinkStats());
+    readlinkMock.mockResolvedValue('/etc/passwd');
+    const provider = createProvider(['escape-link']);
+
+    // When
+    const files = await provider.getFiles('working');
+
+    // Then: the external file is never read; only the link text is shown
+    expect(readFileMock).not.toHaveBeenCalled();
+    expect(files[0].hunks[0].lines.map((line) => line.content)).toEqual(['/etc/passwd']);
   });
 
   it('propagates Git diff failures in strict mode', async () => {
@@ -178,7 +226,7 @@ describe('RepositoryDiffProvider', () => {
   it('propagates untracked-file read failures in strict mode', async () => {
     // Given: an untracked file is discovered but cannot be inspected
     const error = new Error('stat failed');
-    statMock.mockRejectedValue(error);
+    lstatMock.mockRejectedValue(error);
     const provider = createStrictProvider({
       repoRoot: '/repo/root',
       getDiffOutput: vi.fn().mockResolvedValue(''),
