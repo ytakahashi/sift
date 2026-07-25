@@ -83,7 +83,7 @@
     "format:fix": "prettier --write \"src/**/*.{ts,tsx,css}\"",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "package:check": "npm pack --dry-run --cache .npm",
+    "package:check": "npm pack --dry-run --json --ignore-scripts | node scripts/check-tarball.mjs",
     "prepack": "pnpm run build:npm",
     "start": "node dist/cli/index.js",
     "test": "vitest run",
