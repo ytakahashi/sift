@@ -2,10 +2,10 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { DiffProvider } from '../../../domain/diff/diff-provider';
 import { parseDiff } from '../../../domain/diff/diff-parser';
+import { MAX_TEXT_DIFF_BYTES } from '../../../domain/diff/file-content-limits';
+import { splitTextFileLines } from '../../../domain/diff/text-file-lines';
 import type { DiffFile, FileBucket, DiffHunk, DiffLine } from '../../../domain/diff/types';
 import { GitClient } from '../git/git-client';
-
-const MAX_UNTRACKED_TEXT_DIFF_BYTES = 512 * 1024;
 
 export interface RepositoryDiffProviderOptions {
   /**
@@ -14,20 +14,6 @@ export interface RepositoryDiffProviderOptions {
    * instead receive those failures and abort their operation.
    */
   errorMode?: 'suppress' | 'throw';
-}
-
-function splitTextFileLines(content: string): string[] {
-  if (content === '') {
-    return [];
-  }
-
-  const lines = content.split('\n');
-  if (content.endsWith('\n')) {
-    // A trailing newline is a line terminator, not an empty final line.
-    lines.pop();
-  }
-
-  return lines;
 }
 
 export class RepositoryDiffProvider implements DiffProvider {
@@ -105,7 +91,7 @@ export class RepositoryDiffProvider implements DiffProvider {
           ],
         });
       } else {
-        if (!stats.isFile() || stats.size > MAX_UNTRACKED_TEXT_DIFF_BYTES) {
+        if (!stats.isFile() || stats.size > MAX_TEXT_DIFF_BYTES) {
           return this.createUntrackedBinaryFile(file);
         }
 

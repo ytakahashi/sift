@@ -1,11 +1,13 @@
-import React, { useEffect, useMemo, useRef, useState, type ReactElement } from 'react';
+import React, { useEffect, useRef, useState, type ReactElement } from 'react';
+import { createPortal } from 'react-dom';
+import { UnfoldVertical } from 'lucide-react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
-import { DiffViewModelBuilder } from '../../../domain/diff/diff-view-model-builder';
 import { findHunkContainingRange } from '../../../domain/notes/resolve-line-note-target';
 import { formatLineRange } from '../../presentation/notes/line-range';
 import { NoteEditor } from '../notes/NoteEditor';
 import { NoteCard } from '../notes/NoteCard';
 import { SyntaxHighlightedLine } from './SyntaxHighlightedLine';
+import { useFileFullView } from './useFileFullView';
 
 type LineInteraction =
   | { type: 'idle' }
@@ -16,6 +18,9 @@ const RANGE_SELECTION_ERROR = 'Select lines within a single diff hunk.';
 
 export function UnifiedDiffViewer({
   file,
+  repoId,
+  fileContentReader,
+  fullViewToolbarTarget,
   paneMode,
   onStageHunk,
   onUnstageHunk,
@@ -27,12 +32,25 @@ export function UnifiedDiffViewer({
   isFileNoteEditorOpen = false,
   onCloseFileNoteEditor,
 }: BaseDiffViewerProps): ReactElement {
-  const rows = useMemo(() => DiffViewModelBuilder.buildUnified(file.hunks), [file.hunks]);
+  const {
+    rows,
+    isFullView,
+    loading: fullViewLoading,
+    error: fullViewError,
+    showFullView,
+  } = useFileFullView(file, repoId, fileContentReader);
   const viewerRef = useRef<HTMLDivElement>(null);
   const [interaction, setInteraction] = useState<LineInteraction>({ type: 'idle' });
   const [rangeSelectionError, setRangeSelectionError] = useState<string | null>(null);
   const fileNotes = notes.filter((note) => note.kind === 'file');
   const paneLineNotes = notes.filter((note) => note.kind === 'line' && note.bucket === paneMode);
+  const canShowFullView =
+    paneMode === 'staged' &&
+    file.kind === 'text' &&
+    file.status !== 'added' &&
+    file.status !== 'deleted' &&
+    file.hunks.length > 0 &&
+    file.newBlobId !== undefined;
 
   useEffect(() => {
     if (interaction.type !== 'selecting') {
@@ -155,6 +173,30 @@ export function UnifiedDiffViewer({
           {rangeSelectionError}
         </div>
       )}
+      {fullViewError && (
+        <div
+          role="alert"
+          style={{ color: '#f85149', padding: '0.4rem 1rem', whiteSpace: 'pre-wrap' }}
+        >
+          {fullViewError}
+        </div>
+      )}
+      {fullViewToolbarTarget &&
+        canShowFullView &&
+        !isFullView &&
+        createPortal(
+          <button
+            aria-label={fullViewLoading ? 'Loading entire file' : 'View entire file'}
+            className="button file-list-toggle-button"
+            disabled={fullViewLoading}
+            onClick={showFullView}
+            title={fullViewLoading ? 'Loading entire file' : 'View entire file'}
+            type="button"
+          >
+            <UnfoldVertical aria-hidden="true" size={18} strokeWidth={1.8} />
+          </button>,
+          fullViewToolbarTarget,
+        )}
       <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
         <colgroup>
           <col style={{ width: '40px' }} />
@@ -275,29 +317,31 @@ export function UnifiedDiffViewer({
                       position: 'relative',
                     }}
                   >
-                    {row.type !== 'hunk-header' && row.newLineNumber !== undefined && (
-                      <button
-                        aria-label={`Select line ${row.newLineNumber} for note`}
-                        data-note-range-gutter="true"
-                        onClick={() => handleGutterClick(row.newLineNumber!)}
-                        style={{
-                          background: 'transparent',
-                          color: '#8b949e',
-                          border: 'none',
-                          cursor: 'pointer',
-                          padding: '0 4px',
-                          width: '100%',
-                          opacity: 0.5,
-                        }}
-                        title={
-                          interaction.type === 'selecting'
-                            ? `Click to end the note range at line ${row.newLineNumber}`
-                            : `Click to start a note at line ${row.newLineNumber} (click another line for a range)`
-                        }
-                      >
-                        +
-                      </button>
-                    )}
+                    {row.type !== 'hunk-header' &&
+                      row.origin === 'hunk' &&
+                      row.newLineNumber !== undefined && (
+                        <button
+                          aria-label={`Select line ${row.newLineNumber} for note`}
+                          data-note-range-gutter="true"
+                          onClick={() => handleGutterClick(row.newLineNumber!)}
+                          style={{
+                            background: 'transparent',
+                            color: '#8b949e',
+                            border: 'none',
+                            cursor: 'pointer',
+                            padding: '0 4px',
+                            width: '100%',
+                            opacity: 0.5,
+                          }}
+                          title={
+                            interaction.type === 'selecting'
+                              ? `Click to end the note range at line ${row.newLineNumber}`
+                              : `Click to start a note at line ${row.newLineNumber} (click another line for a range)`
+                          }
+                        >
+                          +
+                        </button>
+                      )}
                   </td>
                   <td
                     style={{ padding: '0 0.5rem', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}

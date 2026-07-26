@@ -38,6 +38,7 @@ describe('parseDiff', () => {
     expect(file.bucket).toBe('working');
     expect(file.status).toBe('modified');
     expect(file.kind).toBe('text');
+    expect(file.newBlobId).toBe('def5678');
     expect(file.hunks).toHaveLength(1);
 
     const hunk = file.hunks[0];

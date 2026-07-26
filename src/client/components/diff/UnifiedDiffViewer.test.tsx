@@ -1,9 +1,23 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { FileNote, LineNote } from '../../../domain/notes/types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
+
+const viewerDependencies = {
+  repoId: 'repo',
+  fileContentReader: {
+    fetchFileContent: vi.fn(),
+  },
+};
+
+function createFullViewToolbarTarget(): HTMLSpanElement {
+  const target = document.createElement('span');
+  target.dataset.fullViewToolbarTarget = 'true';
+  document.body.append(target);
+  return target;
+}
 
 function createTextFile(): DiffFile {
   return {
@@ -46,6 +60,14 @@ function createTextFile(): DiffFile {
         ],
       },
     ],
+  };
+}
+
+function createExpandableFile(): DiffFile {
+  return {
+    ...createTextFile(),
+    bucket: 'staged',
+    newBlobId: 'expected-blob',
   };
 }
 
@@ -127,6 +149,10 @@ function createLineNote(overrides?: Partial<LineNote>): LineNote {
 describe('UnifiedDiffViewer', () => {
   afterEach(() => {
     cleanup();
+    document
+      .querySelectorAll('[data-full-view-toolbar-target="true"]')
+      .forEach((target) => target.remove());
+    vi.clearAllMocks();
   });
 
   it('adds a file note from the top editor', async () => {
@@ -136,6 +162,7 @@ describe('UnifiedDiffViewer', () => {
     const onCloseFileNoteEditor = vi.fn();
     render(
       <UnifiedDiffViewer
+        {...viewerDependencies}
         file={createTextFile()}
         paneMode="working"
         onAddNote={onAddNote}
@@ -157,6 +184,7 @@ describe('UnifiedDiffViewer', () => {
     // Given: a file note and a line note are both attached to the selected file
     const { container } = render(
       <UnifiedDiffViewer
+        {...viewerDependencies}
         file={createTextFile()}
         paneMode="working"
         notes={[createFileNote(), createLineNote()]}
@@ -179,7 +207,14 @@ describe('UnifiedDiffViewer', () => {
     // Given: the diff is rendered in the staged pane
     const user = userEvent.setup();
     const onAddNote = vi.fn(async () => {});
-    render(<UnifiedDiffViewer file={createTextFile()} paneMode="staged" onAddNote={onAddNote} />);
+    render(
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createTextFile()}
+        paneMode="staged"
+        onAddNote={onAddNote}
+      />,
+    );
 
     // When: the user selects the same line twice and saves a note
     const lineButton = screen.getByRole('button', { name: 'Select line 1 for note' });
@@ -207,7 +242,12 @@ describe('UnifiedDiffViewer', () => {
     const user = userEvent.setup();
     const onAddNote = vi.fn(async () => {});
     const { container } = render(
-      <UnifiedDiffViewer file={createTextFile()} paneMode="working" onAddNote={onAddNote} />,
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createTextFile()}
+        paneMode="working"
+        onAddNote={onAddNote}
+      />,
     );
 
     // When: the user selects the last line first and the first line second
@@ -241,7 +281,9 @@ describe('UnifiedDiffViewer', () => {
   it('cancels range selection with Escape or a non-gutter click', async () => {
     // Given: a diff with an active range anchor
     const user = userEvent.setup();
-    const { container } = render(<UnifiedDiffViewer file={createTextFile()} paneMode="working" />);
+    const { container } = render(
+      <UnifiedDiffViewer {...viewerDependencies} file={createTextFile()} paneMode="working" />,
+    );
     const firstLineButton = screen.getByRole('button', { name: 'Select line 1 for note' });
     const firstLineRow = container.querySelector('tr[data-new-line-number="1"]');
     await user.click(firstLineButton);
@@ -265,7 +307,9 @@ describe('UnifiedDiffViewer', () => {
   it('rejects a range that spans separate hunks', async () => {
     // Given: selectable endpoints in two different hunks
     const user = userEvent.setup();
-    render(<UnifiedDiffViewer file={createTwoHunkFile()} paneMode="working" />);
+    render(
+      <UnifiedDiffViewer {...viewerDependencies} file={createTwoHunkFile()} paneMode="working" />,
+    );
 
     // When: the endpoints cross the hunk boundary
     await user.click(screen.getByRole('button', { name: 'Select line 2 for note' }));
@@ -284,7 +328,12 @@ describe('UnifiedDiffViewer', () => {
       endLine: 3,
     });
     const { container } = render(
-      <UnifiedDiffViewer file={createTextFile()} paneMode="working" notes={[rangeNote]} />,
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createTextFile()}
+        paneMode="working"
+        notes={[rangeNote]}
+      />,
     );
 
     // When: the diff is rendered
@@ -308,7 +357,12 @@ describe('UnifiedDiffViewer', () => {
 
     // When: the file is rendered in the staged pane
     const staged = render(
-      <UnifiedDiffViewer file={createTextFile()} paneMode="staged" notes={notes} />,
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createTextFile()}
+        paneMode="staged"
+        notes={notes}
+      />,
     );
 
     // Then: the working-anchored line note is hidden (the same line number can
@@ -319,7 +373,12 @@ describe('UnifiedDiffViewer', () => {
 
     // When: the same notes render in the working pane
     const working = render(
-      <UnifiedDiffViewer file={createTextFile()} paneMode="working" notes={notes} />,
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createTextFile()}
+        paneMode="working"
+        notes={notes}
+      />,
     );
 
     // Then: the line note is anchored in its own pane
@@ -330,7 +389,12 @@ describe('UnifiedDiffViewer', () => {
   it('renders file notes for non-text files', () => {
     // Given: a binary file has a file-level note
     const { container } = render(
-      <UnifiedDiffViewer file={createBinaryFile()} paneMode="working" notes={[createFileNote()]} />,
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createBinaryFile()}
+        paneMode="working"
+        notes={[createFileNote()]}
+      />,
     );
 
     // When: the binary diff placeholder is rendered
@@ -340,5 +404,98 @@ describe('UnifiedDiffViewer', () => {
     expect(renderedText.indexOf('file note body')).toBeLessThan(
       renderedText.indexOf('Binary file changed'),
     );
+  });
+
+  it('expands an eligible staged file and omits note controls from restored context', async () => {
+    // Given: the staged blob has one line beyond the compact hunk
+    const user = userEvent.setup();
+    const fileContentReader = {
+      fetchFileContent: vi.fn().mockResolvedValue({
+        blobId: 'expected-blob',
+        lines: ['const a = 1;', 'const b = 2;', 'const c = 3;', 'const d = 4;'],
+      }),
+    };
+    const fullViewToolbarTarget = createFullViewToolbarTarget();
+    const { container } = render(
+      <UnifiedDiffViewer
+        file={createExpandableFile()}
+        fileContentReader={fileContentReader}
+        fullViewToolbarTarget={fullViewToolbarTarget}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+
+    // When
+    const fullViewButton = screen.getByRole('button', { name: 'View entire file' });
+    expect(fullViewButton.textContent).toBe('');
+    await user.click(fullViewButton);
+
+    // Then: the omitted line is displayed, but only hunk-origin lines offer note actions
+    await waitFor(() => {
+      expect(container.querySelector('tr[data-new-line-number="4"]')).not.toBeNull();
+    });
+    expect(screen.queryByRole('button', { name: 'View entire file' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Select line 4 for note' })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Select line 3 for note' })).toBeDefined();
+    expect(fileContentReader.fetchFileContent).toHaveBeenCalledWith('repo', 'src/file.ts');
+  });
+
+  it('returns an expanded file to compact view when refresh replaces the file object', async () => {
+    // Given: an expanded staged file
+    const user = userEvent.setup();
+    const fileContentReader = {
+      fetchFileContent: vi.fn().mockResolvedValue({
+        blobId: 'expected-blob',
+        lines: ['const a = 1;', 'const b = 2;', 'const c = 3;', 'const d = 4;'],
+      }),
+    };
+    const file = createExpandableFile();
+    const fullViewToolbarTarget = createFullViewToolbarTarget();
+    const { container, rerender } = render(
+      <UnifiedDiffViewer
+        file={file}
+        fileContentReader={fileContentReader}
+        fullViewToolbarTarget={fullViewToolbarTarget}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'View entire file' }));
+    await waitFor(() => {
+      expect(container.querySelector('tr[data-new-line-number="4"]')).not.toBeNull();
+    });
+
+    // When: diff refresh produces a new DiffFile object for the same path
+    rerender(
+      <UnifiedDiffViewer
+        file={{ ...file }}
+        fileContentReader={fileContentReader}
+        fullViewToolbarTarget={fullViewToolbarTarget}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+
+    // Then
+    expect(container.querySelector('tr[data-new-line-number="4"]')).toBeNull();
+    expect(screen.getByRole('button', { name: 'View entire file' })).toBeDefined();
+  });
+
+  it('does not offer full view in the working pane', () => {
+    // Given / When
+    const fullViewToolbarTarget = createFullViewToolbarTarget();
+    render(
+      <UnifiedDiffViewer
+        file={createExpandableFile()}
+        fileContentReader={viewerDependencies.fileContentReader}
+        fullViewToolbarTarget={fullViewToolbarTarget}
+        paneMode="working"
+        repoId="repo"
+      />,
+    );
+
+    // Then
+    expect(screen.queryByRole('button', { name: 'View entire file' })).toBeNull();
   });
 });

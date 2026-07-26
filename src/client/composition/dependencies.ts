@@ -1,5 +1,6 @@
 import type {
   DiffReader,
+  FileContentReader,
   NotesGateway,
   RepositoryReader,
   RepositoryWriter,
@@ -9,6 +10,7 @@ import type {
 
 export interface AppDependencies {
   diffReader: DiffReader;
+  fileContentReader: FileContentReader;
   repositoryReader: RepositoryReader;
   repositoryWriter: RepositoryWriter;
   workspaceActions: WorkspaceActions;

@@ -56,6 +56,9 @@ const testDependencies: AppDependencies = {
       stagedFiles: [],
     })),
   },
+  fileContentReader: {
+    fetchFileContent: vi.fn(),
+  },
   repositoryReader: {
     fetchRepositories: vi.fn(async () => ({
       invalidRepositories: [],
