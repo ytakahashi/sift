@@ -7,7 +7,30 @@ export class GitClient {
   constructor(readonly repoRoot: string) {}
 
   async runGitCommand(args: string[]): Promise<string> {
+    return this.execGit(args);
+  }
+
+  /**
+   * Shared `execFile` + error-wrapping for both text (`runGitCommand`) and
+   * binary (`getBlobContent`) output, so the two call sites don't duplicate
+   * the "Git command failed" formatting.
+   */
+  private async execGit(args: string[]): Promise<string>;
+  private async execGit(args: string[], options: { encoding: 'buffer' }): Promise<Buffer>;
+  private async execGit(
+    args: string[],
+    options?: { encoding: 'buffer' },
+  ): Promise<string | Buffer> {
     try {
+      if (options?.encoding === 'buffer') {
+        const { stdout } = await execFileAsync('git', args, {
+          cwd: this.repoRoot,
+          maxBuffer: 10 * 1024 * 1024, // 10MB
+          encoding: 'buffer',
+        });
+        return stdout;
+      }
+
       const { stdout } = await execFileAsync('git', args, {
         cwd: this.repoRoot,
         maxBuffer: 10 * 1024 * 1024, // 10MB
@@ -20,7 +43,7 @@ export class GitClient {
   }
 
   async getDiffOutput(staged: boolean): Promise<string> {
-    const args = ['diff', '--no-ext-diff', '--color=never'];
+    const args = ['diff', '--no-ext-diff', '--color=never', '--full-index'];
     if (staged) {
       args.push('--cached');
     }
@@ -35,6 +58,43 @@ export class GitClient {
 
   async getStatus(): Promise<string> {
     return await this.runGitCommand(['status', '--short', '--porcelain']);
+  }
+
+  async getIndexEntry(path: string): Promise<{ mode: string; blobId: string } | null> {
+    const output = await this.runGitCommand([
+      '--literal-pathspecs',
+      'ls-files',
+      '--stage',
+      '-z',
+      '--',
+      path,
+    ]);
+
+    for (const record of output.split('\0')) {
+      if (record === '') {
+        continue;
+      }
+
+      const match = record.match(/^(\d{6}) ([0-9a-f]+) ([0-3])\t([\s\S]*)$/);
+      if (match?.[3] === '0' && match[4] === path) {
+        return { mode: match[1], blobId: match[2] };
+      }
+    }
+
+    return null;
+  }
+
+  async getBlobSize(blobId: string): Promise<number> {
+    const output = await this.runGitCommand(['cat-file', '-s', blobId]);
+    const size = Number.parseInt(output.trim(), 10);
+    if (!Number.isSafeInteger(size) || size < 0) {
+      throw new Error(`git cat-file returned an invalid blob size: ${output.trim()}`);
+    }
+    return size;
+  }
+
+  async getBlobContent(blobId: string): Promise<Buffer> {
+    return this.execGit(['cat-file', '-p', blobId], { encoding: 'buffer' });
   }
 
   async cleanPath(path: string): Promise<void> {

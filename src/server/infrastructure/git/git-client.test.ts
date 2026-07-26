@@ -1,6 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { spawn } from 'node:child_process';
+import { execFile, spawn } from 'node:child_process';
 import { GitClient } from './git-client';
 
 vi.mock('node:child_process', () => ({
@@ -116,5 +116,130 @@ describe('GitClient.hashObjects', () => {
     // Then: no subprocess is started
     expect(result).toEqual([]);
     expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
+describe('GitClient index content commands', () => {
+  it('requests a literal pathspec and selects only its stage-zero entry', async () => {
+    // Given: the path contains characters Git would otherwise treat as pathspec syntax
+    const client = new GitClient('/repo/root');
+    const runGitCommand = vi
+      .spyOn(client, 'runGitCommand')
+      .mockResolvedValue(
+        ['100644 aaaa1111 1\tsrc/[literal].ts', '100755 deadbeef 0\tsrc/[literal].ts', ''].join(
+          '\0',
+        ),
+      );
+
+    // When
+    const entry = await client.getIndexEntry('src/[literal].ts');
+
+    // Then
+    expect(entry).toEqual({ mode: '100755', blobId: 'deadbeef' });
+    expect(runGitCommand).toHaveBeenCalledWith([
+      '--literal-pathspecs',
+      'ls-files',
+      '--stage',
+      '-z',
+      '--',
+      'src/[literal].ts',
+    ]);
+  });
+
+  it('returns null when the index has no exact stage-zero entry', async () => {
+    // Given: only conflict stages and a different path are returned
+    const client = new GitClient('/repo/root');
+    vi.spyOn(client, 'runGitCommand').mockResolvedValue(
+      ['100644 aaaa1111 2\tsrc/file.ts', '100644 bbbb2222 0\tsrc/file.ts.bak', ''].join('\0'),
+    );
+
+    // When / Then
+    await expect(client.getIndexEntry('src/file.ts')).resolves.toBeNull();
+  });
+
+  it('requests full object ids in diff output', async () => {
+    // Given
+    const client = new GitClient('/repo/root');
+    const runGitCommand = vi.spyOn(client, 'runGitCommand').mockResolvedValue('');
+
+    // When
+    await client.getDiffOutput(true);
+
+    // Then
+    expect(runGitCommand).toHaveBeenCalledWith([
+      'diff',
+      '--no-ext-diff',
+      '--color=never',
+      '--full-index',
+      '--cached',
+    ]);
+  });
+
+  it('parses a non-negative blob size and rejects invalid output', async () => {
+    // Given
+    const client = new GitClient('/repo/root');
+    const runGitCommand = vi.spyOn(client, 'runGitCommand');
+    runGitCommand.mockResolvedValueOnce('512\n').mockResolvedValueOnce('not-a-size\n');
+
+    // When / Then
+    await expect(client.getBlobSize('blob')).resolves.toBe(512);
+    await expect(client.getBlobSize('blob')).rejects.toThrow('invalid blob size');
+  });
+});
+
+describe('GitClient.getBlobContent', () => {
+  type ExecFileCallback = (error: Error | null, result: { stdout: Buffer; stderr: Buffer }) => void;
+
+  beforeEach(() => {
+    vi.mocked(execFile).mockReset();
+  });
+
+  it('requests buffer-encoded output so binary bytes survive intact', async () => {
+    // Given: a blob whose bytes are not valid UTF-8 on their own (a lone
+    // continuation byte), which would be corrupted by text-mode decoding
+    const stdout = Buffer.from([0xff, 0x00, 0x41]);
+    vi.mocked(execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
+      options: unknown,
+      callback: ExecFileCallback,
+    ) => {
+      expect(options).toMatchObject({ cwd: '/repo/root', encoding: 'buffer' });
+      callback(null, { stdout, stderr: Buffer.alloc(0) });
+    }) as unknown as typeof execFile);
+    const client = new GitClient('/repo/root');
+
+    // When
+    const result = await client.getBlobContent('blob-id');
+
+    // Then
+    expect(result).toEqual(stdout);
+    expect(execFile).toHaveBeenCalledWith(
+      'git',
+      ['cat-file', '-p', 'blob-id'],
+      expect.objectContaining({ encoding: 'buffer' }),
+      expect.any(Function),
+    );
+  });
+
+  it('wraps a failed cat-file call in a "Git command failed" error', async () => {
+    // Given
+    vi.mocked(execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
+      _options: unknown,
+      callback: ExecFileCallback,
+    ) => {
+      callback(new Error('fatal: not a valid object name blob-id'), {
+        stdout: Buffer.alloc(0),
+        stderr: Buffer.alloc(0),
+      });
+    }) as unknown as typeof execFile);
+    const client = new GitClient('/repo/root');
+
+    // When / Then
+    await expect(client.getBlobContent('blob-id')).rejects.toThrow(
+      'Git command failed: git cat-file -p blob-id',
+    );
   });
 });

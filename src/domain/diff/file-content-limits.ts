@@ -1,0 +1,2 @@
+export const MAX_TEXT_DIFF_BYTES = 512 * 1024;
+export const MAX_FULL_FILE_VIEW_LINES = 10_000;

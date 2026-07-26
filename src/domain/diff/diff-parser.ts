@@ -73,8 +73,16 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
       continue;
     }
 
-    if (line.startsWith('--- ') || line.startsWith('+++ ') || line.startsWith('index ')) {
-      // standard git diff headers, ignore
+    if (line.startsWith('index ')) {
+      const match = line.match(/^index [0-9a-f]+\.\.([0-9a-f]+)(?: \d{6})?$/);
+      if (match) {
+        currentFile.newBlobId = match[1];
+      }
+      continue;
+    }
+
+    if (line.startsWith('--- ') || line.startsWith('+++ ')) {
+      // Standard Git diff headers.
       continue;
     }
 

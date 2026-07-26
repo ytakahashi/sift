@@ -7,6 +7,7 @@ import { createHostGuard } from './routes/host-guard';
 import { createNotesRoutes } from './routes/notes';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
+import { createFileContentRoutes } from './routes/file-content';
 import type { NotesStore } from './services/notes-store';
 import type { RepositoryConfigUpdater } from './services/repository-config';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
@@ -20,6 +21,7 @@ import {
   type RepositoryValidator,
 } from './infrastructure/repository-validator';
 import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
+import { RepositoryFileContentProvider } from './infrastructure/diff/repository-file-content-provider';
 import { WorktreeFileGenerationProvider } from './infrastructure/git/worktree-file-generation-provider';
 import { InMemoryNotesStore } from './infrastructure/notes/in-memory-notes-store';
 import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
@@ -63,6 +65,13 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
     createDiffRoutes({
       repositoryResolver: resolver,
       createDiffProvider: (path) => new RepositoryDiffProvider(path),
+    }),
+  );
+  app.route(
+    '/api',
+    createFileContentRoutes({
+      repositoryResolver: resolver,
+      createFileContentProvider: (path) => new RepositoryFileContentProvider(path),
     }),
   );
   app.route(

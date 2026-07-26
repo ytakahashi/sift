@@ -45,6 +45,7 @@ describe('DiffViewModelBuilder', () => {
       expect(rows[0].type).toBe('hunk-header');
       expect(rows[0].content).toBe('@@ -1,3 +1,3 @@');
       expect(rows[0].hunkId).toBe('hunk-1');
+      expect(rows.every((row) => row.origin === 'hunk')).toBe(true);
 
       expect(rows[1]).toMatchObject({ type: 'context', content: 'ctx', hunkId: 'hunk-1' });
       expect(rows[2]).toMatchObject({ type: 'delete', content: 'old' });
@@ -80,6 +81,103 @@ describe('DiffViewModelBuilder', () => {
       expect(rows[2].newLineNumber).toBeUndefined();
       expect(rows[3].oldLineNumber).toBeUndefined();
       expect(rows[3].newLineNumber).toBe(2);
+    });
+  });
+
+  describe('buildUnifiedFullFile', () => {
+    it('fills leading, between-hunk, and trailing context with corrected old line numbers', () => {
+      // Given: the first hunk adds one line, shifting old numbers after it by one
+      const first = createHunk({
+        id: 'hunk-1',
+        header: '@@ -2,1 +2,2 @@',
+        oldStart: 2,
+        oldLines: 1,
+        newStart: 2,
+        newLines: 2,
+        lines: [
+          {
+            id: 'line-2',
+            type: 'context',
+            oldLineNumber: 2,
+            newLineNumber: 2,
+            content: 'two',
+          },
+          { id: 'line-3', type: 'add', newLineNumber: 3, content: 'inserted' },
+        ],
+      });
+      const second = createHunk({
+        id: 'hunk-2',
+        header: '@@ -5,1 +6,1 @@',
+        oldStart: 5,
+        oldLines: 1,
+        newStart: 6,
+        newLines: 1,
+        lines: [
+          {
+            id: 'line-6',
+            type: 'context',
+            oldLineNumber: 5,
+            newLineNumber: 6,
+            content: 'six',
+          },
+        ],
+      });
+      const fileLines = ['one', 'two', 'inserted', 'four', 'five', 'six', 'seven'];
+
+      // When: full-file rows are built
+      const rows = DiffViewModelBuilder.buildUnifiedFullFile([first, second], fileLines);
+
+      // Then: every omitted range is restored and the post-insert old numbers are shifted
+      const expanded = rows.filter((row) => row.origin === 'expanded-context');
+      expect(expanded.map((row) => [row.newLineNumber, row.oldLineNumber, row.content])).toEqual([
+        [1, 1, 'one'],
+        [4, 3, 'four'],
+        [5, 4, 'five'],
+        [7, 6, 'seven'],
+      ]);
+      expect(rows.filter((row) => row.origin === 'hunk')).toHaveLength(5);
+    });
+
+    it('does not add context rows when adjacent hunks and file boundaries leave no gaps', () => {
+      // Given: two hunks cover the complete two-line file
+      const first = createHunk({
+        id: 'hunk-1',
+        oldStart: 1,
+        oldLines: 1,
+        newStart: 1,
+        newLines: 1,
+        lines: [
+          {
+            id: 'line-1',
+            type: 'context',
+            oldLineNumber: 1,
+            newLineNumber: 1,
+            content: 'one',
+          },
+        ],
+      });
+      const second = createHunk({
+        id: 'hunk-2',
+        oldStart: 2,
+        oldLines: 1,
+        newStart: 2,
+        newLines: 1,
+        lines: [
+          {
+            id: 'line-2',
+            type: 'context',
+            oldLineNumber: 2,
+            newLineNumber: 2,
+            content: 'two',
+          },
+        ],
+      });
+
+      // When
+      const rows = DiffViewModelBuilder.buildUnifiedFullFile([first, second], ['one', 'two']);
+
+      // Then
+      expect(rows.some((row) => row.origin === 'expanded-context')).toBe(false);
     });
   });
 

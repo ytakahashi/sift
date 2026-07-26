@@ -26,6 +26,16 @@ export class DiffFetchError extends Error {
   }
 }
 
+export class FileContentFetchError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'FileContentFetchError';
+  }
+}
+
 export class WorkspaceActionError extends Error {
   constructor(
     message: string,
@@ -53,6 +63,15 @@ export class NotesActionError extends Error {
 
 export interface DiffReader {
   fetchDiff(repoId: RepositoryId): Promise<RepositoryDiff>;
+}
+
+export interface FileContent {
+  blobId: string;
+  lines: string[];
+}
+
+export interface FileContentReader {
+  fetchFileContent(repoId: RepositoryId, path: string): Promise<FileContent>;
 }
 
 export interface RepositoryReader {
