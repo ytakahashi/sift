@@ -1,8 +1,17 @@
 # Sift
 
+[![GitHub release](https://img.shields.io/github/release/ytakahashi/sift.svg)](https://github.com/ytakahashi/sift/releases/)
+[![NPM Version](https://img.shields.io/npm/v/%40ytakahashi%2Fsift)](https://www.npmjs.com/package/@ytakahashi/sift)
+[![Node.js CI](https://github.com/ytakahashi/sift/actions/workflows/node.js.yml/badge.svg)](https://github.com/ytakahashi/sift/actions/workflows/node.js.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 > **Sift before you commit.**
 
 A lightweight local diff viewer for inspecting changes with agent-aware ephemeral notes.
+
+<p align="center">
+  <img src="./images/sift.png" alt="Sift Screenshot" width="800">
+</p>
 
 ## Features
 
@@ -17,37 +26,52 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
   locked to your Git repository.
 
-## Requirements
+## Installation
+
+Sift can be used either as a standalone macOS app or as a command-line tool.
+
+### macOS App
+
+The Sift macOS app is a standalone application. It bundles its own Node.js runtime and starts the
+local Sift server automatically, so Node.js and the `sift` command are not required.
+
+Requirements:
+
+- macOS on Apple Silicon
+- Git
+
+Download the latest app from the [Releases page](https://github.com/ytakahashi/sift/releases).
+
+Install the command-line tool as well if you want to open the app from a terminal with
+`sift open --app`, use Sift in a browser, or use commands such as `sift mcp`.
+
+### Command-line Tool
+
+The command-line tool runs Sift in your browser and provides terminal and MCP integration.
+
+#### Install
+
+Requirements:
 
 - Node.js >= 22.12.0
 - Git
-- Browser mode: macOS, Linux, Windows
-- Desktop app: macOS (Apple Silicon) only
-
-## Installation
+- macOS, Linux, or Windows
 
 ```bash
 npm install --global @ytakahashi/sift
 ```
 
-### Update
+#### Update and Uninstall
 
 ```bash
+# Update
 npm update --global @ytakahashi/sift
-```
 
-### Uninstall
-
-```bash
+# Uninstall
 npm uninstall --global @ytakahashi/sift
 ```
 
-### macOS App (optional)
-
-`sift open --app` requires the Sift macOS app. Download the latest `.dmg` from the
-[GitHub Releases page](https://github.com/ytakahashi/sift/releases) and install it.
-
-## Usage
+## Command-line Usage
 
 ```sh
 sift open [path] [--app|--browser]
@@ -67,7 +91,8 @@ Open a repository in the browser or the Sift macOS app.
 - `path`: Repository path to open (defaults to the current directory). Registers the repository
   automatically if it isn't already in the local Sift config. Cannot be combined with `-i`.
 - `-b, --browser`: Open the browser (default).
-- `-a, --app`: Open the Sift macOS application instead of the browser.
+- `-a, --app`: Open the Sift macOS application instead of the browser. Requires the Sift macOS app
+  to be installed (see Installation).
 - `-i, --interactive`: Pick a registered repository from an interactive list instead of using `path`
   or the current directory.
 
