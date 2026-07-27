@@ -10,7 +10,11 @@ describe('httpDiffReader', () => {
   it('fetches diff data from the repository-scoped endpoint', async () => {
     // Given
     const payload = {
-      metadata: { repoRoot: '/repo/my-app', revision: 'HEAD' as const },
+      metadata: {
+        repoRoot: '/repo/my-app',
+        revision: 'HEAD' as const,
+        head: { type: 'branch' as const, name: 'main' },
+      },
       stagedFiles: [{ id: 'staged.ts' }],
       workingFiles: [{ id: 'working.ts' }],
     };

@@ -3,6 +3,7 @@ import { cleanup, render, screen, within, fireEvent, act } from '@testing-librar
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../domain/diff/types';
+import type { HeadRef } from '../../domain/git/head-ref';
 import type { AppDependencies } from '../composition/dependencies';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
@@ -51,7 +52,11 @@ function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
 const testDependencies: AppDependencies = {
   diffReader: {
     fetchDiff: vi.fn(async () => ({
-      metadata: { repoRoot: '/repo/my-app', revision: 'HEAD' as const },
+      metadata: {
+        repoRoot: '/repo/my-app',
+        revision: 'HEAD' as const,
+        head: { type: 'branch' as const, name: 'main' },
+      },
       workingFiles: [],
       stagedFiles: [],
     })),
@@ -135,6 +140,7 @@ describe('RepositoryViewerPage interactions', () => {
   const discardAllWorkingFiles = vi.fn(async () => {});
   let diffState: {
     repoRoot: string | null;
+    head: HeadRef | null;
     workingFiles: DiffFile[];
     stagedFiles: DiffFile[];
     loading: boolean;
@@ -147,6 +153,7 @@ describe('RepositoryViewerPage interactions', () => {
     vi.clearAllMocks();
     diffState = {
       repoRoot: '/Users/dev/projects/my-app',
+      head: { type: 'branch', name: 'main' },
       workingFiles: [
         createFile('a', 'working'),
         createFile('b', 'working'),
@@ -582,6 +589,30 @@ describe('RepositoryViewerPage interactions', () => {
     expect(testDependencies.repositoryReader.fetchRepository).toHaveBeenCalledWith('demo-repo');
   });
 
+  it('renders the branch from the diff read in the header', async () => {
+    // Given: the diff read reports the checked-out branch
+    diffState.head = { type: 'branch', name: 'feature/add-branch-label' };
+
+    // When
+    render(<Page repoId="demo-repo" />);
+
+    // Then
+    const branchLabel = await screen.findByTitle('Branch: feature/add-branch-label');
+    expect(branchLabel.textContent).toBe('feature/add-branch-label');
+  });
+
+  it('omits the branch label when the diff read could not report HEAD', async () => {
+    // Given: Git failed to resolve HEAD, so there is nothing trustworthy to show
+    diffState.head = { type: 'unknown' };
+
+    // When
+    const { container } = render(<Page repoId="demo-repo" />);
+
+    // Then
+    await screen.findByText('demo-repo');
+    expect(container.querySelector('.app-branch-name')).toBeNull();
+  });
+
   it('fetches and renders repository metadata on direct route loads', async () => {
     // Given: direct route load
     vi.mocked(testDependencies.repositoryReader.fetchRepository).mockResolvedValueOnce({
@@ -686,6 +717,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     });
     vi.mocked(useDiffData).mockReturnValue({
       repoRoot: '/Users/dev/projects/my-app',
+      head: { type: 'branch', name: 'main' },
       workingFiles: [],
       stagedFiles: [],
       loading: false,
@@ -818,6 +850,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     // Given: a working file matching the note's path is available in the diff
     vi.mocked(useDiffData).mockReturnValue({
       repoRoot: '/Users/dev/projects/my-app',
+      head: { type: 'branch', name: 'main' },
       workingFiles: [createFile('f1', 'working')],
       stagedFiles: [],
       loading: false,

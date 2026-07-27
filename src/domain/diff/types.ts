@@ -1,9 +1,19 @@
+import type { HeadRef } from '../git/head-ref';
+
 export type FileBucket = 'working' | 'staged' | 'single';
 
+/**
+ * A best-effort repository read assembled from several Git invocations.
+ *
+ * Repository state may change while the response is being assembled, so its
+ * parts are not guaranteed to describe the exact same instant.
+ */
 export interface RepositoryDiff {
   metadata: {
     repoRoot: string;
     revision: 'HEAD';
+    /** HEAD observed during this diff read, for display purposes. */
+    head: HeadRef;
   };
   stagedFiles: DiffFile[];
   workingFiles: DiffFile[];

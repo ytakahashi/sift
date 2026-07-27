@@ -1,11 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { DiffFile, RepositoryDiff } from '../../../domain/diff/types';
+import type { HeadRef } from '../../../domain/git/head-ref';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type { DiffReader } from '../../application/ports';
 
 export interface UseDiffDataResult {
   /** Absolute repository root returned with the latest accepted diff read. */
   repoRoot: string | null;
+  /** HEAD as of the latest accepted diff read, or null before the first one. */
+  head: HeadRef | null;
   /** Files with unstaged working-tree changes returned by the latest accepted diff read. */
   workingFiles: DiffFile[];
   /** Files with staged index changes returned by the latest accepted diff read. */
@@ -22,6 +25,7 @@ export interface UseDiffDataResult {
 
 export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDiffDataResult {
   const [repoRoot, setRepoRoot] = useState<string | null>(null);
+  const [head, setHead] = useState<HeadRef | null>(null);
   const [workingFiles, setWorkingFiles] = useState<DiffFile[]>([]);
   const [stagedFiles, setStagedFiles] = useState<DiffFile[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,6 +52,7 @@ export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDi
       setWorkingFiles(result.workingFiles);
       setStagedFiles(result.stagedFiles);
       setRepoRoot(result.metadata.repoRoot);
+      setHead(result.metadata.head);
       return result;
     } catch (err: unknown) {
       if (requestId === latestRequestId.current) {
@@ -73,6 +78,7 @@ export function useDiffData(diffReader: DiffReader, repoId: RepositoryId): UseDi
 
   return {
     repoRoot,
+    head,
     workingFiles,
     stagedFiles,
     loading,

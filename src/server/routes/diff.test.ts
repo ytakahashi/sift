@@ -10,6 +10,7 @@ import {
 } from '../services/repository-resolver';
 
 const getFilesMock = vi.fn();
+const getHeadRefMock = vi.fn();
 
 function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
   const app = new Hono<Env>();
@@ -17,8 +18,9 @@ function createApp(repositoryResolver: RepositoryResolver): Hono<Env> {
     '/api',
     createDiffRoutes({
       repositoryResolver,
-      // Inject a mock DiffProvider factory so tests do not touch the filesystem
+      // Inject mock provider factories so tests do not touch the filesystem
       createDiffProvider: () => ({ getFiles: getFilesMock }),
+      createHeadRefProvider: () => ({ getHeadRef: getHeadRefMock }),
     }),
   );
   return app;
@@ -34,6 +36,7 @@ describe('diffRoutes', () => {
 
       return Promise.resolve([{ id: 'staged-file', path: 'staged.ts' }]);
     });
+    getHeadRefMock.mockResolvedValue({ type: 'branch', name: 'main' });
   });
 
   it('returns RepositoryDiff for a valid repository', async () => {
@@ -57,8 +60,29 @@ describe('diffRoutes', () => {
     // Confirm the factory was called with the resolved repository path
     expect(data.metadata.repoRoot).toBe('/repo/my-app');
     expect(data.metadata.revision).toBe('HEAD');
+    expect(data.metadata.head).toEqual({ type: 'branch', name: 'main' });
     expect(data).toHaveProperty('workingFiles');
     expect(data).toHaveProperty('stagedFiles');
+  });
+
+  it('reports a detached HEAD alongside the diff', async () => {
+    // Given: the repository is checked out at a commit rather than a branch
+    const mockResolver = {
+      listRepositories: vi.fn(),
+      resolveRepository: vi
+        .fn()
+        .mockResolvedValue({ id: 'my-app', name: 'my-app', path: '/repo/my-app' }),
+    };
+    getHeadRefMock.mockResolvedValue({ type: 'detached', revision: 'a1b2c3d' });
+    const app = createApp(mockResolver);
+
+    // When
+    const response = await app.request('/api/repositories/my-app/diff');
+    const data = await response.json();
+
+    // Then
+    expect(response.status).toBe(200);
+    expect(data.metadata.head).toEqual({ type: 'detached', revision: 'a1b2c3d' });
   });
 
   it('returns 404 when repoId is not configured', async () => {
@@ -170,6 +194,7 @@ describe('diffRoutes', () => {
         createDiffProvider: () => ({
           getFiles: vi.fn().mockRejectedValue(new Error('git: fatal error')),
         }),
+        createHeadRefProvider: () => ({ getHeadRef: getHeadRefMock }),
       }),
     );
 

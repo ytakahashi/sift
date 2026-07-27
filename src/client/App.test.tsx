@@ -41,7 +41,11 @@ vi.mock('./components/diff/UnifiedDiffViewer', () => ({
 const testDependencies: AppDependencies = {
   diffReader: {
     fetchDiff: vi.fn(async () => ({
-      metadata: { repoRoot: '/repo/my-app', revision: 'HEAD' as const },
+      metadata: {
+        repoRoot: '/repo/my-app',
+        revision: 'HEAD' as const,
+        head: { type: 'branch' as const, name: 'main' },
+      },
       workingFiles: [],
       stagedFiles: [],
     })),
@@ -98,6 +102,7 @@ describe('App Routing', () => {
     vi.clearAllMocks();
     vi.mocked(useDiffData).mockReturnValue({
       repoRoot: '/repo/my-app',
+      head: { type: 'branch', name: 'main' },
       workingFiles: [],
       stagedFiles: [],
       loading: false,
@@ -178,6 +183,7 @@ describe('App repository tabs', () => {
     };
     vi.mocked(useDiffData).mockReturnValue({
       repoRoot: '/repo/my-app',
+      head: { type: 'branch', name: 'main' },
       workingFiles: [],
       stagedFiles: [],
       loading: false,

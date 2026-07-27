@@ -29,6 +29,7 @@ import { usePaneFileActions } from '../hooks/panes/usePaneFileActions';
 import { useDiscardConfirmModal } from '../hooks/discard-confirm/useDiscardConfirmModal';
 import { DiscardConfirmModal } from '../components/discard-confirm/DiscardConfirmModal';
 import { AppHeader } from '../components/app-header/AppHeader';
+import { toHeadLabel } from '../presentation/app-header/head-label';
 import type { AppDependencies } from '../composition/dependencies';
 
 export interface RepositoryViewerPageProps {
@@ -148,6 +149,7 @@ function RepositoryWorkspace({
   const repositorySidebarWidthPx = useMemo(() => resolveRepositorySidebarWidthPx(), []);
   const {
     repoRoot,
+    head,
     workingFiles: serverWorkingFiles,
     stagedFiles: serverStagedFiles,
     loading,
@@ -276,6 +278,7 @@ function RepositoryWorkspace({
       <AppHeader
         onNavigateHome={onNavigateToRoot}
         repositoryLabel={repository ? { name: repository.name, path: repository.path } : undefined}
+        branchLabel={toHeadLabel(head) ?? undefined}
         errorMessage={repositoryError || diffError || actionError || notesError}
         actions={
           <>
