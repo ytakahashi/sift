@@ -40,6 +40,43 @@ describe('AppHeader', () => {
     expect(label.getAttribute('title')).toBe('/repo/sift');
   });
 
+  it('shows the branch label with its tooltip text', () => {
+    // Given / When
+    render(
+      <AppHeader
+        actions={null}
+        branchLabel={{ text: 'main', title: 'Branch: main', detached: false }}
+      />,
+    );
+
+    // Then
+    const label = screen.getByTitle('Branch: main');
+    expect(label.textContent).toBe('main');
+    // The detached marker is a styling hook, so it must be absent for a branch.
+    expect(label.getAttribute('data-detached')).toBeNull();
+  });
+
+  it('marks the branch label as detached when the label says so', () => {
+    // Given / When
+    render(
+      <AppHeader
+        actions={null}
+        branchLabel={{ text: 'a1b2c3d (detached)', title: 'Detached HEAD', detached: true }}
+      />,
+    );
+
+    // Then
+    expect(screen.getByTitle('Detached HEAD').getAttribute('data-detached')).toBe('true');
+  });
+
+  it('omits the branch label when branchLabel is not provided', () => {
+    // Given / When
+    const { container } = render(<AppHeader actions={null} />);
+
+    // Then
+    expect(container.querySelector('.app-branch-name')).toBeNull();
+  });
+
   it('omits the repository label when repositoryLabel is not provided', () => {
     // Given / When
     render(<AppHeader actions={null} />);

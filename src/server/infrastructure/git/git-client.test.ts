@@ -175,6 +175,29 @@ describe('GitClient index content commands', () => {
     ]);
   });
 
+  it('trims the branch name and reports a detached HEAD as an empty name', async () => {
+    // Given: `git branch --show-current` prints an empty line for a detached HEAD,
+    // which is what lets callers distinguish it from a branch checkout
+    const client = new GitClient('/repo/root');
+    const runGitCommand = vi.spyOn(client, 'runGitCommand');
+    runGitCommand.mockResolvedValueOnce('feature/a\n').mockResolvedValueOnce('\n');
+
+    // When / Then
+    await expect(client.getCurrentBranchName()).resolves.toBe('feature/a');
+    await expect(client.getCurrentBranchName()).resolves.toBe('');
+    expect(runGitCommand).toHaveBeenCalledWith(['branch', '--show-current']);
+  });
+
+  it('trims the short HEAD revision', async () => {
+    // Given
+    const client = new GitClient('/repo/root');
+    const runGitCommand = vi.spyOn(client, 'runGitCommand').mockResolvedValue('a1b2c3d\n');
+
+    // When / Then
+    await expect(client.getShortHeadRevision()).resolves.toBe('a1b2c3d');
+    expect(runGitCommand).toHaveBeenCalledWith(['rev-parse', '--short', 'HEAD']);
+  });
+
   it('parses a non-negative blob size and rejects invalid output', async () => {
     // Given
     const client = new GitClient('/repo/root');

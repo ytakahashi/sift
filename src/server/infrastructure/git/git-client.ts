@@ -60,6 +60,20 @@ export class GitClient {
     return await this.runGitCommand(['status', '--short', '--porcelain']);
   }
 
+  /**
+   * Returns the checked-out branch name, or an empty string when HEAD is
+   * detached. Unlike `rev-parse --abbrev-ref HEAD`, which reports the literal
+   * string "HEAD" for a detached HEAD, this makes the two states distinguishable.
+   * A branch without a commit yet (unborn HEAD) still reports its name.
+   */
+  async getCurrentBranchName(): Promise<string> {
+    return (await this.runGitCommand(['branch', '--show-current'])).trim();
+  }
+
+  async getShortHeadRevision(): Promise<string> {
+    return (await this.runGitCommand(['rev-parse', '--short', 'HEAD'])).trim();
+  }
+
   async getIndexEntry(path: string): Promise<{ mode: string; blobId: string } | null> {
     const output = await this.runGitCommand([
       '--literal-pathspecs',

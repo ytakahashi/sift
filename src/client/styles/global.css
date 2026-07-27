@@ -98,6 +98,36 @@ button.app-brand-home {
   white-space: nowrap;
 }
 
+/* A divider plus the ref icon keep the branch readable as its own item next to
+   the repository name, which uses the same muted color. */
+.app-branch-name {
+  align-items: center;
+  border-left: 1px solid var(--border-color);
+  color: #8b949e;
+  display: inline-flex;
+  font-size: 0.9rem;
+  gap: 0.3rem;
+  max-width: 16rem;
+  min-width: 0;
+  padding-left: 0.6rem;
+}
+
+/* Detached HEAD is unusual enough that it should read differently from a
+   branch, without implying an error. */
+.app-branch-name[data-detached] {
+  color: var(--text-color);
+}
+
+.app-branch-name-icon {
+  flex: 0 0 auto;
+}
+
+.app-branch-name-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
 .app-header-actions {
   display: flex;
   gap: 1rem;

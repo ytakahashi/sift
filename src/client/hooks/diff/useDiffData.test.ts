@@ -36,7 +36,11 @@ describe('useDiffData', () => {
     const stagedFile = { ...createFile('staged'), bucket: 'staged' as const };
     const diffReader: DiffReader = {
       fetchDiff: vi.fn().mockResolvedValue({
-        metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
+        metadata: {
+          repoRoot: '/repo/sift',
+          revision: 'HEAD' as const,
+          head: { type: 'branch' as const, name: 'main' },
+        },
         workingFiles: [workingFile],
         stagedFiles: [stagedFile],
       }),
@@ -52,6 +56,7 @@ describe('useDiffData', () => {
     expect(result.current.workingFiles).toEqual([workingFile]);
     expect(result.current.stagedFiles).toEqual([stagedFile]);
     expect(result.current.repoRoot).toBe('/repo/sift');
+    expect(result.current.head).toEqual({ type: 'branch', name: 'main' });
     expect(result.current.initialized).toBe(true);
     expect(result.current.error).toBeNull();
     expect(diffReader.fetchDiff).toHaveBeenCalledWith('sift');
@@ -62,7 +67,11 @@ describe('useDiffData', () => {
     const olderRefresh = createDeferred<RepositoryDiff>();
     const newerRefresh = createDeferred<RepositoryDiff>();
     const fetchDiff = vi.fn().mockResolvedValueOnce({
-      metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
+      metadata: {
+        repoRoot: '/repo/sift',
+        revision: 'HEAD' as const,
+        head: { type: 'branch' as const, name: 'main' },
+      },
       workingFiles: [createFile('initial')],
       stagedFiles: [],
     });
@@ -80,7 +89,11 @@ describe('useDiffData', () => {
     const secondPromise = result.current.refresh();
 
     newerRefresh.resolve({
-      metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
+      metadata: {
+        repoRoot: '/repo/sift',
+        revision: 'HEAD' as const,
+        head: { type: 'branch' as const, name: 'latest-branch' },
+      },
       workingFiles: [createFile('latest')],
       stagedFiles: [],
     });
@@ -88,7 +101,11 @@ describe('useDiffData', () => {
       return await secondPromise;
     });
     olderRefresh.resolve({
-      metadata: { repoRoot: '/repo/sift', revision: 'HEAD' as const },
+      metadata: {
+        repoRoot: '/repo/sift',
+        revision: 'HEAD' as const,
+        head: { type: 'branch' as const, name: 'stale-branch' },
+      },
       workingFiles: [createFile('stale')],
       stagedFiles: [],
     });
@@ -103,5 +120,8 @@ describe('useDiffData', () => {
     expect(secondResult!.workingFiles.map((file) => file.id)).toEqual(['latest']);
     expect(result.current.workingFiles.map((file) => file.id)).toEqual(['latest']);
     expect(result.current.repoRoot).toBe('/repo/sift');
+    // HEAD follows the accepted result too, so the header cannot show a branch
+    // from a superseded read.
+    expect(result.current.head).toEqual({ type: 'branch', name: 'latest-branch' });
   });
 });

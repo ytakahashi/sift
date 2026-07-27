@@ -22,6 +22,7 @@ import {
 } from './infrastructure/repository-validator';
 import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
 import { RepositoryFileContentProvider } from './infrastructure/diff/repository-file-content-provider';
+import { RepositoryHeadRefProvider } from './infrastructure/git/repository-head-ref-provider';
 import { WorktreeFileGenerationProvider } from './infrastructure/git/worktree-file-generation-provider';
 import { InMemoryNotesStore } from './infrastructure/notes/in-memory-notes-store';
 import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
@@ -65,6 +66,7 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
     createDiffRoutes({
       repositoryResolver: resolver,
       createDiffProvider: (path) => new RepositoryDiffProvider(path),
+      createHeadRefProvider: (path) => new RepositoryHeadRefProvider(path),
     }),
   );
   app.route(
