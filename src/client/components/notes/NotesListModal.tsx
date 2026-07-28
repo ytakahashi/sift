@@ -81,6 +81,7 @@ export function NotesListModal({
           </button>
         </div>
         <div
+          className="scroll-area"
           data-testid="notes-modal-scroll-area"
           style={{
             flex: 1,

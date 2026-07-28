@@ -59,7 +59,7 @@ export function RepositorySidebar({
   const statusMessage = error ?? configMissingError;
 
   return (
-    <aside aria-label="Repository list" className="repository-sidebar">
+    <aside aria-label="Repository list" className="repository-sidebar scroll-area">
       <div className="repository-sidebar-header">Repositories</div>
       {statusMessage ? <div className="repository-sidebar-error">{statusMessage}</div> : null}
       {loading && !statusMessage && items.length === 0 ? (

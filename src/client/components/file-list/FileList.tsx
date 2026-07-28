@@ -48,6 +48,10 @@ export function FileList({
   onBoundaryNavigate,
 }: FileListProps): ReactElement {
   const listRef = useRef<HTMLDivElement | null>(null);
+  // Points at the currently selected row. A ref is used instead of looking the
+  // row up by id because `DiffFile.id` does not distinguish panes, so the same
+  // id can exist in both the working and staged lists.
+  const selectedItemRef = useRef<HTMLDivElement | null>(null);
   const [contextMenu, setContextMenu] = useState<FilePathContextMenuState | null>(null);
   const closeContextMenu = useCallback((): void => {
     setContextMenu(null);
@@ -71,6 +75,19 @@ export function FileList({
       listRef.current?.focus();
     }
   }, [isActive, selectedFileId]);
+
+  useEffect(() => {
+    if (!selectedFileId) {
+      return;
+    }
+
+    // With the aria-activedescendant pattern, focus stays on the listbox, so the
+    // browser never scrolls the active row into view on its own. Keyboard
+    // navigation through a long list would otherwise move the selection out of
+    // the visible area. 'nearest' leaves an already visible row untouched, which
+    // keeps mouse selection from scrolling the list.
+    selectedItemRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [selectedFileId]);
 
   if (files.length === 0) {
     return (
@@ -100,6 +117,7 @@ export function FileList({
             key={file.id}
             id={`file-item-${file.id}`}
             className={`file-item ${isSelected ? 'selected' : ''}`}
+            ref={isSelected ? selectedItemRef : null}
             role="option"
             aria-selected={isSelected}
             onClick={() => {
