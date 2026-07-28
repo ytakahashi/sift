@@ -322,7 +322,7 @@ function RepositoryWorkspace({
                   <span>Working Directory ({workingFiles.length})</span>
                   <DiffFilesLineStats files={workingFiles} />
                 </div>
-                <div className="pane-content" style={{ padding: 0 }}>
+                <div className="pane-content scroll-area" style={{ padding: 0 }}>
                   {loading && workingFiles.length === 0 ? (
                     <div style={{ padding: '1rem' }}>Loading...</div>
                   ) : (
@@ -360,7 +360,7 @@ function RepositoryWorkspace({
                   <span>Staged Changes ({stagedFiles.length})</span>
                   <DiffFilesLineStats files={stagedFiles} />
                 </div>
-                <div className="pane-content" style={{ padding: 0 }}>
+                <div className="pane-content scroll-area" style={{ padding: 0 }}>
                   {loading && stagedFiles.length === 0 ? (
                     <div style={{ padding: '1rem' }}>Loading...</div>
                   ) : (
@@ -445,7 +445,7 @@ function RepositoryWorkspace({
               </div>
             )}
           </div>
-          <div className="pane-content" style={{ padding: 0 }}>
+          <div className="pane-content scroll-area" style={{ padding: 0 }}>
             {!selectedFile ? (
               <div style={{ padding: '2rem', textAlign: 'center', color: '#8b949e' }}>
                 Select a file to view differences.

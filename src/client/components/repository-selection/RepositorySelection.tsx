@@ -355,7 +355,7 @@ export function RepositorySelection({
           </button>
         }
       />
-      <main className="repository-selection-main">
+      <main className="repository-selection-main scroll-area">
         <section className="repository-selection-content">
           <div className="repository-selection-heading">
             <h1>Repositories</h1>
