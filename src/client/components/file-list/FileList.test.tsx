@@ -464,6 +464,41 @@ describe('FileList', () => {
     expect(document.activeElement).toBe(listbox);
   });
 
+  it('scrolls the selected row into view when the selection moves', () => {
+    // Given: a rendered FileList whose first item is selected. jsdom has no
+    // layout, so scrollIntoView is only observable through a spy.
+    const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView');
+    const { rerender } = render(
+      <FileList
+        files={files}
+        repoRoot="/repo/sift"
+        selectedFileId="a"
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+    scrollIntoView.mockClear();
+
+    // When: the selection moves to another item
+    rerender(
+      <FileList
+        files={files}
+        repoRoot="/repo/sift"
+        selectedFileId="c"
+        onSelect={vi.fn()}
+        onActivate={vi.fn()}
+      />,
+    );
+
+    // Then: the newly selected row is revealed, without moving rows that are
+    // already visible ('nearest')
+    expect(scrollIntoView).toHaveBeenCalledTimes(1);
+    expect(scrollIntoView.mock.instances[0]).toBe(screen.getByRole('option', { name: 'c.tsM' }));
+    expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+
+    scrollIntoView.mockRestore();
+  });
+
   it('copies the relative path from the file context menu', async () => {
     // Given: a file list with clipboard access
     vi.useFakeTimers();

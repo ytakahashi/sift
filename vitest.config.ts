@@ -9,6 +9,7 @@ export default defineConfig({
           name: 'client',
           environment: 'jsdom',
           include: ['src/client/**/*.test.{ts,tsx}'],
+          setupFiles: ['src/client/vitest-setup.ts'],
         },
       },
       {
