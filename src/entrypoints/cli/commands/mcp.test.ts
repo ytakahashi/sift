@@ -5,10 +5,7 @@ import { createMcpCommand } from './mcp';
 function createDependencies(): McpCommandDependencies {
   return {
     resolveRepoRoot: vi.fn().mockReturnValue('/repo/sift'),
-    startMcpServer: vi.fn().mockResolvedValue({
-      server: {},
-      repoRootResolver: { resolve: vi.fn() },
-    }),
+    startMcpServer: vi.fn().mockReturnValue({ close: vi.fn().mockResolvedValue(undefined) }),
   };
 }
 

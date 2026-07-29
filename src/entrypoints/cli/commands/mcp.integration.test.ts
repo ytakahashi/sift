@@ -93,4 +93,42 @@ describe('sift mcp (real stdio child process)', () => {
       }
     }
   });
+
+  // The client above uses the SDK default (`versionNegotiation.mode: 'legacy'`),
+  // so it exercises the 2025 `initialize` handshake only. This one pins the
+  // 2026-07-28 revision: pinning fails loudly when the server cannot serve that
+  // era, whereas `'auto'` would silently fall back to `initialize` and pass even
+  // if modern support regressed.
+  it('serves a client pinned to the 2026-07-28 revision over the same stdio entry point', async () => {
+    const client = new Client(
+      { name: 'sift-mcp-stdio-modern-test', version: '0.0.0' },
+      { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+    );
+    const transport = new StdioClientTransport({
+      command: process.execPath,
+      args: [CLI_BUNDLE, 'mcp', '--repo', NONEXISTENT_REPO_PATH],
+      env: Object.fromEntries(
+        Object.entries(process.env).filter(
+          (entry): entry is [string, string] => entry[1] !== undefined,
+        ),
+      ),
+      stderr: 'pipe',
+    });
+    let stderrOutput = '';
+    transport.stderr?.on('data', (chunk: Buffer | string) => {
+      stderrOutput += chunk.toString();
+    });
+
+    try {
+      await client.connect(transport);
+
+      expect(client.getProtocolEra(), `Child stderr:\n${stderrOutput}`).toBe('modern');
+      expect(client.getNegotiatedProtocolVersion()).toBe('2026-07-28');
+
+      const { tools } = await client.listTools();
+      expect(tools.map((tool) => tool.name).sort()).toEqual(['add_note', 'list_notes']);
+    } finally {
+      await client.close().catch(() => {});
+    }
+  });
 });
