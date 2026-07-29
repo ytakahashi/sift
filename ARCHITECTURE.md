@@ -237,9 +237,14 @@ The Electron main process entry point. It starts the Hono server via `startServe
   responses, ensuring transport contracts without leaking schema validation rules into `domain/`.
 - Lazy Repository Resolution: `repo-target.ts` holds the repository path candidate (from `--repo` or
   working directory) and lazily resolves/caches the git root on the first tool invocation. This
-  allows MCP initialization and `tools/list` to succeed without a confirmed git repository.
-- Server Lifecycle & Transport: `start-mcp-server.ts` builds the `McpServer` instance, wires stdio
-  transport, and registers tools (`list_notes`/`add_note`).
+  allows opening a connection and answering `tools/list` to succeed without a confirmed git
+  repository.
+- Server Lifecycle & Transport: `start-mcp-server.ts` serves stdio through the SDK's `serveStdio`
+  entry point, which selects the protocol era from the client's opening message and pins one server
+  instance for the connection. The server factory builds an `McpServer`, its own repo root resolver,
+  and the tools (`list_notes`/`add_note`) per instance, and must stay side-effect free: an instance
+  built for a `server/discover` probe is discarded when the client falls back to the 2025
+  `initialize` handshake.
 - Server Lifecycle Independence: Connects to an existing Sift HTTP server; it does not start, stop,
   or manage the lifecycle of the HTTP server process.
 

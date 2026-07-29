@@ -3,7 +3,7 @@ import type { McpServerHandle, StartMcpServerOptions } from '../../../mcp/start-
 
 export interface McpCommandDependencies {
   resolveRepoRoot: (targetPath: string) => string;
-  startMcpServer: (options: StartMcpServerOptions) => Promise<McpServerHandle>;
+  startMcpServer: (options: StartMcpServerOptions) => McpServerHandle;
 }
 
 interface McpCommandOptions {
@@ -14,11 +14,13 @@ export function createMcpCommand(dependencies: McpCommandDependencies): Command 
   return new Command('mcp')
     .description('Start the MCP server exposing Notes to AI agent hosts over stdio')
     .option('--repo <path>', 'Repository to operate on (defaults to the current directory)')
-    .action(async (options: McpCommandOptions) => {
+    .action((options: McpCommandOptions) => {
       // The stdio transport uses stdout exclusively for JSON-RPC framing, so this
       // action must never console.log; even one stray byte breaks the protocol.
+      // The returned handle is intentionally dropped: the connection lives as
+      // long as the process, which exits when stdin closes.
       const repoPath = options.repo ?? process.cwd();
-      await dependencies.startMcpServer({
+      dependencies.startMcpServer({
         repoPath,
         resolveRepoRoot: dependencies.resolveRepoRoot,
       });

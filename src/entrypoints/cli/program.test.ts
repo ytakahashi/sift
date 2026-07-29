@@ -18,10 +18,7 @@ function createDependencies(): CliDependencies {
     resolveRepoRoot: vi.fn().mockReturnValue('/repo/sift'),
     resolveRepositoryIdForOpen: vi.fn().mockResolvedValue('repo-123'),
     selectRepository: vi.fn().mockResolvedValue(null),
-    startMcpServer: vi.fn().mockResolvedValue({
-      server: {},
-      repoRootResolver: { resolve: vi.fn() },
-    }),
+    startMcpServer: vi.fn().mockReturnValue({ close: vi.fn().mockResolvedValue(undefined) }),
     startServer: vi.fn().mockResolvedValue({ owned: true, url: 'http://127.0.0.1:49321' }),
   };
 }
