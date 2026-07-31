@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import { createHostGuard, isAllowedHost } from './host-guard';
 
 describe('isAllowedHost', () => {

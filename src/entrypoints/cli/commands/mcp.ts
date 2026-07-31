@@ -1,8 +1,10 @@
 import { Command } from 'commander';
+import type { ResolvedRepository } from '../../../domain/repository/repository';
 import type { McpServerHandle, StartMcpServerOptions } from '../../../mcp/start-mcp-server';
 
 export interface McpCommandDependencies {
   resolveRepoRoot: (targetPath: string) => string;
+  findRegisteredRepositoryByPath: (path: string) => Promise<ResolvedRepository | null>;
   startMcpServer: (options: StartMcpServerOptions) => McpServerHandle;
 }
 
@@ -23,6 +25,7 @@ export function createMcpCommand(dependencies: McpCommandDependencies): Command 
       dependencies.startMcpServer({
         repoPath,
         resolveRepoRoot: dependencies.resolveRepoRoot,
+        findRegisteredRepositoryByPath: dependencies.findRegisteredRepositoryByPath,
       });
     });
 }

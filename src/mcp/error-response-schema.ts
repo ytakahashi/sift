@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { ERROR_RESPONSE_CODES, type ErrorResponseCode } from '../server/routes/route-error';
+import { ERROR_RESPONSE_CODES, type ErrorResponseCode } from '../server/contract/error-codes';
 
 /**
  * `code` is validated as a plain string, not `z.enum(ERROR_RESPONSE_CODES)`.

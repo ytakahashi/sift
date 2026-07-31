@@ -1,7 +1,8 @@
 import { createAdaptorServer } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { ServerType } from '@hono/node-server';
-import { createApp, Env } from './create-app';
+import { createApp } from './create-app';
+import type { Env } from './routes/env';
 import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';

@@ -7,7 +7,7 @@ import { isNoteEligibleFile } from '../../domain/notes/note-eligibility';
 import { resolveLineNoteTarget } from '../../domain/notes/resolve-line-note-target';
 import type { Note, NoteBucket } from '../../domain/notes/types';
 import type { RepositoryId } from '../../domain/repository/repository';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import type { FileGenerationProvider } from '../services/file-generation-provider';
 import type { NotesStore } from '../services/notes-store';
 import {

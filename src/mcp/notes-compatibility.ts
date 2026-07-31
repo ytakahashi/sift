@@ -1,4 +1,5 @@
-import { NOTES_V1_CAPABILITY, probeLocalServer, type HealthFetch } from '../server/health-probe';
+import { probeLocalServer, type HealthFetch } from '../server/health-probe';
+import { NOTES_V1_CAPABILITY } from '../server/contract/health-contract';
 
 export type NotesApiCompatibility =
   | { kind: 'compatible' }

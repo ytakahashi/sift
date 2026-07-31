@@ -4,7 +4,7 @@ import type { FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
 import type { Note } from '../../domain/notes/types';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import { NoteNotFoundError } from '../services/notes-store';
 import { RepositoryNotFoundError } from '../services/repository-resolver';
 import { createNotesRoutes } from './notes';

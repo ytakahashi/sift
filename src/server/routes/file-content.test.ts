@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import type { FileContentResult } from '../services/file-content-provider';
 import type { RepositoryResolver } from '../services/repository-resolver';
 import { createFileContentRoutes } from './file-content';

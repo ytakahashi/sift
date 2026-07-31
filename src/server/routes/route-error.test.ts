@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { describe, expect, it } from 'vitest';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import {
   NoteGenerationUnavailableError,
   NoteNotFoundError,
@@ -11,7 +11,8 @@ import {
   RepositoryNotFoundError,
   RepositoryValidationError,
 } from '../services/repository-resolver';
-import { handleRouteError, type ErrorResponseCode } from './route-error';
+import { handleRouteError } from './route-error';
+import type { ErrorResponseCode } from '../contract/error-codes';
 
 interface ErrorMappingFixture {
   label: string;

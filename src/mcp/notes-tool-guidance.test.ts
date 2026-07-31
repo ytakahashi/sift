@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import type { ErrorResponseCode } from '../server/routes/route-error';
-import { ERROR_RESPONSE_CODES } from '../server/routes/route-error';
+import type { ErrorResponseCode } from '../server/contract/error-codes';
+import { ERROR_RESPONSE_CODES } from '../server/contract/error-codes';
 import {
   describeCapabilityMissing,
   describeIncompatibleProduct,

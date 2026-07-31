@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import type { RepositoryConfigUpdater } from '../services/repository-config';
 import type { RepositoryResolver } from '../services/repository-resolver';
 import { handleRouteError } from './route-error';

@@ -13,6 +13,7 @@ function createDependencies(): CliDependencies {
   return {
     createRepositoryConfigUpdater: vi.fn(() => ({ addRepository })),
     listRegisteredRepositories: vi.fn().mockResolvedValue([]),
+    findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
     openApp: vi.fn().mockResolvedValue(undefined),
     openBrowser: vi.fn(),
     resolveRepoRoot: vi.fn().mockReturnValue('/repo/sift'),
@@ -204,6 +205,7 @@ describe('createCliProgram', () => {
     expect(dependencies.startMcpServer).toHaveBeenCalledWith({
       repoPath: '/path',
       resolveRepoRoot: dependencies.resolveRepoRoot,
+      findRegisteredRepositoryByPath: dependencies.findRegisteredRepositoryByPath,
     });
     expect(dependencies.startServer).not.toHaveBeenCalled();
     expect(dependencies.resolveRepositoryIdForOpen).not.toHaveBeenCalled();

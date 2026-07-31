@@ -1,8 +1,8 @@
 import { McpServer } from '@modelcontextprotocol/server';
 import { serveStdio, type StdioServerHandle } from '@modelcontextprotocol/server/stdio';
+import type { ResolvedRepository } from '../domain/repository/repository';
 import { APP_INFO } from '../server/app-info';
 import { resolvePort } from '../server/fixed-port';
-import { createRegisteredRepositoryLister } from '../server/index';
 import { checkNotesApiCompatibility } from './notes-compatibility';
 import { createNote, getNotes } from './notes-http-client';
 import { registerNotesTools } from './register-notes-tools';
@@ -12,6 +12,12 @@ export interface StartMcpServerOptions {
   /** `--repo <path>` value, or `process.cwd()` when not given. */
   repoPath: string;
   resolveRepoRoot: (targetPath: string) => string;
+  /**
+   * Injected by `entrypoints/cli` rather than built here: the lister is a
+   * `server/infrastructure/` implementation, and reaching for it directly
+   * would make this protocol adapter depend on the server's internals.
+   */
+  findRegisteredRepositoryByPath: (path: string) => Promise<ResolvedRepository | null>;
 }
 
 /**
@@ -36,8 +42,7 @@ function createNotesServer(options: StartMcpServerOptions): McpServer {
   registerNotesTools(server, {
     repoPath: options.repoPath,
     repoRootResolver: createRepoRootResolver(options.repoPath, options.resolveRepoRoot),
-    findRegisteredRepositoryByPath:
-      createRegisteredRepositoryLister().findRegisteredRepositoryByPath,
+    findRegisteredRepositoryByPath: options.findRegisteredRepositoryByPath,
     resolvePort,
     checkNotesApiCompatibility,
     getNotes,

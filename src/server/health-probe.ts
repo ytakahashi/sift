@@ -1,18 +1,7 @@
-import { APP_INFO } from './app-info';
 import { buildLocalServerUrl } from './fixed-port';
-
-export const SIFT_HEALTH_PRODUCT = APP_INFO.productName;
-export const SIFT_HEALTH_VERSION = APP_INFO.version;
-export const NOTES_V1_CAPABILITY = 'notes-v1';
-export const SIFT_HEALTH_CAPABILITIES: readonly string[] = [NOTES_V1_CAPABILITY];
+import { SIFT_HEALTH_PRODUCT, type SiftHealthIdentity } from './contract/health-contract';
 
 export type ExistingServerStatus = 'sift' | 'other' | 'unreachable';
-
-/** Identity fields parsed from a trusted `{ kind: 'sift' }` health response. */
-export interface SiftHealthIdentity {
-  version: string;
-  capabilities: readonly string[];
-}
 
 /**
  * Discriminated probe result shared by callers that only need to know whether a Sift

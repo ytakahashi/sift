@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import { createWatchRoutes } from './watch';
 import {
   RepositoryConfigResolutionError,

@@ -22,9 +22,9 @@ export default defineConfig({
       },
       {
         test: {
-          // For tests that can take longer than an in-process unit test,
-          // such as spawning a real child process, so that budget doesn't
-          // apply to the rest of the suite.
+          // Tests that do real I/O, such as spawning a real child process,
+          // need a longer budget than the rest of the suite; isolating them
+          // here keeps that budget off everything else.
           name: 'integration',
           environment: 'node',
           include: ['src/**/*.integration.test.ts'],

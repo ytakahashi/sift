@@ -1,6 +1,8 @@
 import { Hono } from 'hono';
 import { logger } from 'hono/logger';
-import { healthRoutes } from './routes/health';
+import { APP_INFO } from './app-info';
+import type { Env } from './routes/env';
+import { createHealthRoutes } from './routes/health';
 import { createDiffRoutes } from './routes/diff';
 import { createActionRoutes } from './routes/actions';
 import { createHostGuard } from './routes/host-guard';
@@ -28,8 +30,6 @@ import { InMemoryNotesStore } from './infrastructure/notes/in-memory-notes-store
 import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 
-export type Env = Record<string, never>;
-
 export interface CreateAppOptions {
   repoWatchManager: RepoWatchManager;
   readConfig?: () => Promise<RepositoryConfigReadResult>;
@@ -53,7 +53,7 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
   app.use('*', createHostGuard());
 
   // Mount API routes
-  app.route('/api/health', healthRoutes);
+  app.route('/api/health', createHealthRoutes({ version: APP_INFO.version }));
   app.route(
     '/api/repositories',
     createRepositoryRoutes({

@@ -11,9 +11,12 @@ import { resolveRepositoryIdForOpen } from './resolve-repository-for-open';
 import { selectRepositoryInteractively } from './select-repository';
 import { createCliProgram } from './program';
 
+const registeredRepositoryLister = createRegisteredRepositoryLister();
+
 const program = createCliProgram({
   createRepositoryConfigUpdater,
-  listRegisteredRepositories: createRegisteredRepositoryLister().listRegisteredRepositories,
+  listRegisteredRepositories: registeredRepositoryLister.listRegisteredRepositories,
+  findRegisteredRepositoryByPath: registeredRepositoryLister.findRegisteredRepositoryByPath,
   openApp,
   openBrowser,
   resolveRepoRoot,
