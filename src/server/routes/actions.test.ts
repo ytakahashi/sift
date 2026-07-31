@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Hono } from 'hono';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import { createActionRoutes, type CreateActionRoutesOptions } from './actions';
 import { RepositoryNotFoundError } from '../services/repository-resolver';
 import type { WorkspaceActionService } from '../services/workspace-action-service';

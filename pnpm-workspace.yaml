@@ -3,3 +3,5 @@ allowBuilds:
   electron-winstaller: false
   esbuild: true
 preferSymlinkedExecutables: true
+# Pin dependencies to exact versions on `pnpm add`.
+savePrefix: ''

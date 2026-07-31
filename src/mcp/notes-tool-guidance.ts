@@ -1,4 +1,4 @@
-import type { ErrorResponseCode } from '../server/routes/route-error';
+import type { ErrorResponseCode } from '../server/contract/error-codes';
 import { isKnownErrorResponseCode } from './error-response-schema';
 
 export function describeUnreachable(): string {

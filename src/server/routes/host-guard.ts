@@ -1,5 +1,5 @@
 import type { MiddlewareHandler } from 'hono';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 
 const ALLOWED_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]']);
 

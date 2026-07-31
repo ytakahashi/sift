@@ -28,15 +28,6 @@ vi.mock('./register-notes-tools', () => ({
   registerNotesTools: registerNotesToolsMock,
 }));
 
-// Building a lister reads the repository config path; stub it so this
-// transport-wiring test never touches the real filesystem.
-vi.mock('../server/index', () => ({
-  createRegisteredRepositoryLister: vi.fn().mockReturnValue({
-    findRegisteredRepositoryByPath: vi.fn(),
-    listRegisteredRepositories: vi.fn(),
-  }),
-}));
-
 const { startMcpServer } = await import('./start-mcp-server');
 const { APP_INFO } = await import('../server/app-info');
 
@@ -59,7 +50,7 @@ function startAndCaptureFactory(repoPath: string): {
   serveStdioMock.mockReturnValue(handle);
   const resolveRepoRoot = vi.fn().mockReturnValue('/repo/sift');
 
-  startMcpServer({ repoPath, resolveRepoRoot });
+  startMcpServer({ repoPath, resolveRepoRoot, findRegisteredRepositoryByPath: vi.fn() });
 
   const [factory, serveStdioOptions] = serveStdioMock.mock.calls.at(-1) as [
     ServerFactory,
@@ -79,7 +70,11 @@ describe('startMcpServer', () => {
     serveStdioMock.mockReturnValue(handle);
 
     // When
-    const returned = startMcpServer({ repoPath: '/repo/sift', resolveRepoRoot: vi.fn() });
+    const returned = startMcpServer({
+      repoPath: '/repo/sift',
+      resolveRepoRoot: vi.fn(),
+      findRegisteredRepositoryByPath: vi.fn(),
+    });
 
     // Then
     expect(serveStdioMock).toHaveBeenCalledWith(expect.any(Function), expect.any(Object));

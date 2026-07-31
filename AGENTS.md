@@ -5,25 +5,20 @@
 Sift is a lightweight local Git diff viewer. It is designed to run on the user's machine and avoid
 sending repository data externally.
 
-The application consists of:
-
-- Hono-based server that reads local Git state through CLI adapters
-- React frontend for visualizing diffs
-- CLI entry point that bundles everything for standalone use
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for detailed architecture information.
+See [ARCHITECTURE.md](ARCHITECTURE.md) for layers, dependency rules, and layer-specific testing
+rules.
 
 ## Build & Test Commands
 
 This project uses **pnpm** as its package manager. See `package.json` for defined commands.
 
+Dependencies are pinned to exact versions. `savePrefix: ''` in `pnpm-workspace.yaml` enforces this
+for `pnpm add`; keep it in mind when editing `package.json` by hand.
+
 ## Coding Style Guidelines
 
 ### TypeScript
 
-- Strict mode is enabled (`"strict": true`).
-- Use explicit types for function parameters and return values.
-- Use `unknown` (not `any`) in `catch` blocks, with `instanceof Error` guards.
 - When intentionally discarding an error, bind it as `_error: unknown` rather than omitting the
   binding entirely (`catch { ... }`).
 
@@ -37,28 +32,28 @@ This project uses **pnpm** as its package manager. See `package.json` for define
 
 ### Testing
 
-- Test files are colocated with source files.
-- Test runner is Vitest (config: `vitest.config.ts`).
-- Tests use explicit imports (`import { describe, it, expect } from 'vitest'`), not globals.
 - Use **Given / When / Then** style with explicit comment blocks to structure test cases for better
   readability.
-- Avoid tests that require real Git repositories or filesystem access.
-- Follow layer-specific testing rules in [ARCHITECTURE.md](ARCHITECTURE.md).
+- Tests do no real I/O by default: mock or inject everything that crosses the process boundary — Git
+  CLI adapters, filesystem calls, network requests, child processes — so that no result depends on
+  the machine the suite runs on. Importing source, or repository-committed data is not I/O in this
+  sense. How many real modules a test composes is not the criterion: a composition root is tested by
+  wiring the real thing and mocking only the boundary.
+- A test that genuinely needs real I/O is named `*.integration.test.ts`; `vitest.config.ts` puts
+  those in their own project.
 
 ### Imports
 
-- Use relative imports within each layer (`./`, `../`).
 - Do **not** add `.js` extensions to import paths. The bundler (Vite / esbuild) resolves `.ts` files
   directly.
-- Follow layer boundaries in [ARCHITECTURE.md](ARCHITECTURE.md).
 
 ## Implementation Checklist
 
 After completing any implementation task, ensure the following all pass:
 
 ```bash
-pnpm run format    # Prettier check passes
-pnpm run lint      # ESLint check passes
+pnpm run format    # Prettier check passes (pnpm run format:fix to apply)
+pnpm run lint      # ESLint check passes (pnpm run lint:fix to apply)
 pnpm run typecheck # TypeScript type checks pass
 pnpm run test      # All test cases pass
 pnpm run build     # Production build succeeds

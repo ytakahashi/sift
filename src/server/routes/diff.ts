@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
 import type { RepositoryDiff } from '../../domain/diff/types';
-import type { Env } from '../create-app';
+import type { Env } from './env';
 import type { HeadRefProvider } from '../services/head-ref-provider';
 import type { RepositoryResolver } from '../services/repository-resolver';
 import { handleRouteError } from './route-error';
