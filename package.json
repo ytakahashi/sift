@@ -74,7 +74,7 @@
     "build": "pnpm run build:client && pnpm run build:server && pnpm run build:electron",
     "build:client": "vite build",
     "build:electron": "esbuild src/entrypoints/electron/main.ts --bundle --platform=node --format=esm --outdir=dist/electron --external:electron && esbuild src/entrypoints/electron/preload.ts --bundle --platform=node --format=cjs --outfile=dist/electron/preload.cjs --external:electron",
-    "build:mac": "pnpm run build && electron-builder --mac",
+    "build:mac": "pnpm run build && electron-builder --mac --publish never",
     "build:mac:dev": "pnpm run build && electron-builder --mac --dir -c electron-builder.dev.yml",
     "build:npm": "pnpm run build:client && pnpm run build:server",
     "build:server": "esbuild src/entrypoints/cli/index.ts --bundle --platform=node --format=esm --outdir=dist/cli --packages=external --banner:js=\"#!/usr/bin/env node\"",
