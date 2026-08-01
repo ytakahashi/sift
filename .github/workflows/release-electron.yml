@@ -70,6 +70,10 @@ jobs:
         env:
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY }}
         run: |
+          if [ -z "$APPLE_API_KEY_P8" ]; then
+            echo "APPLE_API_KEY secret is not available to this job"
+            exit 1
+          fi
           KEY_DIR="$RUNNER_TEMP/private_keys"
           mkdir -p "$KEY_DIR"
           printf '%s' "$APPLE_API_KEY_P8" | base64 --decode > "$KEY_DIR/AuthKey.p8"
