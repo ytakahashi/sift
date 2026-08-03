@@ -160,24 +160,24 @@ export function FilePathLabel({ oldPath, path }: FilePathLabelProps): ReactEleme
   return (
     <span
       aria-describedby={isTooltipVisible ? tooltipId : undefined}
-      className="file-item-path"
+      className="file-path-label"
       onMouseEnter={showTooltipAfterDelay}
       onMouseLeave={hideTooltip}
       ref={containerRef}
     >
-      <span aria-hidden="true" className="file-item-path-measure" ref={fullTextMeasureRef}>
+      <span aria-hidden="true" className="file-path-label-measure" ref={fullTextMeasureRef}>
         {candidates.map((candidate, index) => (
           // Keyed by index (not text): the list is positional — updateOverflow
           // matches measured DOM children back to `candidates` by array index.
-          <span className="file-item-path-measure-candidate" key={index}>
+          <span className="file-path-label-measure-candidate" key={index}>
             {candidate.measureText}
           </span>
         ))}
       </span>
-      <span className="file-item-path-visible">
+      <span className="file-path-label-visible">
         {oldPath ? (
           <>
-            <span className="file-item-old-path">{visibleCandidate.oldPathText}</span> &rarr;{' '}
+            <span className="file-path-label-old">{visibleCandidate.oldPathText}</span> &rarr;{' '}
             {visibleCandidate.pathText}
           </>
         ) : (

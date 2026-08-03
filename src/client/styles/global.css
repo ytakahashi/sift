@@ -545,17 +545,33 @@ button.app-brand-home {
   font-size: 0.85rem;
 }
 
+/*
+ * The title group grows into the free space, so the actions are pushed to the
+ * right edge without justify-content; the gap is what keeps the file path from
+ * touching the first action button.
+ */
+.diff-header {
+  gap: 0.5rem;
+}
+
+/*
+ * Claims the header's free space so that the file path label inside it is
+ * sized by the space available rather than by the path it currently shows.
+ * See .file-path-label for why that matters.
+ */
 .diff-header-title-group {
   display: flex;
   align-items: center;
+  flex: 1 1 auto;
   min-width: 0;
   gap: 0.5rem;
 }
 
-.diff-header-file-name {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+/* Never shrink: the file path yields header space before the actions do. */
+.diff-header-actions {
+  display: flex;
+  flex: 0 0 auto;
+  gap: 0.5rem;
 }
 
 .diff-line-stats {
@@ -622,7 +638,17 @@ button.app-brand-home {
   border-left: 3px solid transparent;
 }
 
-.file-item-path {
+/*
+ * Shared by the file list rows and the diff header.
+ *
+ * `flex: 1` (a zero flex basis) is what makes the label's width come from the
+ * space its container offers rather than from the text it currently shows.
+ * FilePathLabel picks the longest path candidate that fits this width, so a
+ * content-derived width would shrink to the abbreviated text and the full path
+ * could never be restored. Every container of this label must therefore leave
+ * it free space to grow into.
+ */
+.file-path-label {
   position: relative;
   flex: 1;
   min-width: 0;
@@ -631,18 +657,18 @@ button.app-brand-home {
   white-space: nowrap;
 }
 
-.file-item-path-measure {
+.file-path-label-measure {
   position: absolute;
   visibility: hidden;
   pointer-events: none;
 }
 
-.file-item-path-measure-candidate {
+.file-path-label-measure-candidate {
   display: block;
   width: max-content;
 }
 
-.file-item-old-path {
+.file-path-label-old {
   opacity: 0.6;
 }
 
