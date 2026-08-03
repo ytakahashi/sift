@@ -8,6 +8,7 @@ import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
 import { FileList } from '../components/file-list/FileList';
 import { PaneBulkActions } from '../components/file-list/PaneBulkActions';
+import { FilePathLabel } from '../components/file-path/FilePathLabel';
 import { DiffFilesLineStats, DiffLineStats } from '../components/diff/DiffLineStats';
 import { UnifiedDiffViewer } from '../components/diff/UnifiedDiffViewer';
 import { RepositorySidebar } from '../components/repository-sidebar/RepositorySidebar';
@@ -393,7 +394,7 @@ function RepositoryWorkspace({
           </>
         )}
         <div className="pane main-diff">
-          <div className="pane-header" style={{ display: 'flex', justifyContent: 'space-between' }}>
+          <div className="pane-header diff-header">
             <div className="diff-header-title-group">
               <button
                 aria-expanded={isFileListOpen}
@@ -410,13 +411,17 @@ function RepositoryWorkspace({
                 ref={setFullViewToolbarTarget}
                 style={{ display: 'inline-flex', flex: '0 0 auto' }}
               />
-              <span className="diff-header-file-name">
-                {selectedFile ? selectedFile.displayPath : 'Diff Viewer'}
-              </span>
+              {selectedFile ? (
+                // Renamed files show only the new path here: the header is
+                // width-constrained, and the rename is visible in the file list.
+                <FilePathLabel path={selectedFile.displayPath} />
+              ) : (
+                <span>Diff Viewer</span>
+              )}
               {selectedFile && <DiffLineStats file={selectedFile} />}
             </div>
             {selectedFile && (
-              <div style={{ display: 'flex', gap: '0.5rem' }}>
+              <div className="diff-header-actions">
                 <button
                   className="button diff-file-action-button"
                   onClick={paneFileActions.toggleSelectedFileStage}

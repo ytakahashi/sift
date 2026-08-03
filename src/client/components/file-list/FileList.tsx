@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import type { DiffFile } from '../../../domain/diff/types';
 import { resolveAbsoluteFilePath } from '../../presentation/file-list/file-path';
-import { FilePathLabel } from './FilePathLabel';
+import { FilePathLabel } from '../file-path/FilePathLabel';
 import { FilePathContextMenu } from './FilePathContextMenu';
 import { useFileListController } from './useFileListController';
 

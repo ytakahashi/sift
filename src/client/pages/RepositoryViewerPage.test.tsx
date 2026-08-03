@@ -209,6 +209,30 @@ describe('RepositoryViewerPage interactions', () => {
     expect(screen.getByTestId('diff-viewer').textContent).toBe('b.ts');
   });
 
+  it('renders the selected file path in the diff header through FilePathLabel', async () => {
+    // Given: the app is rendered with a nested working file
+    const user = userEvent.setup();
+    diffState.workingFiles = [
+      {
+        ...createFile('nested', 'working'),
+        path: 'src/client/components/file-path/FilePathLabel.tsx',
+        displayPath: 'src/client/components/file-path/FilePathLabel.tsx',
+      },
+    ];
+    render(<Page />);
+
+    // When: the file is selected
+    await user.click(
+      screen.getByRole('option', { name: 'src/client/components/file-path/FilePathLabel.tsxM' }),
+    );
+
+    // Then: the header path comes from FilePathLabel, so it abbreviates and
+    // shows a hover tooltip on narrow headers. jsdom reports every width as 0,
+    // which counts as fitting, so the complete path is rendered here.
+    const headerPath = document.querySelector('.diff-header .file-path-label-visible');
+    expect(headerPath?.textContent).toBe('src/client/components/file-path/FilePathLabel.tsx');
+  });
+
   it('passes the repoId prop through repository-scoped hooks', () => {
     // Given: the page is rendered for a specific repoId
     render(<Page />);
