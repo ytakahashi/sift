@@ -43,16 +43,17 @@ function createFile(options: FileFixtureOptions): DiffFile {
   };
 }
 
-function createStoredNote(id: string): AnchoredNote {
+function createStoredNote(id: string, path = 'a.ts'): AnchoredNote {
   return {
     id,
-    target: { kind: 'file', fileId: 'file-a.ts' },
+    path,
+    target: { kind: 'file', fileId: `file-${path}` },
     body: `note-${id}`,
     createdAt: 100,
   };
 }
 
-/** The public shape a store-returned file note (fileId "file-a.ts") maps to against the default `a.ts` fixture. */
+/** The public shape a store-returned file note maps to. */
 function createPublicFileNote(id: string, path = 'a.ts'): Note {
   return { id, kind: 'file', path, body: `note-${id}`, createdAt: 100 };
 }
@@ -197,18 +198,19 @@ describe('notesRoutes', () => {
       expect(JSON.stringify(payload)).not.toContain('fileId');
     });
 
-    it('returns 500 when a stored note cannot be resolved against the current diff', async () => {
-      // Given: the stored note's fileId matches no eligible file in either pane
+    it('returns a stored note with its recorded path even when its file left the diff', async () => {
+      // Given: the stored note's file is absent from both panes. Reconcile
+      // normally keeps this from happening, but the response no longer depends
+      // on the current diff to name the note's location.
       workingFiles = [];
       stagedFiles = [];
 
       // When: notes are listed
       const response = await app.request('/api/repositories/my-repo/notes');
 
-      // Then: the request fails instead of silently dropping the note or leaking its fileId
-      expect(response.status).toBe(500);
-      const payload = (await response.json()) as { error: string };
-      expect(payload.error).not.toContain('file-a.ts');
+      // Then: the note is presented at the location it was created for
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ notes: [createPublicFileNote('n1')] });
     });
   });
 
@@ -219,6 +221,7 @@ describe('notesRoutes', () => {
       // assertion below actually exercises the line-note mapping
       notesStore.add.mockResolvedValue({
         id: 'created',
+        path: 'a.ts',
         target: {
           kind: 'line',
           fileId: 'file-a.ts',
@@ -251,18 +254,22 @@ describe('notesRoutes', () => {
         createdAt: 100,
       });
 
-      // Then: the server-resolved target and anchor are stored
+      // Then: the requested path, the server-resolved target, and the anchor
+      // are stored
       expect(notesStore.add).toHaveBeenCalledWith(
         'my-repo',
         {
-          kind: 'line',
-          fileId: 'file-a.ts',
-          bucket: 'working',
-          hunkId: 'hunk-a.ts-0',
-          startNewLineNumber: 5,
-          endNewLineNumber: 5,
+          path: 'a.ts',
+          target: {
+            kind: 'line',
+            fileId: 'file-a.ts',
+            bucket: 'working',
+            hunkId: 'hunk-a.ts-0',
+            startNewLineNumber: 5,
+            endNewLineNumber: 5,
+          },
+          body: 'needs a guard',
         },
-        'needs a guard',
         { generation: FILE_GENERATION, lineContents: ['alpha'] },
       );
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
@@ -292,14 +299,17 @@ describe('notesRoutes', () => {
       expect(notesStore.add).toHaveBeenCalledWith(
         'my-repo',
         {
-          kind: 'line',
-          fileId: 'file-a.ts',
-          bucket: 'working',
-          hunkId: 'hunk-a.ts-0',
-          startNewLineNumber: 5,
-          endNewLineNumber: 7,
+          path: 'a.ts',
+          target: {
+            kind: 'line',
+            fileId: 'file-a.ts',
+            bucket: 'working',
+            hunkId: 'hunk-a.ts-0',
+            startNewLineNumber: 5,
+            endNewLineNumber: 7,
+          },
+          body: 'review this block',
         },
-        'review this block',
         { generation: FILE_GENERATION, lineContents: ['first', 'second', 'third'] },
       );
     });
@@ -324,7 +334,7 @@ describe('notesRoutes', () => {
 
       // Then: the staged pane is resolved without ambiguity
       expect(response.status).toBe(201);
-      const target = notesStore.add.mock.calls[0][1];
+      const { target } = notesStore.add.mock.calls[0][1];
       expect(target.bucket).toBe('staged');
       expect(target.hunkId).toBe('hunk-staged');
     });
@@ -525,8 +535,7 @@ describe('notesRoutes', () => {
       expect(response.status).toBe(201);
       expect(notesStore.add).toHaveBeenCalledWith(
         'my-repo',
-        { kind: 'file', fileId: 'file-a.ts' },
-        'about this file',
+        { path: 'a.ts', target: { kind: 'file', fileId: 'file-a.ts' }, body: 'about this file' },
         { generation: FILE_GENERATION, lineContents: undefined },
       );
     });
@@ -543,27 +552,17 @@ describe('notesRoutes', () => {
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
-    it('returns 500 without leaking fileId when the stored note cannot be mapped back', async () => {
-      // Given: the store (mocked) returns a note anchored to a fileId absent
-      // from the current diff — a server invariant violation, since creation
-      // just resolved this same target successfully
-      notesStore.add.mockResolvedValue({
-        id: 'created',
-        target: { kind: 'file', fileId: 'file-unknown.ts' },
-        body: 'about this file',
-        createdAt: 100,
-      });
-
+    it('returns the created note without leaking internal ids', async () => {
       // When: a file note is created
       const response = await postNote({
         target: { kind: 'file', path: 'a.ts' },
         body: 'about this file',
       });
 
-      // Then: the response is a 500 invariant error, not a note exposing fileId
-      expect(response.status).toBe(500);
-      const payload = (await response.json()) as { error: string };
-      expect(payload.error).not.toContain('file-unknown.ts');
+      // Then: the response is the public, path-based shape
+      expect(response.status).toBe(201);
+      const payload = await response.json();
+      expect(JSON.stringify(payload)).not.toContain('fileId');
     });
   });
 

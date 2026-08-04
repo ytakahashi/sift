@@ -60,6 +60,7 @@ function createLineRecord(options: LineRecordOptions): NoteReconcileRecord {
   return {
     note: {
       id: options.id,
+      path: options.path,
       target: {
         kind: 'line',
         fileId: `file-${options.path}`,
@@ -84,6 +85,7 @@ function createFileRecord(
   return {
     note: {
       id,
+      path,
       target: { kind: 'file', fileId: `file-${path}` },
       body: `note-${id}`,
       createdAt: 1,
