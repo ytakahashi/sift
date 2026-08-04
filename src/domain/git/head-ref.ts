@@ -10,6 +10,4 @@
  * genuinely detached HEAD reports a revision.
  */
 export type HeadRef =
-  | { type: 'branch'; name: string }
-  | { type: 'detached'; revision: string }
-  | { type: 'unknown' };
+  { type: 'branch'; name: string } | { type: 'detached'; revision: string } | { type: 'unknown' };

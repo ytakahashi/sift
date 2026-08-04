@@ -102,14 +102,12 @@ export class RepositoryDiffProvider implements DiffProvider {
 
         const content = contentBuffer.toString('utf8');
         const lines = splitTextFileLines(content);
-        const diffLines: DiffLine[] = lines.map(
-          (line: string, idx: number): DiffLine => ({
-            id: `line-${file}-untracked-${idx}`,
-            type: 'add',
-            newLineNumber: idx + 1,
-            content: line,
-          }),
-        );
+        const diffLines: DiffLine[] = lines.map((line: string, idx: number): DiffLine => ({
+          id: `line-${file}-untracked-${idx}`,
+          type: 'add',
+          newLineNumber: idx + 1,
+          content: line,
+        }));
         if (diffLines.length > 0) {
           hunks.push({
             id: `hunk-${file}-untracked`,

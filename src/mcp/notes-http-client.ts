@@ -8,8 +8,7 @@ function notesUrl(port: number, repoId: string): string {
 }
 
 type ParsedErrorResponse =
-  | { kind: 'valid'; status: number; code?: string; message: string }
-  | { kind: 'invalid' };
+  { kind: 'valid'; status: number; code?: string; message: string } | { kind: 'invalid' };
 
 async function parseErrorResponse(response: Response): Promise<ParsedErrorResponse> {
   let body: unknown;

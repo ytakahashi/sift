@@ -19,9 +19,7 @@ export interface InvalidRepositoryConfig {
 }
 
 export type RepositoryConfigReadResult =
-  | FoundRepositoryConfig
-  | MissingRepositoryConfig
-  | InvalidRepositoryConfig;
+  FoundRepositoryConfig | MissingRepositoryConfig | InvalidRepositoryConfig;
 
 export async function readRepositoryConfig(
   configPath: string = DEFAULT_REPOSITORY_CONFIG_PATH,

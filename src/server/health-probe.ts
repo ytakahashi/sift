@@ -9,9 +9,7 @@ export type ExistingServerStatus = 'sift' | 'other' | 'unreachable';
  * `capabilities` to decide whether the server satisfies a given tool contract.
  */
 export type LocalServerProbe =
-  | { kind: 'unreachable' }
-  | { kind: 'other' }
-  | ({ kind: 'sift' } & SiftHealthIdentity);
+  { kind: 'unreachable' } | { kind: 'other' } | ({ kind: 'sift' } & SiftHealthIdentity);
 
 interface HealthFetchResponse {
   json: () => Promise<unknown>;
