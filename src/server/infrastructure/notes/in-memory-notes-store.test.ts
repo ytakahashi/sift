@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { ConfirmedFileGeneration, FileGeneration } from '../../../domain/diff/file-generation';
 import type { DiffFile } from '../../../domain/diff/types';
+import type { AnchoredNote } from '../../../domain/notes/anchored-note';
 import { NoteNotFoundError } from '../../services/notes-store';
 import { InMemoryNotesStore } from './in-memory-notes-store';
 
@@ -42,9 +43,11 @@ async function addFileNote(
   path: string,
   generation: ConfirmedFileGeneration = fileGeneration('blob-1'),
 ): Promise<string> {
-  const note = await store.add(repoId, { kind: 'file', fileId: `file-${path}` }, 'body', {
-    generation,
-  });
+  const note = await store.add(
+    repoId,
+    { path, target: { kind: 'file', fileId: `file-${path}` }, body: 'body' },
+    { generation },
+  );
   return note.id;
 }
 
@@ -57,22 +60,48 @@ describe('InMemoryNotesStore', () => {
     const note = await store.add(
       'repo-1',
       {
-        kind: 'line',
-        fileId: 'file-a.ts',
-        bucket: 'working',
-        hunkId: 'hunk-a.ts-0',
-        startNewLineNumber: 1,
-        endNewLineNumber: 1,
+        path: 'a.ts',
+        target: {
+          kind: 'line',
+          fileId: 'file-a.ts',
+          bucket: 'working',
+          hunkId: 'hunk-a.ts-0',
+          startNewLineNumber: 1,
+          endNewLineNumber: 1,
+        },
+        body: 'the body',
       },
-      'the body',
       { generation: fileGeneration('blob-1'), lineContents: ['x'] },
     );
 
-    // Then: identity fields are generated and the note is listed
+    // Then: identity fields are generated and the draft is stored as given
     expect(note.id).toBeTruthy();
     expect(note.createdAt).toBeGreaterThan(0);
     expect(note.body).toBe('the body');
+    expect(note.path).toBe('a.ts');
     await expect(store.list('repo-1')).resolves.toEqual([note]);
+  });
+
+  it('generates identity even when the draft already carries id and createdAt', async () => {
+    // Given: an existing note reused as a draft. NoteDraft omits id/createdAt,
+    // but structural typing accepts this wider object, so the store must not
+    // let the caller's values through.
+    const store = new InMemoryNotesStore();
+    const existing: AnchoredNote = {
+      id: 'caller-supplied-id',
+      path: 'a.ts',
+      target: { kind: 'file', fileId: 'file-a.ts' },
+      body: 'body',
+      createdAt: 1,
+    };
+
+    // When: it is added as a new note
+    const note = await store.add('repo-1', existing, { generation: fileGeneration('blob-1') });
+
+    // Then: the store owns identity; only the note's content came from the draft
+    expect(note.id).not.toBe('caller-supplied-id');
+    expect(note.createdAt).toBeGreaterThan(1);
+    expect(note.path).toBe('a.ts');
   });
 
   it('isolates notes per repository', async () => {

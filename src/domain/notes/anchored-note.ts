@@ -32,6 +32,15 @@ export type AnchoredNoteTarget = AnchoredLineNoteTarget | AnchoredFileNoteTarget
 
 export type AnchoredNote = {
   id: string;
+  /**
+   * Repository-relative path of the target file, recorded at creation.
+   *
+   * The note carries its own path instead of having it looked up from the
+   * current diff, so it can still be presented after its file left the diff.
+   * `fileId` is `file-${path}`, so a rename produces a different file rather
+   * than a path change on the same note: nothing rewrites this afterwards.
+   */
+  path: string;
   target: AnchoredNoteTarget;
   body: string;
   createdAt: number;

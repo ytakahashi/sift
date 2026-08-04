@@ -1,11 +1,11 @@
 import { randomUUID } from 'node:crypto';
 import type { FileGeneration } from '../../../domain/diff/file-generation';
 import type { DiffFile } from '../../../domain/diff/types';
-import type { AnchoredNote, AnchoredNoteTarget } from '../../../domain/notes/anchored-note';
+import type { AnchoredNote } from '../../../domain/notes/anchored-note';
 import type { NoteReconcileRecord } from '../../../domain/notes/reconcile-notes';
 import { reconcileNotes } from '../../../domain/notes/reconcile-notes';
 import type { RepositoryId } from '../../../domain/repository/repository';
-import type { NoteAnchor, NotesStore } from '../../services/notes-store';
+import type { NoteAnchor, NoteDraft, NotesStore } from '../../services/notes-store';
 import { NoteNotFoundError } from '../../services/notes-store';
 
 /**
@@ -53,16 +53,13 @@ export class InMemoryNotesStore implements NotesStore {
     return (this.records.get(repoId) ?? []).map((record) => record.note);
   }
 
-  async add(
-    repoId: RepositoryId,
-    target: AnchoredNoteTarget,
-    body: string,
-    anchor: NoteAnchor,
-  ): Promise<AnchoredNote> {
+  async add(repoId: RepositoryId, draft: NoteDraft, anchor: NoteAnchor): Promise<AnchoredNote> {
+    // The draft is spread first so that the store's identity fields always
+    // win: NoteDraft omits them, but structural typing lets a caller pass a
+    // wider object (e.g. an existing AnchoredNote) that still carries them.
     const note: AnchoredNote = {
+      ...draft,
       id: randomUUID(),
-      target,
-      body,
       createdAt: Date.now(),
     };
     const record: NoteReconcileRecord = {

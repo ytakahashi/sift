@@ -1,6 +1,6 @@
 import type { ConfirmedFileGeneration, FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
-import type { AnchoredNote, AnchoredNoteTarget } from '../../domain/notes/anchored-note';
+import type { AnchoredNote } from '../../domain/notes/anchored-note';
 import type { RepositoryId } from '../../domain/repository/repository';
 
 /** The requested note does not exist (including notes just discarded by reconcile). */
@@ -56,6 +56,9 @@ export interface NoteAnchor {
   lineContents?: string[];
 }
 
+/** The parts of a note the caller supplies; the store owns id and createdAt. */
+export type NoteDraft = Omit<AnchoredNote, 'id' | 'createdAt'>;
+
 export interface NotesStore {
   /**
    * Validates stored notes against the current diff and worktree generations:
@@ -74,12 +77,7 @@ export interface NotesStore {
     },
   ): Promise<boolean>;
   list(repoId: RepositoryId): Promise<AnchoredNote[]>;
-  add(
-    repoId: RepositoryId,
-    target: AnchoredNoteTarget,
-    body: string,
-    anchor: NoteAnchor,
-  ): Promise<AnchoredNote>;
+  add(repoId: RepositoryId, draft: NoteDraft, anchor: NoteAnchor): Promise<AnchoredNote>;
   updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<AnchoredNote>;
   remove(repoId: RepositoryId, noteId: string): Promise<void>;
   clear(repoId: RepositoryId): Promise<void>;

@@ -242,7 +242,7 @@ describe('createNote', () => {
     expect(result).toEqual({ kind: 'uncertain' });
   });
 
-  it('returns uncertain for a code-less 500 (possible post-write presentation failure)', async () => {
+  it('returns uncertain for a code-less 500 (the write may already have happened)', async () => {
     // Given
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: 'invariant violated' }));
 

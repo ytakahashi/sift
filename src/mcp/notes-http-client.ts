@@ -107,9 +107,9 @@ export async function createNote(
   }
 
   if (response.status === 500) {
-    // This route's only code-less failure is a post-write presentation error
-    // (the note write happens before the response is built), so a 500 here
-    // does not rule out that the note was saved.
+    // The request was already dispatched and the note write happens before the
+    // response is built, so an unexpected 500 does not tell us whether the note
+    // was saved.
     return { kind: 'uncertain' };
   }
 
