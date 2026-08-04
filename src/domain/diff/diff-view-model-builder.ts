@@ -79,17 +79,15 @@ export class DiffViewModelBuilder {
         hunkId: hunk.id,
         origin: 'hunk',
       },
-      ...hunk.lines.map(
-        (line): UnifiedRow => ({
-          id: line.id,
-          type: line.type,
-          oldLineNumber: line.oldLineNumber,
-          newLineNumber: line.newLineNumber,
-          content: line.content,
-          hunkId: hunk.id,
-          origin: 'hunk',
-        }),
-      ),
+      ...hunk.lines.map((line): UnifiedRow => ({
+        id: line.id,
+        type: line.type,
+        oldLineNumber: line.oldLineNumber,
+        newLineNumber: line.newLineNumber,
+        content: line.content,
+        hunkId: hunk.id,
+        origin: 'hunk',
+      })),
     ];
   }
 

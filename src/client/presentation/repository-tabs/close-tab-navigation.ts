@@ -1,9 +1,7 @@
 import type { RepositoryId } from '../../../domain/repository/repository';
 
 export type CloseTabNavigation =
-  | { type: 'none' }
-  | { type: 'selection' }
-  | { type: 'repository'; repoId: RepositoryId };
+  { type: 'none' } | { type: 'selection' } | { type: 'repository'; repoId: RepositoryId };
 
 /**
  * Decides where the app should navigate after a tab is closed.
