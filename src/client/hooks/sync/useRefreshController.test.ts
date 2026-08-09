@@ -3,22 +3,27 @@ import { describe, expect, it, vi } from 'vitest';
 import type { DiffFile, DiffHunk } from '../../../domain/diff/types';
 import { useRefreshController } from './useRefreshController';
 
-function createHunk(content: string): DiffHunk {
+function createHunk(contents: string[]): DiffHunk {
   return {
-    id: `hunk-${content}`,
+    id: `hunk-${contents.join('-')}`,
     header: '@@ -1,1 +1,1 @@',
     oldStart: 1,
     oldLines: 1,
     newStart: 1,
-    newLines: 1,
+    newLines: contents.length,
     lines: [
-      { id: `delete-${content}`, type: 'delete', oldLineNumber: 1, content: 'old' },
-      { id: `add-${content}`, type: 'add', newLineNumber: 1, content },
+      { id: 'delete-old', type: 'delete', oldLineNumber: 1, content: 'old' },
+      ...contents.map((content, index) => ({
+        id: `add-${content}`,
+        type: 'add' as const,
+        newLineNumber: index + 1,
+        content,
+      })),
     ],
   };
 }
 
-function createFile(path: string, bucket: 'working' | 'staged', content: string): DiffFile {
+function createFile(path: string, bucket: 'working' | 'staged', contents: string[]): DiffFile {
   return {
     id: path,
     bucket,
@@ -26,107 +31,76 @@ function createFile(path: string, bucket: 'working' | 'staged', content: string)
     status: 'modified',
     kind: 'text',
     displayPath: path,
-    hunks: [createHunk(content)],
+    hunks: [createHunk(contents)],
   };
 }
 
 describe('useRefreshController', () => {
-  it('refetches notes when refreshed diff content changes', async () => {
-    // Given: refresh returns different diff content
-    const refresh = vi.fn().mockResolvedValue({
-      workingFiles: [createFile('a.ts', 'working', 'newer')],
-      stagedFiles: [],
-    });
+  it.each([
+    [
+      'the diff content changed',
+      { workingFiles: [createFile('a.ts', 'working', ['newer'])], stagedFiles: [] },
+    ],
+    [
+      'content moved between panes',
+      { workingFiles: [], stagedFiles: [createFile('a.ts', 'staged', ['new'])] },
+    ],
+    [
+      'the diff comes back identical',
+      { workingFiles: [createFile('a.ts', 'working', ['new'])], stagedFiles: [] },
+    ],
+  ])('refetches notes after a successful refresh when %s', async (_label, diff) => {
+    // Given: a refresh that resolves with some diff state
+    const refresh = vi.fn().mockResolvedValue(diff);
     const refetchNotes = vi.fn();
-    const { result } = renderHook(() =>
-      useRefreshController({
-        workingFiles: [createFile('a.ts', 'working', 'new')],
-        stagedFiles: [],
-        refresh,
-        refetchNotes,
-      }),
-    );
+    const { result } = renderHook(() => useRefreshController({ refresh, refetchNotes }));
 
     // When
     await act(async () => {
       await result.current.refreshAll();
     });
 
-    // Then
+    // Then: staleness is the server's decision, so the client does not filter
+    // refreshes by what it can see in the diff
     expect(refetchNotes).toHaveBeenCalledTimes(1);
   });
 
-  it('refetches notes when content moves between working and staged panes', async () => {
-    // Given: refresh returns the same content in a different pane
-    // (stage/unstage). The server re-anchors line notes to the new bucket
-    // during reconcile, so the client must pick up that result.
+  it('refetches notes for an edit that only reorders the changed lines', async () => {
+    // Given: the same added lines come back in a different order. Comparing the
+    // diff's changed lines cannot see this (such a comparison has to sort them
+    // to stay stable across hunk movement), but the server anchors notes to the
+    // worktree blob id, which a reorder does change — so the notes on this file
+    // have just gone stale.
     const refresh = vi.fn().mockResolvedValue({
-      workingFiles: [],
-      stagedFiles: [createFile('a.ts', 'staged', 'new')],
-    });
-    const refetchNotes = vi.fn();
-    const { result } = renderHook(() =>
-      useRefreshController({
-        workingFiles: [createFile('a.ts', 'working', 'new')],
-        stagedFiles: [],
-        refresh,
-        refetchNotes,
-      }),
-    );
-
-    // When
-    await act(async () => {
-      await result.current.refreshAll();
-    });
-
-    // Then
-    expect(refetchNotes).toHaveBeenCalledTimes(1);
-  });
-
-  it('does not refetch notes when the refreshed diff is unchanged', async () => {
-    // Given: refresh returns the identical pane contents
-    const refresh = vi.fn().mockResolvedValue({
-      workingFiles: [createFile('a.ts', 'working', 'new')],
+      workingFiles: [createFile('a.ts', 'working', ['second', 'first'])],
       stagedFiles: [],
     });
     const refetchNotes = vi.fn();
-    const { result } = renderHook(() =>
-      useRefreshController({
-        workingFiles: [createFile('a.ts', 'working', 'new')],
-        stagedFiles: [],
-        refresh,
-        refetchNotes,
-      }),
-    );
+    const { result } = renderHook(() => useRefreshController({ refresh, refetchNotes }));
 
-    // When
+    // When: the refresh completes
     await act(async () => {
       await result.current.refreshAll();
     });
 
-    // Then: no-op filesystem events do not cause extra notes traffic
-    expect(refetchNotes).not.toHaveBeenCalled();
+    // Then: the notes are refetched, so they are shown as stale instead of
+    // staying live until some unrelated notes API call happens to run reconcile
+    expect(refetchNotes).toHaveBeenCalledTimes(1);
   });
 
   it('skips the refetch when refresh fails or is superseded', async () => {
     // Given: refresh returns null
     const refresh = vi.fn().mockResolvedValue(null);
     const refetchNotes = vi.fn();
-    const { result } = renderHook(() =>
-      useRefreshController({
-        workingFiles: [createFile('a.ts', 'working', 'new')],
-        stagedFiles: [],
-        refresh,
-        refetchNotes,
-      }),
-    );
+    const { result } = renderHook(() => useRefreshController({ refresh, refetchNotes }));
 
     // When
     await act(async () => {
       await result.current.refreshAll();
     });
 
-    // Then
+    // Then: the diff state is unknown, and server-side notes changes still
+    // arrive over SSE
     expect(refetchNotes).not.toHaveBeenCalled();
   });
 });

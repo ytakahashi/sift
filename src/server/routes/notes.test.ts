@@ -3,7 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
-import type { Note } from '../../domain/notes/types';
+import type { Note, NoteStaleness } from '../../domain/notes/types';
 import type { Env } from './env';
 import { NoteNotFoundError } from '../services/notes-store';
 import { RepositoryNotFoundError } from '../services/repository-resolver';
@@ -43,19 +43,33 @@ function createFile(options: FileFixtureOptions): DiffFile {
   };
 }
 
-function createStoredNote(id: string, path = 'a.ts'): AnchoredNote {
+const LIVE: NoteStaleness = { kind: 'live' };
+
+function createStoredNote(
+  id: string,
+  path = 'a.ts',
+  staleness: NoteStaleness = LIVE,
+): AnchoredNote {
   return {
     id,
     path,
     target: { kind: 'file', fileId: `file-${path}` },
     body: `note-${id}`,
     createdAt: 100,
+    staleness,
   };
 }
 
 /** The public shape a store-returned file note maps to. */
-function createPublicFileNote(id: string, path = 'a.ts'): Note {
-  return { id, kind: 'file', path, body: `note-${id}`, createdAt: 100 };
+function createPublicFileNote(id: string, path = 'a.ts', staleness: NoteStaleness = LIVE): Note {
+  return {
+    id,
+    kind: 'file',
+    path,
+    body: `note-${id}`,
+    createdAt: 100,
+    staleness,
+  };
 }
 
 const FILE_GENERATION: FileGeneration = { kind: 'file', blobId: 'blob-1', mode: '100644' };
@@ -149,7 +163,7 @@ describe('notesRoutes', () => {
       });
     });
 
-    it('notifies subscribers when reconcile discarded or re-anchored notes', async () => {
+    it('notifies subscribers when reconcile changed staleness or re-anchored notes', async () => {
       // Given: reconcile reports a change
       notesStore.reconcile.mockResolvedValue(true);
 
@@ -198,19 +212,24 @@ describe('notesRoutes', () => {
       expect(JSON.stringify(payload)).not.toContain('fileId');
     });
 
-    it('returns a stored note with its recorded path even when its file left the diff', async () => {
-      // Given: the stored note's file is absent from both panes. Reconcile
-      // normally keeps this from happening, but the response no longer depends
-      // on the current diff to name the note's location.
+    it('returns a stale note with its recorded path and reason', async () => {
+      // Given: the note's file was committed away, so reconcile marked it stale
+      // and the panes no longer contain it. The response cannot look the
+      // location up in the diff any more, and must not drop or unmark the note.
+      const staleness: NoteStaleness = { kind: 'stale', reason: 'file-out-of-diff' };
+      notesStore.list.mockResolvedValue([createStoredNote('n1', 'a.ts', staleness)]);
       workingFiles = [];
       stagedFiles = [];
 
       // When: notes are listed
       const response = await app.request('/api/repositories/my-repo/notes');
 
-      // Then: the note is presented at the location it was created for
+      // Then: the note comes back at the location it was written for, carrying
+      // the reason it no longer applies
       expect(response.status).toBe(200);
-      await expect(response.json()).resolves.toEqual({ notes: [createPublicFileNote('n1')] });
+      await expect(response.json()).resolves.toEqual({
+        notes: [createPublicFileNote('n1', 'a.ts', staleness)],
+      });
     });
   });
 
@@ -654,11 +673,12 @@ describe('notesRoutes', () => {
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
     });
 
-    it('returns 404 when the note does not exist (including reconcile discards)', async () => {
-      // Given: the store no longer holds the note
+    it('returns 404 when the note does not exist', async () => {
+      // Given: the store does not hold the note (deleted, or a wrong id —
+      // reconcile no longer removes notes, so this is never a stale note)
       notesStore.updateBody.mockRejectedValue(new NoteNotFoundError('Note not found: n1'));
 
-      // When: the stale note is updated
+      // When: the missing note is updated
       const response = await app.request('/api/repositories/my-repo/notes/n1', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },

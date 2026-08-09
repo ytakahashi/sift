@@ -61,6 +61,9 @@ export class InMemoryNotesStore implements NotesStore {
       ...draft,
       id: randomUUID(),
       createdAt: Date.now(),
+      // Creation only succeeds once the target resolved against the current
+      // diff, so a new note always starts out matching it.
+      staleness: { kind: 'live' },
     };
     const record: NoteReconcileRecord = {
       note,

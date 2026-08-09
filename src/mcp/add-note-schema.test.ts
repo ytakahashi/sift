@@ -100,6 +100,7 @@ describe('addNoteOutputSchema', () => {
         bucket: 'working',
         body: 'note',
         createdAt: 1,
+        staleness: { kind: 'live' },
       },
     };
 

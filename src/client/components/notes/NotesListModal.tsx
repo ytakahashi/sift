@@ -1,6 +1,11 @@
 import type { ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
-import { formatNoteLocation, formatNotesForClipboard } from '../../../domain/notes/format';
+import {
+  describeNoteStaleReason,
+  formatNoteLocation,
+  formatNotesForClipboard,
+} from '../../../domain/notes/format';
+import { isLiveNote } from '../../../domain/notes/note-staleness';
 import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
 import { NoteActionButton } from './NoteActionButton';
 import { useCopyFeedback } from './useCopyFeedback';
@@ -23,6 +28,63 @@ export function NotesListModal({
   deleteDisabled = false,
 }: NotesListModalProps): ReactElement {
   const { copied, copy } = useCopyFeedback();
+  const liveNotes = notes.filter(isLiveNote);
+  const staleNotes = notes.filter((note) => !isLiveNote(note));
+  // Lead with the count that represents outstanding work. The stale count is
+  // spelled out rather than folded into the total, so the header cannot be
+  // read as "you still have this many things to look at".
+  const countLabel =
+    staleNotes.length > 0
+      ? `${liveNotes.length} + ${staleNotes.length} stale`
+      : String(liveNotes.length);
+
+  const renderNote = (note: Note): ReactElement => {
+    const stale = note.staleness.kind === 'stale';
+    return (
+      <div key={note.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+        <button
+          onClick={() => onSelectLocation(note)}
+          type="button"
+          style={{
+            background: 'transparent',
+            border: 'none',
+            padding: 0,
+            textAlign: 'left',
+            cursor: 'pointer',
+            fontSize: '0.8rem',
+            color: stale ? '#8b949e' : '#c9d1d9',
+          }}
+        >
+          {formatNoteLocation(note)}
+        </button>
+        <div
+          style={{
+            backgroundColor: '#0d1117',
+            border: `1px solid ${stale ? '#484f58' : '#3fb950'}`,
+            borderRadius: '4px',
+            padding: '0.5rem',
+          }}
+        >
+          {note.staleness.kind === 'stale' && (
+            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: '0.35rem' }}>
+              {describeNoteStaleReason(note.staleness.reason)}
+            </div>
+          )}
+          <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9', fontSize: '0.85rem' }}>
+            {note.body}
+          </div>
+          <div style={{ marginTop: '0.5rem' }}>
+            <NoteActionButton
+              label="Delete"
+              onClick={() => void onDeleteNote(note.id)}
+              variant="danger"
+              disabled={deleteDisabled}
+            />
+          </div>
+        </div>
+      </div>
+    );
+  };
 
   return (
     <>
@@ -65,7 +127,7 @@ export function NotesListModal({
             alignItems: 'center',
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Your Notes ({notes.length})</span>
+          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Your Notes ({countLabel})</span>
           <button
             onClick={onClose}
             style={{
@@ -93,51 +155,22 @@ export function NotesListModal({
             gap: '1rem',
           }}
         >
-          {notes.map((note) => {
-            const location = formatNoteLocation(note);
-            return (
+          {liveNotes.map(renderNote)}
+          {staleNotes.length > 0 && (
+            <>
               <div
-                key={note.id}
-                style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}
+                style={{
+                  color: '#8b949e',
+                  fontSize: '0.75rem',
+                  borderTop: '1px solid #30363d',
+                  paddingTop: '0.8rem',
+                }}
               >
-                <button
-                  onClick={() => onSelectLocation(note)}
-                  type="button"
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    padding: 0,
-                    textAlign: 'left',
-                    cursor: 'pointer',
-                    fontSize: '0.8rem',
-                    color: '#c9d1d9',
-                  }}
-                >
-                  {location}
-                </button>
-                <div
-                  style={{
-                    backgroundColor: '#0d1117',
-                    border: '1px solid #3fb950',
-                    borderRadius: '4px',
-                    padding: '0.5rem',
-                  }}
-                >
-                  <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9', fontSize: '0.85rem' }}>
-                    {note.body}
-                  </div>
-                  <div style={{ marginTop: '0.5rem' }}>
-                    <NoteActionButton
-                      label="Delete"
-                      onClick={() => void onDeleteNote(note.id)}
-                      variant="danger"
-                      disabled={deleteDisabled}
-                    />
-                  </div>
-                </div>
+                Stale ({staleNotes.length})
               </div>
-            );
-          })}
+              {staleNotes.map(renderNote)}
+            </>
+          )}
         </div>
         <div
           style={{

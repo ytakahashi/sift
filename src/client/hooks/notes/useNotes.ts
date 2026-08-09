@@ -27,7 +27,7 @@ export interface UseNotesResult {
 /**
  * Server-backed notes state. The server store is the single source of truth:
  * every mutation is followed by a refetch instead of optimistic updates, so
- * the UI always shows the reconciled result (including discards and
+ * the UI always shows the reconciled result (including staleness changes and
  * re-anchoring that happened server-side during the request).
  */
 export function useNotes(notesGateway: NotesGateway, repoId: RepositoryId): UseNotesResult {

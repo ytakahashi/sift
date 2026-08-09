@@ -17,6 +17,7 @@ export function toNoteResponse(note: AnchoredNote): Note {
       path: note.path,
       body: note.body,
       createdAt: note.createdAt,
+      staleness: note.staleness,
     };
   }
 
@@ -29,5 +30,6 @@ export function toNoteResponse(note: AnchoredNote): Note {
     bucket: note.target.bucket,
     body: note.body,
     createdAt: note.createdAt,
+    staleness: note.staleness,
   };
 }

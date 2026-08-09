@@ -35,12 +35,13 @@ describe('describeIncompatibleProduct', () => {
 });
 
 describe('describeCapabilityMissing', () => {
-  it('mentions updating Sift', () => {
+  it('points at a version mismatch rather than blaming either side', () => {
     // Given / When
     const message = describeCapabilityMissing();
 
-    // Then
-    expect(message).toContain('Update Sift');
+    // Then: this is reached from both directions (older server, newer server),
+    // so the guidance must be to align the versions
+    expect(message).toContain('same Sift version');
   });
 });
 

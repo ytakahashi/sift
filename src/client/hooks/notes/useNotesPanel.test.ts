@@ -13,6 +13,7 @@ function createNote(id: string, path: string): Note {
     bucket: 'working',
     body: `note-${id}`,
     createdAt: 1,
+    staleness: { kind: 'live' },
   };
 }
 

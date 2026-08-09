@@ -1,4 +1,5 @@
 import { useState, type ReactElement } from 'react';
+import { isLiveNote } from '../../../domain/notes/note-staleness';
 import type { Note } from '../../../domain/notes/types';
 import { NoteEditor } from './NoteEditor';
 import { NoteViewer } from './NoteViewer';
@@ -35,7 +36,9 @@ export function NoteCard({
       style={{
         padding: '0.5rem',
         backgroundColor: '#161b22',
-        border: '1px solid #3fb950',
+        // Stale notes drop the "active review comment" green so they read as
+        // background at a glance, without hiding them.
+        border: `1px solid ${isLiveNote(note) ? '#3fb950' : '#484f58'}`,
         borderRadius: '4px',
       }}
     >

@@ -1,5 +1,5 @@
 import { probeLocalServer, type HealthFetch } from '../server/health-probe';
-import { NOTES_V1_CAPABILITY } from '../server/contract/health-contract';
+import { NOTES_V2_CAPABILITY } from '../server/contract/health-contract';
 
 export type NotesApiCompatibility =
   | { kind: 'compatible' }
@@ -9,9 +9,10 @@ export type NotesApiCompatibility =
 
 /**
  * Checks, ahead of any Notes API call, whether the local server is a Sift
- * server that supports Notes. Distinguishes "no server" from "some other
- * product" from "a Sift server too old for Notes" so each can get its own
- * actionable guidance instead of one generic error.
+ * server speaking the same Notes contract as this build. Distinguishes "no
+ * server" from "some other product" from "a Sift server on a different Notes
+ * version" so each can get its own actionable guidance instead of one generic
+ * error.
  */
 export async function checkNotesApiCompatibility(
   port: number,
@@ -25,7 +26,7 @@ export async function checkNotesApiCompatibility(
     case 'other':
       return { kind: 'incompatible-product' };
     case 'sift':
-      return probe.capabilities.includes(NOTES_V1_CAPABILITY)
+      return probe.capabilities.includes(NOTES_V2_CAPABILITY)
         ? { kind: 'compatible' }
         : { kind: 'capability-missing' };
   }

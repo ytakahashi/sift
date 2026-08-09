@@ -12,6 +12,7 @@ function createNote(id: string, path: string): Note {
     bucket: 'working',
     body: `note-${id}`,
     createdAt: 1,
+    staleness: { kind: 'live' },
   };
 }
 
@@ -22,6 +23,7 @@ function createFileNote(id: string, path: string): Note {
     path,
     body: `note-${id}`,
     createdAt: 1,
+    staleness: { kind: 'live' },
   };
 }
 

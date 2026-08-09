@@ -30,6 +30,7 @@ const NOTE = {
   path: 'a.ts',
   body: 'note body',
   createdAt: 100,
+  staleness: { kind: 'live' },
 };
 
 describe('httpNotesGateway', () => {

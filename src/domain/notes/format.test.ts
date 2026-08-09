@@ -1,7 +1,12 @@
 import { describe, it, expect } from 'vitest';
-import { formatNoteForClipboard, formatNoteLocation, formatNotesForClipboard } from './format';
+import {
+  describeNoteStaleReason,
+  formatNoteForClipboard,
+  formatNoteLocation,
+  formatNotesForClipboard,
+} from './format';
 
-import type { Note } from './types';
+import { NOTE_STALE_REASONS, type Note } from './types';
 
 describe('formatNotesForClipboard', () => {
   it('formats multiple notes into a clipboard string', () => {
@@ -16,6 +21,7 @@ describe('formatNotesForClipboard', () => {
         bucket: 'working',
         body: 'First note',
         createdAt: 1000,
+        staleness: { kind: 'live' },
       },
       {
         id: 'n2',
@@ -23,6 +29,7 @@ describe('formatNotesForClipboard', () => {
         path: 'path/to/file2.txt',
         body: 'Second note',
         createdAt: 2000,
+        staleness: { kind: 'live' },
       },
     ];
 
@@ -57,6 +64,7 @@ describe('formatNoteForClipboard', () => {
       bucket: 'working',
       body: 'My note',
       createdAt: 1000,
+      staleness: { kind: 'live' },
     };
 
     // When
@@ -77,6 +85,7 @@ describe('formatNoteForClipboard', () => {
       bucket: 'working',
       body: 'My range note',
       createdAt: 1000,
+      staleness: { kind: 'live' },
     };
 
     // When: the note is formatted
@@ -94,6 +103,7 @@ describe('formatNoteForClipboard', () => {
       path: 'path/to/file.ts',
       body: 'My file note',
       createdAt: 1000,
+      staleness: { kind: 'live' },
     };
 
     // When
@@ -101,6 +111,40 @@ describe('formatNoteForClipboard', () => {
 
     // Then
     expect(result).toBe('> path/to/file.ts\nMy file note');
+  });
+
+  it('labels a stale note with its reason', () => {
+    // Given: a note whose code has changed since it was written
+    const note: Note = {
+      id: 'n1',
+      kind: 'line',
+      path: 'path/to/file.ts',
+      startLine: 10,
+      endLine: 10,
+      bucket: 'working',
+      body: 'My note',
+      createdAt: 1000,
+      staleness: { kind: 'stale', reason: 'content-changed' },
+    };
+
+    // When
+    const result = formatNoteForClipboard(note);
+
+    // Then: pasting this into an agent prompt cannot read as a current finding
+    expect(result).toBe(
+      '> path/to/file.ts#L10 (stale: the file changed after this note was written)\nMy note',
+    );
+  });
+});
+
+describe('describeNoteStaleReason', () => {
+  it.each(NOTE_STALE_REASONS)('describes %s', (reason) => {
+    // Given / When: every reason the domain can produce
+    const description = describeNoteStaleReason(reason);
+
+    // Then: none falls through to an empty or placeholder string, so the UI
+    // and the clipboard always have something to show
+    expect(description).not.toBe('');
   });
 });
 
@@ -113,6 +157,7 @@ describe('formatNoteLocation', () => {
       path: 'src/a.ts',
       body: 'file',
       createdAt: 1,
+      staleness: { kind: 'live' },
     };
     const singleLineNote: Note = {
       id: 'single',
@@ -123,6 +168,7 @@ describe('formatNoteLocation', () => {
       bucket: 'working',
       body: 'single',
       createdAt: 1,
+      staleness: { kind: 'live' },
     };
     const rangeNote: Note = {
       ...singleLineNote,

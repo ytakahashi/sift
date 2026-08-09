@@ -10,6 +10,7 @@ const lineNote = {
   bucket: 'working',
   body: 'looks good',
   createdAt: 1700000000000,
+  staleness: { kind: 'live' },
 };
 
 const fileNote = {
@@ -18,6 +19,7 @@ const fileNote = {
   path: 'README.md',
   body: 'needs an update',
   createdAt: 1700000000001,
+  staleness: { kind: 'live' },
 };
 
 describe('listNotesInputSchema', () => {

@@ -3,7 +3,7 @@ import type { ConfirmedFileGeneration, FileGeneration } from '../diff/file-gener
 import type { DiffFile, DiffLine } from '../diff/types';
 import type { NoteReconcileRecord } from './reconcile-notes';
 import { reconcileNotes } from './reconcile-notes';
-import type { NoteBucket } from './types';
+import type { NoteBucket, NoteStaleReason } from './types';
 
 interface FileFixtureOptions {
   path: string;
@@ -71,6 +71,7 @@ function createLineRecord(options: LineRecordOptions): NoteReconcileRecord {
       },
       body: `note-${options.id}`,
       createdAt: 1,
+      staleness: { kind: 'live' },
     },
     generation: options.generation ?? fileGeneration('blob-1'),
     lineContents: options.lineContents,
@@ -89,6 +90,7 @@ function createFileRecord(
       target: { kind: 'file', fileId: `file-${path}` },
       body: `note-${id}`,
       createdAt: 1,
+      staleness: { kind: 'live' },
     },
     generation,
   };
@@ -98,6 +100,11 @@ function generationsOf(
   entries: Array<[string, FileGeneration]>,
 ): ReadonlyMap<string, FileGeneration> {
   return new Map(entries);
+}
+
+/** The record as reconcile is expected to return it once marked stale. */
+function markedStale(record: NoteReconcileRecord, reason: NoteStaleReason): NoteReconcileRecord {
+  return { ...record, note: { ...record.note, staleness: { kind: 'stale', reason } } };
 }
 
 describe('reconcileNotes', () => {
@@ -133,7 +140,7 @@ describe('reconcileNotes', () => {
     expect(result).toEqual({ records: [record], changed: false });
   });
 
-  it('discards a range note when one anchored line changes', () => {
+  it('marks a range note stale when one anchored line changes', () => {
     // Given: the second line of an anchored range no longer matches
     const record = createLineRecord({
       id: 'range',
@@ -161,11 +168,14 @@ describe('reconcileNotes', () => {
       generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
     });
 
-    // Then: the note is discarded instead of partially re-anchored
-    expect(result).toEqual({ records: [], changed: true });
+    // Then: the note is marked instead of partially re-anchored
+    expect(result).toEqual({
+      records: [markedStale(record, 'range-unresolved')],
+      changed: true,
+    });
   });
 
-  it('discards a range note when part of the range is no longer in one hunk', () => {
+  it('marks a range note stale when part of the range is no longer in one hunk', () => {
     // Given: the stored range expects two lines, but only its first line remains
     const record = createLineRecord({
       id: 'range',
@@ -186,7 +196,10 @@ describe('reconcileNotes', () => {
     });
 
     // Then: shortening the anchor is rejected
-    expect(result).toEqual({ records: [], changed: true });
+    expect(result).toEqual({
+      records: [markedStale(record, 'range-unresolved')],
+      changed: true,
+    });
   });
 
   it('keeps notes untouched when the worktree is unchanged', () => {
@@ -213,7 +226,7 @@ describe('reconcileNotes', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('discards notes when the worktree generation changed', () => {
+  it('marks notes stale when the worktree generation changed', () => {
     // Given: the file was edited in the worktree, producing a new blob.
     // A pure line-reorder edit is the same case: the blob id changes even
     // though the sorted diff-line set would not.
@@ -234,12 +247,12 @@ describe('reconcileNotes', () => {
       generations: generationsOf([['a.ts', fileGeneration('blob-2')]]),
     });
 
-    // Then: the note is discarded
-    expect(result.records).toEqual([]);
+    // Then: the note is marked as pointing at content that has since changed
+    expect(result.records).toEqual([markedStale(record, 'content-changed')]);
     expect(result.changed).toBe(true);
   });
 
-  it('discards notes whose file left the diff', () => {
+  it('marks notes stale when their file left the diff', () => {
     // Given: the file no longer appears in any pane (commit / discard / delete)
     const record = createFileRecord('n1', 'a.ts');
 
@@ -251,8 +264,8 @@ describe('reconcileNotes', () => {
       generations: generationsOf([]),
     });
 
-    // Then: the presence check discards the note
-    expect(result.records).toEqual([]);
+    // Then: the presence check marks the note but keeps it
+    expect(result.records).toEqual([markedStale(record, 'file-out-of-diff')]);
     expect(result.changed).toBe(true);
   });
 
@@ -276,7 +289,7 @@ describe('reconcileNotes', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('discards a line note instead of mis-anchoring when the same line number holds different content', () => {
+  it('marks a line note stale instead of mis-anchoring when the same line number holds different content', () => {
     // Given: a note on staged content "b" at line 1. After stage-all the
     // staged pane shows "c" at the same line number (worktree unchanged).
     const record = createLineRecord({
@@ -297,9 +310,9 @@ describe('reconcileNotes', () => {
       generations: generationsOf([['a.ts', fileGeneration('blob-c')]]),
     });
 
-    // Then: the content check fails in both panes and the note is discarded,
+    // Then: the content check fails in both panes and the note is marked,
     // never re-attached to the different content "c"
-    expect(result.records).toEqual([]);
+    expect(result.records).toEqual([markedStale(record, 'range-unresolved')]);
     expect(result.changed).toBe(true);
   });
 
@@ -326,12 +339,14 @@ describe('reconcileNotes', () => {
       generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
     });
 
-    // Then: the note follows to the staged pane with a refreshed hunkId
+    // Then: the note follows to the staged pane with a refreshed hunkId,
+    // and following the content is not treated as going stale
     expect(result.changed).toBe(true);
     expect(result.records).toHaveLength(1);
     const target = result.records[0].note.target;
     expect(target.kind === 'line' && target.bucket).toBe('staged');
     expect(target.kind === 'line' && target.hunkId).toBe('hunk-a.ts-9');
+    expect(result.records[0].note.staleness).toEqual({ kind: 'live' });
   });
 
   it('holds notes when the current generation is unavailable or missing', () => {
@@ -362,7 +377,7 @@ describe('reconcileNotes', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('discards notes when the path was replaced by a submodule', () => {
+  it('marks notes stale when the path was replaced by a submodule', () => {
     // Given: the note's fileId now only matches a submodule entry
     const record = createFileRecord('n1', 'vendor/lib');
     const workingFiles = [createFile({ path: 'vendor/lib', kind: 'submodule' })];
@@ -375,8 +390,8 @@ describe('reconcileNotes', () => {
       generations: generationsOf([]),
     });
 
-    // Then: no note-eligible file matches, so the presence check discards it
-    expect(result.records).toEqual([]);
+    // Then: no note-eligible file matches, so the presence check marks it
+    expect(result.records).toEqual([markedStale(record, 'file-out-of-diff')]);
     expect(result.changed).toBe(true);
   });
 
@@ -398,7 +413,7 @@ describe('reconcileNotes', () => {
     expect(result.changed).toBe(false);
   });
 
-  it('discards a line record that lost its content baseline', () => {
+  it('marks a line record that lost its content baseline stale', () => {
     // Given: a line record without lineContents (invalid store state); it
     // cannot be re-anchored safely
     const record = createLineRecord({ id: 'n1', path: 'a.ts', bucket: 'working', line: 5 });
@@ -412,15 +427,15 @@ describe('reconcileNotes', () => {
       generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
     });
 
-    // Then: the record is discarded rather than risking a wrong anchor
-    expect(result.records).toEqual([]);
+    // Then: the record is marked rather than risking a wrong anchor
+    expect(result.records).toEqual([markedStale(record, 'range-unresolved')]);
     expect(result.changed).toBe(true);
   });
 
   it('reconciles records of different creation generations independently', () => {
     // Given: two notes on different files created at different times; only
     // one file changed since
-    const stale = createFileRecord('n1', 'a.ts', fileGeneration('blob-old'));
+    const changedFileRecord = createFileRecord('n1', 'a.ts', fileGeneration('blob-old'));
     const fresh = createFileRecord('n2', 'b.ts', fileGeneration('blob-2'));
     const workingFiles = [
       createFile({ path: 'a.ts', lines: [{ line: 1, content: 'x' }] }),
@@ -429,7 +444,7 @@ describe('reconcileNotes', () => {
 
     // When: reconcile runs with current generations
     const result = reconcileNotes({
-      records: [stale, fresh],
+      records: [changedFileRecord, fresh],
       workingFiles,
       stagedFiles: [],
       generations: generationsOf([
@@ -438,8 +453,64 @@ describe('reconcileNotes', () => {
       ]),
     });
 
-    // Then: only the note on the changed file is discarded (per-file granularity)
-    expect(result.records).toEqual([fresh]);
+    // Then: only the note on the changed file is marked (per-file granularity)
+    expect(result.records).toEqual([markedStale(changedFileRecord, 'content-changed'), fresh]);
     expect(result.changed).toBe(true);
+  });
+
+  it('reports no change on a second pass against the same state', () => {
+    // Given: a note that has just gone stale. Reconcile runs at the start of
+    // every notes API call, and `changed` drives the notes-changed event that
+    // makes clients call the API again — so a repeated pass must settle.
+    const record = createFileRecord('n1', 'a.ts');
+    const input = {
+      records: [record],
+      workingFiles: [],
+      stagedFiles: [],
+      generations: generationsOf([]),
+    };
+    const first = reconcileNotes(input);
+    expect(first.changed).toBe(true);
+
+    // When: the same state is reconciled again
+    const second = reconcileNotes({ ...input, records: first.records });
+
+    // Then: nothing is reported, so the notification cannot feed back into itself
+    expect(second.changed).toBe(false);
+    expect(second.records).toEqual(first.records);
+  });
+
+  it('returns a note to live when the file goes back to its creation state', () => {
+    // Given: a note marked stale because its file was edited
+    const record = createLineRecord({
+      id: 'n1',
+      path: 'a.ts',
+      bucket: 'working',
+      line: 5,
+      lineContents: ['x'],
+    });
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'x' }] })];
+    const edited = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-2')]]),
+    });
+    expect(edited.records[0].note.staleness).toEqual({
+      kind: 'stale',
+      reason: 'content-changed',
+    });
+
+    // When: the edit is undone, restoring the creation-time generation
+    const undone = reconcileNotes({
+      records: edited.records,
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: staleness is recomputed rather than accumulated, so the note applies again
+    expect(undone.records).toEqual([record]);
+    expect(undone.changed).toBe(true);
   });
 });

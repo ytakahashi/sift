@@ -1,7 +1,22 @@
 import { z } from 'zod';
-import type { Note } from '../domain/notes/types';
+import { NOTE_STALE_REASONS, type Note, type NoteStaleness } from '../domain/notes/types';
 
-export const listNotesInputSchema = z.object({}).strict();
+export const listNotesInputSchema = z
+  .object({
+    includeStale: z
+      .boolean()
+      .optional()
+      .describe(
+        'Include notes that no longer match the current diff. Defaults to false, ' +
+          'so only notes that still apply are returned.',
+      ),
+  })
+  .strict();
+
+const stalenessSchema: z.ZodType<NoteStaleness> = z.discriminatedUnion('kind', [
+  z.object({ kind: z.literal('live') }).strict(),
+  z.object({ kind: z.literal('stale'), reason: z.enum(NOTE_STALE_REASONS) }).strict(),
+]);
 
 const lineNoteSchema = z
   .object({
@@ -13,6 +28,7 @@ const lineNoteSchema = z
     bucket: z.enum(['working', 'staged']),
     body: z.string(),
     createdAt: z.number(),
+    staleness: stalenessSchema,
   })
   .strict();
 
@@ -23,6 +39,7 @@ const fileNoteSchema = z
     path: z.string(),
     body: z.string(),
     createdAt: z.number(),
+    staleness: stalenessSchema,
   })
   .strict();
 
@@ -36,8 +53,22 @@ export const noteSchema: z.ZodType<Note> = z.discriminatedUnion('kind', [
   fileNoteSchema,
 ]);
 
+/** Shape of the `GET /notes` response body. Always carries every stored note. */
 export const notesListResponseSchema: z.ZodType<{ notes: Note[] }> = z
   .object({
     notes: z.array(noteSchema),
+  })
+  .strict();
+
+/**
+ * Shape of the `list_notes` tool result. Distinct from the HTTP response
+ * because `staleCount` is computed while filtering here: the API has no
+ * business carrying a field that only exists to explain an omission the MCP
+ * layer made.
+ */
+export const listNotesOutputSchema: z.ZodType<{ notes: Note[]; staleCount: number }> = z
+  .object({
+    notes: z.array(noteSchema),
+    staleCount: z.number().int().min(0),
   })
   .strict();

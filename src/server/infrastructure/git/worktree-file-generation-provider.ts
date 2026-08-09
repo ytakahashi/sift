@@ -135,7 +135,8 @@ export class WorktreeFileGenerationProvider implements FileGenerationProvider {
 
     // Directories, gitlinks (submodule races), FIFOs, sockets, ...: not a
     // note-eligible worktree object. The pane diff will surface the real
-    // state (e.g. a submodule entry) and the presence check handles discard.
+    // state (e.g. a submodule entry) and the presence check marks any note on
+    // this path stale.
     return {
       kind: 'resolved',
       generation: { kind: 'unavailable', reason: 'not a regular file or symlink' },

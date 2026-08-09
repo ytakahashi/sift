@@ -1,4 +1,4 @@
-import type { NoteBucket } from './types';
+import type { NoteBucket, NoteStaleness } from './types';
 
 /**
  * Server-internal representation of a note's target: identifies the file and
@@ -44,4 +44,11 @@ export type AnchoredNote = {
   target: AnchoredNoteTarget;
   body: string;
   createdAt: number;
+  /**
+   * Whether the note still matches the current diff, as of the last reconcile
+   * pass. A cached output, never an input: reconcile always recomputes it from
+   * the creation-time anchor held alongside this note, so it can go back to
+   * live when the file returns to the state the note was written against.
+   */
+  staleness: NoteStaleness;
 };

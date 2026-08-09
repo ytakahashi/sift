@@ -10,6 +10,7 @@ const lineNote = {
   bucket: 'working' as const,
   body: 'looks good',
   createdAt: 1700000000000,
+  staleness: { kind: 'live' },
 };
 
 function jsonResponse(status: number, body: unknown): Response {

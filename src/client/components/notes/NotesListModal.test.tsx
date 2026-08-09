@@ -15,6 +15,7 @@ function createLineNote(overrides?: Partial<LineNote>): LineNote {
     bucket: 'working',
     body: 'line note body',
     createdAt: 1000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }
@@ -26,6 +27,7 @@ function createFileNote(overrides?: Partial<FileNote>): FileNote {
     path: 'src/file.ts',
     body: 'file note body',
     createdAt: 2000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }
@@ -58,6 +60,56 @@ describe('NotesListModal', () => {
     expect(screen.getByText('src/line.ts#L10-L12')).toBeDefined();
     expect(screen.getByText('src/file.ts')).toBeDefined();
     expect(screen.queryByText('src/file.ts#L10')).toBeNull();
+  });
+
+  it('groups stale notes under their own heading, after the notes that still apply', () => {
+    // Given: a mix of notes that do and do not still match the diff
+    const notes = [
+      createLineNote({ id: 'live', body: 'live note body' }),
+      createFileNote({
+        id: 'stale',
+        body: 'stale note body',
+        staleness: { kind: 'stale', reason: 'file-out-of-diff' },
+      }),
+    ];
+
+    // When: the modal is rendered
+    const { container } = render(
+      <NotesListModal
+        notes={notes}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // Then: the actionable notes come first, and the rest are set apart with
+    // their count and the reason they no longer apply
+    const renderedText = container.textContent ?? '';
+    expect(renderedText.indexOf('live note body')).toBeLessThan(
+      renderedText.indexOf('stale note body'),
+    );
+    expect(screen.getByText('Stale (1)')).toBeDefined();
+    expect(screen.getByText('this file is no longer part of the diff')).toBeDefined();
+
+    // Then: the header separates the two counts instead of showing one total,
+    // so it reads as outstanding work rather than a note count
+    expect(screen.getByText('Your Notes (1 + 1 stale)')).toBeDefined();
+  });
+
+  it('omits the stale count from the header when nothing is stale', () => {
+    // Given: only notes that still apply
+    render(
+      <NotesListModal
+        notes={[createLineNote()]}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // Then: the header stays a plain count
+    expect(screen.getByText('Your Notes (1)')).toBeDefined();
   });
 
   it('keeps the Copy action outside the scrollable notes area so it stays reachable', () => {
