@@ -18,6 +18,7 @@ describe('toNoteResponse', () => {
       },
       body: 'review this',
       createdAt: 100,
+      staleness: { kind: 'live' },
     };
 
     // When: the note is converted to its public shape
@@ -33,6 +34,7 @@ describe('toNoteResponse', () => {
       bucket: 'working',
       body: 'review this',
       createdAt: 100,
+      staleness: { kind: 'live' },
     });
   });
 
@@ -44,6 +46,7 @@ describe('toNoteResponse', () => {
       target: { kind: 'file', fileId: 'file-b.ts' },
       body: 'about this file',
       createdAt: 200,
+      staleness: { kind: 'live' },
     };
 
     // When: the note is converted
@@ -56,6 +59,7 @@ describe('toNoteResponse', () => {
       path: 'b.ts',
       body: 'about this file',
       createdAt: 200,
+      staleness: { kind: 'live' },
     });
   });
 
@@ -68,6 +72,7 @@ describe('toNoteResponse', () => {
       target: { kind: 'file', fileId: 'file-src/nested/a.ts' },
       body: 'x',
       createdAt: 1,
+      staleness: { kind: 'live' },
     };
 
     // When: the note is converted

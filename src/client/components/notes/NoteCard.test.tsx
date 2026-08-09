@@ -14,6 +14,7 @@ function createNote(overrides?: Partial<LineNote>): LineNote {
     bucket: 'working',
     body: 'original body',
     createdAt: 1000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }
@@ -25,6 +26,7 @@ function createFileNote(overrides?: Partial<FileNote>): FileNote {
     path: 'path/to/file.ts',
     body: 'original body',
     createdAt: 1000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }

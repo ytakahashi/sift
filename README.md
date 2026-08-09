@@ -21,8 +21,8 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **Ephemeral Notes**: Add in-memory notes to specific lines, line ranges, or entire files. This is
   perfect for jotting down self-reminders and double-checking your work before it gets etched into
   your Git history.
-- **Notes MCP**: Let MCP-compatible AI agents read unresolved Notes and add review findings directly
-  within your local environment.
+- **Notes MCP**: Let MCP-compatible AI agents read the Notes that still apply and add review
+  findings directly within your local environment.
 - **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
   locked to your Git repository.
 
@@ -137,6 +137,8 @@ Notes and operational details:
 - Both processes use `PORT` (default: `49321`). If you override it, provide the same value to the
   HTTP server and the MCP process.
 - Notes are stored in the HTTP server's memory and cleared when the server exits.
+- `list_notes` returns only the notes that still match the current diff, and reports how many stale
+  ones were left out. Pass `includeStale: true` to see those too.
 
 Example requests after the MCP server is connected:
 

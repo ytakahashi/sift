@@ -10,7 +10,9 @@ export function describeIncompatibleProduct(): string {
 }
 
 export function describeCapabilityMissing(): string {
-  return 'The running Sift server is too old to support the Notes API. Update Sift and restart the server.';
+  // Reached from either direction: an older server without this Notes contract,
+  // or a newer one that has moved past it. The fix is the same either way.
+  return 'The running Sift server does not speak the same Notes API version as this MCP process. Make sure both come from the same Sift version, then restart the server.';
 }
 
 export function describeRepoRootResolutionFailure(candidatePath: string, error: unknown): string {

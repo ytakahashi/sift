@@ -14,6 +14,7 @@ function createNote(overrides?: Partial<LineNote>): LineNote {
     bucket: 'working',
     body: 'note body',
     createdAt: 1000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }

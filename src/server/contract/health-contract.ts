@@ -6,14 +6,23 @@ import { SIFT_PRODUCT_NAME } from '../../domain/app/app-info';
  */
 export const SIFT_HEALTH_PRODUCT = SIFT_PRODUCT_NAME;
 
-export const NOTES_V1_CAPABILITY = 'notes-v1';
+/**
+ * The Notes API as of the note shape that carries `staleness`.
+ *
+ * Notes clients validate responses strictly, so any change to the public Note
+ * shape breaks clients built against the previous one. The capability is
+ * therefore bumped with the shape, and the superseded value is *not* also
+ * advertised: letting an older client through would only move its failure from
+ * an actionable "versions do not match" to an opaque parse error.
+ */
+export const NOTES_V2_CAPABILITY = 'notes-v2';
 
 /**
  * Capabilities this build advertises. Kept as a literal tuple so the contract
  * states the exact set; widening it to `string[]` would let a capability be
  * dropped or renamed without any caller noticing.
  */
-export const SIFT_HEALTH_CAPABILITIES = [NOTES_V1_CAPABILITY] as const;
+export const SIFT_HEALTH_CAPABILITIES = [NOTES_V2_CAPABILITY] as const;
 
 /**
  * Identity fields parsed from a trusted `{ kind: 'sift' }` health response.

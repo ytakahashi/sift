@@ -82,10 +82,10 @@ describe('InMemoryNotesStore', () => {
     await expect(store.list('repo-1')).resolves.toEqual([note]);
   });
 
-  it('generates identity even when the draft already carries id and createdAt', async () => {
-    // Given: an existing note reused as a draft. NoteDraft omits id/createdAt,
-    // but structural typing accepts this wider object, so the store must not
-    // let the caller's values through.
+  it('owns identity and staleness even when the draft already carries them', async () => {
+    // Given: an existing note reused as a draft. NoteDraft omits the fields the
+    // store derives, but structural typing accepts this wider object, so the
+    // store must not let the caller's values through.
     const store = new InMemoryNotesStore();
     const existing: AnchoredNote = {
       id: 'caller-supplied-id',
@@ -93,14 +93,16 @@ describe('InMemoryNotesStore', () => {
       target: { kind: 'file', fileId: 'file-a.ts' },
       body: 'body',
       createdAt: 1,
+      staleness: { kind: 'stale', reason: 'content-changed' },
     };
 
     // When: it is added as a new note
     const note = await store.add('repo-1', existing, { generation: fileGeneration('blob-1') });
 
-    // Then: the store owns identity; only the note's content came from the draft
+    // Then: the store owns identity and staleness; only content came from the draft
     expect(note.id).not.toBe('caller-supplied-id');
     expect(note.createdAt).toBeGreaterThan(1);
+    expect(note.staleness).toEqual({ kind: 'live' });
     expect(note.path).toBe('a.ts');
   });
 
@@ -176,11 +178,11 @@ describe('InMemoryNotesStore', () => {
     await expect(store.list('repo-1')).resolves.toHaveLength(1);
   });
 
-  it('persists discards decided by reconcile', async () => {
+  it('persists staleness decided by reconcile', async () => {
     // Given: one note whose file changed and one intact note
     const store = new InMemoryNotesStore();
-    await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-old'));
-    const surviving = await addFileNote(store, 'repo-1', 'b.ts', fileGeneration('blob-1'));
+    const marked = await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-old'));
+    const unaffected = await addFileNote(store, 'repo-1', 'b.ts', fileGeneration('blob-1'));
 
     // When: reconcile sees a new generation for a.ts only
     const changed = await store.reconcile('repo-1', {
@@ -192,10 +194,14 @@ describe('InMemoryNotesStore', () => {
       ]),
     });
 
-    // Then: the change is reported and the discard is persisted
+    // Then: the change is reported and both notes are still stored, with only
+    // the affected one marked
     expect(changed).toBe(true);
     const listed = await store.list('repo-1');
-    expect(listed.map((note) => note.id)).toEqual([surviving]);
+    expect(listed.map((note) => [note.id, note.staleness])).toEqual([
+      [marked, { kind: 'stale', reason: 'content-changed' }],
+      [unaffected, { kind: 'live' }],
+    ]);
   });
 
   it('reports no change for a repository without notes', async () => {

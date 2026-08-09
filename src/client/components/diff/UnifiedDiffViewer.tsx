@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { UnfoldVertical } from 'lucide-react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
+import { isLiveNote } from '../../../domain/notes/note-staleness';
 import { findHunkContainingRange } from '../../../domain/notes/resolve-line-note-target';
 import { formatLineRange } from '../../presentation/notes/line-range';
 import { NoteEditor } from '../notes/NoteEditor';
@@ -42,8 +43,16 @@ export function UnifiedDiffViewer({
   const viewerRef = useRef<HTMLDivElement>(null);
   const [interaction, setInteraction] = useState<LineInteraction>({ type: 'idle' });
   const [rangeSelectionError, setRangeSelectionError] = useState<string | null>(null);
-  const fileNotes = notes.filter((note) => note.kind === 'file');
-  const paneLineNotes = notes.filter((note) => note.kind === 'line' && note.bucket === paneMode);
+  const fileNotes = notes.filter((note) => note.kind === 'file' && isLiveNote(note));
+  const paneLineNotes = notes.filter(
+    (note) => note.kind === 'line' && note.bucket === paneMode && isLiveNote(note),
+  );
+  // Stale notes lose their line anchor — the recorded range no longer describes
+  // what is on screen — but keep the pane they were written in, so they show up
+  // once, in the file-level area, instead of on a line that moved on.
+  const staleNotes = notes.filter(
+    (note) => !isLiveNote(note) && (note.kind === 'file' || note.bucket === paneMode),
+  );
   const canShowFullView =
     paneMode === 'staged' &&
     file.kind === 'text' &&
@@ -107,7 +116,7 @@ export function UnifiedDiffViewer({
   };
 
   const renderFileNotes = (): ReactElement | null => {
-    if (!isFileNoteEditorOpen && fileNotes.length === 0) {
+    if (!isFileNoteEditorOpen && fileNotes.length === 0 && staleNotes.length === 0) {
       return null;
     }
 
@@ -131,6 +140,20 @@ export function UnifiedDiffViewer({
           <NoteCard
             key={note.id}
             note={note}
+            onUpdate={onUpdateNote}
+            onDelete={onDeleteNote}
+            deleteDisabled={notesDeleteDisabled}
+          />
+        ))}
+        {staleNotes.map((note) => (
+          <NoteCard
+            key={note.id}
+            note={note}
+            // A stale line note is no longer rendered next to its lines, so it
+            // has to say which range it was written against.
+            contextLabel={
+              note.kind === 'line' ? formatLineRange(note.startLine, note.endLine) : undefined
+            }
             onUpdate={onUpdateNote}
             onDelete={onDeleteNote}
             deleteDisabled={notesDeleteDisabled}

@@ -241,8 +241,9 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
   /**
    * Shared preprocessing for every handler except the explicit clear-all:
    * fetch both pane diffs, batch-fetch worktree generations for the
-   * note-eligible paths, and reconcile the store so responses never expose
-   * notes that are stale against the current diff.
+   * note-eligible paths, and reconcile the store so every note in the response
+   * reports its staleness against the diff as it is right now. Stale notes are
+   * returned like any other; it is the caller that decides what to do with them.
    */
   const reconcileRepo = async (c: Context<Env>): Promise<RepoNotesContext> => {
     const repository = await resolver.resolveRepository(c.req.param('repoId') as string);

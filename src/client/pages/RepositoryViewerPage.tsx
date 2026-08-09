@@ -178,12 +178,7 @@ function RepositoryWorkspace({
     mutating: notesMutating,
     error: notesError,
   } = useNotes(dependencies.notesGateway, repoId);
-  const { refreshAll } = useRefreshController({
-    workingFiles: serverWorkingFiles,
-    stagedFiles: serverStagedFiles,
-    refresh,
-    refetchNotes,
-  });
+  const { refreshAll } = useRefreshController({ refresh, refetchNotes });
 
   const {
     stageFile,

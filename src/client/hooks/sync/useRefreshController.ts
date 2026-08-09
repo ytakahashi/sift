@@ -1,15 +1,9 @@
-import { useCallback, useEffect, useRef } from 'react';
-import {
-  computeDiffRefreshHash,
-  decideRefreshEffects,
-} from '../../application/sync/refresh-policy';
-import type { DiffFile, RepositoryDiff } from '../../../domain/diff/types';
+import { useCallback } from 'react';
+import type { RepositoryDiff } from '../../../domain/diff/types';
 
 export interface UseRefreshControllerOptions {
-  workingFiles: DiffFile[];
-  stagedFiles: DiffFile[];
   refresh: () => Promise<RepositoryDiff | null>;
-  /** Picks up the server-side reconcile result after the diff content changed. */
+  /** Picks up the server-side reconcile result after the diff was refreshed. */
   refetchNotes: () => Promise<void> | void;
 }
 
@@ -17,30 +11,30 @@ export interface UseRefreshControllerResult {
   refreshAll: () => Promise<void>;
 }
 
+/**
+ * Refreshes the diff, then the notes.
+ *
+ * Notes are refetched after every successful refresh, rather than only when the
+ * client can tell that the diff changed. Staleness is decided server-side from
+ * worktree blob identity, which nothing derived from the diff on this side
+ * reproduces: reordering lines, or changing a file's mode, can leave the diff
+ * looking equivalent while the server considers that file's notes stale.
+ * Guessing wrong leaves a note on screen as though it still applied, so the
+ * client asks rather than predicts.
+ *
+ * A failed or superseded refresh (null) is skipped: the current diff state is
+ * unknown, and server-driven notes changes still arrive over SSE.
+ */
 export function useRefreshController({
-  workingFiles,
-  stagedFiles,
   refresh,
   refetchNotes,
 }: UseRefreshControllerOptions): UseRefreshControllerResult {
-  const latestHashRef = useRef(computeDiffRefreshHash(workingFiles, stagedFiles));
-
-  useEffect(() => {
-    latestHashRef.current = computeDiffRefreshHash(workingFiles, stagedFiles);
-  }, [workingFiles, stagedFiles]);
-
   const refreshAll = useCallback(async () => {
-    const hashBefore = latestHashRef.current;
     const result = await refresh();
-    const decision = decideRefreshEffects(hashBefore, result);
-
-    if (decision.nextHash) {
-      latestHashRef.current = decision.nextHash;
+    if (!result) {
+      return;
     }
-
-    if (decision.shouldRefetchNotes) {
-      await refetchNotes();
-    }
+    await refetchNotes();
   }, [refetchNotes, refresh]);
 
   return { refreshAll };

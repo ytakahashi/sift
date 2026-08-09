@@ -12,6 +12,7 @@ function createNote(id: string): Note {
     path: 'a.ts',
     body: `note-${id}`,
     createdAt: 100,
+    staleness: { kind: 'live' },
   };
 }
 

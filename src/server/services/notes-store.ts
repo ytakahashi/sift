@@ -3,7 +3,7 @@ import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
 import type { RepositoryId } from '../../domain/repository/repository';
 
-/** The requested note does not exist (including notes just discarded by reconcile). */
+/** The requested note does not exist. */
 export class NoteNotFoundError extends Error {
   constructor(message: string) {
     super(message);
@@ -56,16 +56,20 @@ export interface NoteAnchor {
   lineContents?: string[];
 }
 
-/** The parts of a note the caller supplies; the store owns id and createdAt. */
-export type NoteDraft = Omit<AnchoredNote, 'id' | 'createdAt'>;
+/**
+ * The parts of a note the caller supplies. The store owns identity (id,
+ * createdAt) and the initial staleness, which is derived rather than chosen.
+ */
+export type NoteDraft = Omit<AnchoredNote, 'id' | 'createdAt' | 'staleness'>;
 
 export interface NotesStore {
   /**
-   * Validates stored notes against the current diff and worktree generations:
-   * discards notes whose file changed or left the diff, and re-anchors line
-   * notes whose content moved between panes (delegated to domain
-   * reconcileNotes). Returns whether anything was discarded or re-anchored,
-   * so the caller can decide whether to notify subscribers.
+   * Revalidates stored notes against the current diff and worktree
+   * generations: marks notes whose file changed or left the diff as stale, and
+   * re-anchors line notes whose content moved between panes (delegated to
+   * domain reconcileNotes). Notes are never removed here, so the stored count
+   * only changes through explicit deletion. Returns whether any staleness or
+   * anchor changed, so the caller can decide whether to notify subscribers.
    */
   reconcile(
     repoId: RepositoryId,

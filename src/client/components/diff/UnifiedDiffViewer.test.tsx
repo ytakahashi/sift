@@ -128,6 +128,7 @@ function createFileNote(overrides?: Partial<FileNote>): FileNote {
     path: 'src/file.ts',
     body: 'file note body',
     createdAt: 1000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }
@@ -142,6 +143,7 @@ function createLineNote(overrides?: Partial<LineNote>): LineNote {
     bucket: 'working',
     body: 'line note body',
     createdAt: 1000,
+    staleness: { kind: 'live' },
     ...overrides,
   };
 }
@@ -201,6 +203,35 @@ describe('UnifiedDiffViewer', () => {
     expect(renderedText.indexOf('line note body')).toBeGreaterThan(
       renderedText.indexOf('const a = 1;'),
     );
+  });
+
+  it('moves a stale line note out of the diff rows and into the file-level area', () => {
+    // Given: a line note whose anchored range no longer describes what is shown
+    const { container } = render(
+      <UnifiedDiffViewer
+        {...viewerDependencies}
+        file={createTextFile()}
+        paneMode="working"
+        notes={[
+          createLineNote({
+            body: 'stale note body',
+            staleness: { kind: 'stale', reason: 'content-changed' },
+          }),
+        ]}
+      />,
+    );
+
+    // When: the diff is rendered
+    const renderedText = container.textContent ?? '';
+
+    // Then: it is shown above the diff rather than pinned to a line that moved on
+    expect(renderedText.indexOf('stale note body')).toBeLessThan(
+      renderedText.indexOf('const a = 1;'),
+    );
+    // Then: it still says which range it was written against, and why it no longer applies
+    expect(screen.getByText('Line 1')).toBeDefined();
+    expect(screen.getByText('Stale')).toBeDefined();
+    expect(screen.getByText('the file changed after this note was written')).toBeDefined();
   });
 
   it('adds a line note addressed by path, range and pane', async () => {

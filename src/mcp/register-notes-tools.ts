@@ -4,7 +4,8 @@ import type { ResolvedRepository } from '../domain/repository/repository';
 import { addNoteInputSchema, addNoteOutputSchema } from './add-note-schema';
 import type { CreateNoteResult, GetNotesResult } from './notes-http-client';
 import type { NotesApiCompatibility } from './notes-compatibility';
-import { listNotesInputSchema, notesListResponseSchema } from './notes-schema';
+import { isLiveNote } from '../domain/notes/note-staleness';
+import { listNotesInputSchema, listNotesOutputSchema } from './notes-schema';
 import type { RepoRootResolver } from './repo-target';
 import {
   describeCapabilityMissing,
@@ -114,13 +115,15 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
     'list_notes',
     {
       description:
-        'List unresolved review comments (Notes) for the current diff. Call this right after ' +
-        'editing a file to see which notes were automatically cleared because they are now ' +
-        'considered addressed.',
+        'List review comments (Notes) for the current diff. By default only notes that still ' +
+        'match the current diff are returned; notes whose code has since changed are marked ' +
+        'stale and left out, with "staleCount" reporting how many. Call this right after ' +
+        'editing a file to see which notes went stale, which usually means they are addressed. ' +
+        'Pass includeStale: true to see them with the reason they no longer apply.',
       inputSchema: listNotesInputSchema,
-      outputSchema: notesListResponseSchema,
+      outputSchema: listNotesOutputSchema,
     },
-    async (): Promise<CallToolResult> => {
+    async (args): Promise<CallToolResult> => {
       const pre = await preflight(options);
       if (!pre.ok) {
         return pre.result;
@@ -128,8 +131,13 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
 
       const result = await options.getNotes(pre.port, pre.repoId);
       switch (result.kind) {
-        case 'success':
-          return successResult({ notes: result.notes });
+        case 'success': {
+          const staleCount = result.notes.filter((note) => !isLiveNote(note)).length;
+          return successResult({
+            notes: args.includeStale ? result.notes : result.notes.filter(isLiveNote),
+            staleCount,
+          });
+        }
         case 'http-error':
           return errorResult(describeKnownError(result.code, result.message, result.status));
         case 'invalid-response':

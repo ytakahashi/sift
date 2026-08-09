@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
+import type { Note } from '../domain/notes/types';
 import type { ResolvedRepository } from '../domain/repository/repository';
 import type { RegisterNotesToolsOptions } from './register-notes-tools';
 import { registerNotesTools } from './register-notes-tools';
@@ -16,6 +17,24 @@ function createFakeServer(): { server: McpServer; tools: Map<string, ToolCallbac
 }
 
 const registeredRepo: ResolvedRepository = { id: 'sift-repo', name: 'sift', path: '/repo/sift' };
+
+function liveNote(id: string): Note {
+  return {
+    id,
+    kind: 'file',
+    path: 'a.ts',
+    body: 'note',
+    createdAt: 1,
+    staleness: { kind: 'live' },
+  };
+}
+
+function staleNote(id: string): Note {
+  return {
+    ...liveNote(id),
+    staleness: { kind: 'stale', reason: 'content-changed' },
+  };
+}
 
 function createOptions(
   overrides: Partial<RegisterNotesToolsOptions> = {},
@@ -163,7 +182,7 @@ describe('registerNotesTools', () => {
   describe('list_notes', () => {
     it('returns notes as both content and structuredContent on success', async () => {
       // Given
-      const notes = [{ id: 'n1', kind: 'file' as const, path: 'a.ts', body: 'note', createdAt: 1 }];
+      const notes = [liveNote('n1')];
       const options = createOptions({
         getNotes: vi.fn().mockResolvedValue({ kind: 'success', notes }),
       });
@@ -171,13 +190,47 @@ describe('registerNotesTools', () => {
       registerNotesTools(server, options);
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
+      const payload = { notes, staleCount: 0 };
       expect(options.getNotes).toHaveBeenCalledWith(49321, 'sift-repo');
       expect(result.isError).toBeUndefined();
-      expect(result.structuredContent).toEqual({ notes });
-      expect(result.content).toEqual([{ type: 'text', text: JSON.stringify({ notes }) }]);
+      expect(result.structuredContent).toEqual(payload);
+      expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(payload) }]);
+    });
+
+    it('omits stale notes by default but reports how many were left out', async () => {
+      // Given: one note that still applies and one that no longer does
+      const options = createOptions({
+        getNotes: vi
+          .fn()
+          .mockResolvedValue({ kind: 'success', notes: [liveNote('n1'), staleNote('n2')] }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When: the tool is called without arguments
+      const result = await tools.get('list_notes')!({});
+
+      // Then: the agent sees only actionable notes, and that something was hidden
+      expect(result.structuredContent).toEqual({ notes: [liveNote('n1')], staleCount: 1 });
+    });
+
+    it('includes stale notes when asked', async () => {
+      // Given: the same mix of notes
+      const notes = [liveNote('n1'), staleNote('n2')];
+      const options = createOptions({
+        getNotes: vi.fn().mockResolvedValue({ kind: 'success', notes }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When: the caller opts in
+      const result = await tools.get('list_notes')!({ includeStale: true });
+
+      // Then: everything is returned, still with the count
+      expect(result.structuredContent).toEqual({ notes, staleCount: 1 });
     });
 
     it('returns an actionable error for a known http-error code', async () => {
