@@ -20,9 +20,7 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **Granular Git Actions**: Stage and unstage changes directly from the UI.
 - **Ephemeral Notes**: Add in-memory notes to specific lines, line ranges, or entire files. This is
   perfect for jotting down self-reminders and double-checking your work before it gets etched into
-  your Git history. When the code a note points at changes, the note is marked stale rather than
-  removed, so you can still see what was raised and why it no longer applies. Restoring the code
-  makes the note current again.
+  your Git history.
 - **Notes MCP**: Let MCP-compatible AI agents read the Notes that still apply and add review
   findings directly within your local environment.
 - **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
@@ -140,8 +138,7 @@ Notes and operational details:
   HTTP server and the MCP process.
 - Notes are stored in the HTTP server's memory and cleared when the server exits.
 - `list_notes` returns only the notes that still match the current diff, and reports how many stale
-  ones were left out. Pass `includeStale: true` to see those too. Stale notes are never removed
-  automatically; delete them individually, or clear all notes, from the UI.
+  ones were left out. Pass `includeStale: true` to see those too.
 
 Example requests after the MCP server is connected:
 
