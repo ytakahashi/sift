@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { createNote, getNotes } from './notes-http-client';
+import { createNote, deleteNote, getNotes, updateNote } from './notes-http-client';
 
 const lineNote = {
   id: 'n1',
@@ -285,5 +285,232 @@ describe('createNote', () => {
 
     // Then
     expect(result).toEqual({ kind: 'uncertain' });
+  });
+});
+
+describe('updateNote', () => {
+  it('returns success with the updated note on 200', async () => {
+    // Given
+    const updated = { ...lineNote, body: 'revised' };
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, updated));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:49321/api/repositories/sift-repo/notes/n1',
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: 'revised' }),
+      },
+    );
+    expect(result).toEqual({ kind: 'success', note: updated });
+  });
+
+  it('percent-encodes the note id in the request path', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, lineNote));
+
+    // When
+    await updateNote(49321, 'sift-repo', 'note/1 2', 'revised', fetchImpl);
+
+    // Then
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:49321/api/repositories/sift-repo/notes/note%2F1%202',
+      expect.anything(),
+    );
+  });
+
+  it('returns http-error with the code and message when the note is gone', async () => {
+    // Given
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(404, { error: 'Note not found: n1', code: 'NOTE_NOT_FOUND' }),
+      );
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    // No `uncertain`: PATCH replaces the whole body, so the caller may simply
+    // retry rather than having to check for a partially applied write.
+    expect(result).toEqual({
+      kind: 'http-error',
+      status: 404,
+      code: 'NOTE_NOT_FOUND',
+      message: 'Note not found: n1',
+    });
+  });
+
+  it('returns http-error for a code-less 500 instead of uncertain', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: 'invariant violated' }));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    expect(result).toEqual({
+      kind: 'http-error',
+      status: 500,
+      code: undefined,
+      message: 'invariant violated',
+    });
+  });
+
+  it('returns invalid-error-response when a non-2xx body does not match the error schema', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(422, { unexpected: 'shape' }));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-error-response' });
+  });
+
+  it('returns invalid-response for a 2xx other than the documented 200', async () => {
+    // Given
+    // The PATCH contract is 200; a 202 body shape is unknown, so it is not
+    // assumed to carry the updated note.
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(202, lineNote));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-response' });
+  });
+
+  it('returns invalid-response when a 200 body fails schema validation', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { bad: true }));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-response' });
+  });
+
+  it('returns invalid-response when a 200 body is not valid JSON', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(unparseableResponse(200));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-response' });
+  });
+
+  it('returns network-error when the request cannot be completed', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('socket hang up'));
+
+    // When
+    const result = await updateNote(49321, 'sift-repo', 'n1', 'revised', fetchImpl);
+
+    // Then
+    // A retry is safe, so an unfinished request needs no "uncertain" outcome.
+    expect(result).toEqual({ kind: 'network-error' });
+  });
+});
+
+describe('deleteNote', () => {
+  function noBodyResponse(status: number): Response {
+    return {
+      ok: status >= 200 && status < 300,
+      status,
+      json: () => Promise.reject(new Error('no body')),
+    } as unknown as Response;
+  }
+
+  it('returns success on 204 without reading a body', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(noBodyResponse(204));
+
+    // When
+    const result = await deleteNote(49321, 'sift-repo', 'n1', fetchImpl);
+
+    // Then
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:49321/api/repositories/sift-repo/notes/n1',
+      { method: 'DELETE' },
+    );
+    expect(result).toEqual({ kind: 'success' });
+  });
+
+  it('percent-encodes the note id in the request path', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(noBodyResponse(204));
+
+    // When
+    await deleteNote(49321, 'sift-repo', 'note/1 2', fetchImpl);
+
+    // Then
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:49321/api/repositories/sift-repo/notes/note%2F1%202',
+      { method: 'DELETE' },
+    );
+  });
+
+  it('returns http-error when the note is already gone', async () => {
+    // Given
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(
+        jsonResponse(404, { error: 'Note not found: n1', code: 'NOTE_NOT_FOUND' }),
+      );
+
+    // When
+    const result = await deleteNote(49321, 'sift-repo', 'n1', fetchImpl);
+
+    // Then
+    // A repeated delete is reported as an error rather than folded into
+    // success: it is indistinguishable from a wrong or stale id, and hiding it
+    // would let the caller believe it deleted something it never saw.
+    expect(result).toEqual({
+      kind: 'http-error',
+      status: 404,
+      code: 'NOTE_NOT_FOUND',
+      message: 'Note not found: n1',
+    });
+  });
+
+  it('returns invalid-error-response when a non-2xx body does not match the error schema', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(unparseableResponse(500));
+
+    // When
+    const result = await deleteNote(49321, 'sift-repo', 'n1', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-error-response' });
+  });
+
+  it('returns invalid-response for a 2xx other than the documented 204', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { deleted: true }));
+
+    // When
+    const result = await deleteNote(49321, 'sift-repo', 'n1', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'invalid-response' });
+  });
+
+  it('returns network-error when the request cannot be completed', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockRejectedValue(new Error('socket hang up'));
+
+    // When
+    const result = await deleteNote(49321, 'sift-repo', 'n1', fetchImpl);
+
+    // Then
+    expect(result).toEqual({ kind: 'network-error' });
   });
 });

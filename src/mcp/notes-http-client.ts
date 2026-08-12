@@ -7,6 +7,10 @@ function notesUrl(port: number, repoId: string): string {
   return `${buildLocalServerUrl(port)}/api/repositories/${encodeURIComponent(repoId)}/notes`;
 }
 
+function noteUrl(port: number, repoId: string, noteId: string): string {
+  return `${notesUrl(port, repoId)}/${encodeURIComponent(noteId)}`;
+}
+
 type ParsedErrorResponse =
   { kind: 'valid'; status: number; code?: string; message: string } | { kind: 'invalid' };
 
@@ -80,6 +84,13 @@ export async function getNotes(
     : { kind: 'invalid-response' };
 }
 
+/**
+ * Creation is the only note operation that can fail with an unknown outcome:
+ * a retry after an unconfirmed POST can leave a duplicate note behind, so the
+ * caller has to be told to check before retrying. `updateNote`/`deleteNote`
+ * address an existing note by id and are safe to retry, hence no `uncertain`
+ * there.
+ */
 export type CreateNoteResult =
   | { kind: 'success'; note: Note }
   | { kind: 'known-error'; status: number; code?: string; message: string }
@@ -141,4 +152,109 @@ export async function createNote(
 
   const parsed = noteSchema.safeParse(responseBody);
   return parsed.success ? { kind: 'success', note: parsed.data } : { kind: 'uncertain' };
+}
+
+/**
+ * Unlike `createNote`, this has no `uncertain` outcome: PATCH replaces the
+ * whole body, so resending the same request converges on the same note and an
+ * unconfirmed attempt can simply be retried.
+ */
+export type UpdateNoteResult =
+  | { kind: 'success'; note: Note }
+  | { kind: 'http-error'; status: number; code?: string; message: string }
+  | { kind: 'invalid-response' }
+  | { kind: 'invalid-error-response' }
+  | { kind: 'network-error' };
+
+export async function updateNote(
+  port: number,
+  repoId: string,
+  noteId: string,
+  body: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<UpdateNoteResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(noteUrl(port, repoId, noteId), {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ body }),
+    });
+  } catch (_error: unknown) {
+    return { kind: 'network-error' };
+  }
+
+  // The PATCH contract is 200; any other 2xx doesn't match it and its body
+  // shape is unknown, so it is treated the same as a malformed response rather
+  // than assumed to carry the updated note.
+  if (response.status !== 200) {
+    if (response.ok) {
+      return { kind: 'invalid-response' };
+    }
+    const parsedError = await parseErrorResponse(response);
+    if (parsedError.kind === 'invalid') {
+      return { kind: 'invalid-error-response' };
+    }
+    return {
+      kind: 'http-error',
+      status: parsedError.status,
+      code: parsedError.code,
+      message: parsedError.message,
+    };
+  }
+
+  let responseBody: unknown;
+  try {
+    responseBody = await response.json();
+  } catch (_error: unknown) {
+    return { kind: 'invalid-response' };
+  }
+
+  const parsed = noteSchema.safeParse(responseBody);
+  return parsed.success ? { kind: 'success', note: parsed.data } : { kind: 'invalid-response' };
+}
+
+/**
+ * Like `updateNote`, retry-safe and therefore without an `uncertain` outcome:
+ * a repeated DELETE removes nothing extra, it only turns into a 404.
+ */
+export type DeleteNoteResult =
+  | { kind: 'success' }
+  | { kind: 'http-error'; status: number; code?: string; message: string }
+  | { kind: 'invalid-response' }
+  | { kind: 'invalid-error-response' }
+  | { kind: 'network-error' };
+
+export async function deleteNote(
+  port: number,
+  repoId: string,
+  noteId: string,
+  fetchImpl: typeof fetch = fetch,
+): Promise<DeleteNoteResult> {
+  let response: Response;
+  try {
+    response = await fetchImpl(noteUrl(port, repoId, noteId), { method: 'DELETE' });
+  } catch (_error: unknown) {
+    return { kind: 'network-error' };
+  }
+
+  // The DELETE contract is 204. A different 2xx means the server is not
+  // speaking this contract, which is not something to report as a deletion.
+  if (response.status !== 204) {
+    if (response.ok) {
+      return { kind: 'invalid-response' };
+    }
+    const parsedError = await parseErrorResponse(response);
+    if (parsedError.kind === 'invalid') {
+      return { kind: 'invalid-error-response' };
+    }
+    return {
+      kind: 'http-error',
+      status: parsedError.status,
+      code: parsedError.code,
+      message: parsedError.message,
+    };
+  }
+
+  return { kind: 'success' };
 }

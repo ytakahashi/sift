@@ -52,9 +52,9 @@ export const UNCERTAIN_ADD_NOTE_MESSAGE =
   'same target and body before retrying.';
 
 /**
- * Shared actionable-guidance mapping for both `list_notes` and `add_note`
- * non-2xx responses that are not "uncertain" (add_note's own uncertain cases
- * are handled separately, before this is ever called). Exhaustively switches
+ * Shared actionable-guidance mapping for the non-2xx responses of every tool
+ * that are not "uncertain" (add_note's own uncertain cases are handled
+ * separately, before this is ever called). Exhaustively switches
  * over known codes so adding a new `ErrorResponseCode` without a case here
  * fails the build instead of silently falling back to a generic message.
  */
@@ -93,7 +93,7 @@ function describeKnownErrorCode(code: ErrorResponseCode, message: string): strin
     case 'REPOSITORY_INVALID':
       return `${message} Check the repository's registration state.`;
     case 'NOTE_NOT_FOUND':
-      return message;
+      return `${message} The note id is unknown to the server, so it was either already deleted or the id is stale. Call list_notes for the current ids and retry.`;
     default: {
       // Compile-time exhaustiveness check: adding a new ErrorResponseCode
       // without a case here fails the build instead of silently returning

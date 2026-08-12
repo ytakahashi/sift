@@ -151,6 +151,16 @@ describe('describeKnownError', () => {
     expect(guidance).toContain('kind: "file"');
   });
 
+  it('points at list_notes for NOTE_NOT_FOUND', () => {
+    // Given / When
+    const guidance = describeKnownError('NOTE_NOT_FOUND' satisfies ErrorResponseCode, 'x', 404);
+
+    // Then
+    // update_note / delete_note address a note by an id the agent got from a
+    // previous list_notes call, so recovery is always to re-read the ids.
+    expect(guidance).toContain('list_notes');
+  });
+
   it('mentions server logs for a code-less 500', () => {
     // Given / When
     const guidance = describeKnownError(undefined, 'invariant violated', 500);
