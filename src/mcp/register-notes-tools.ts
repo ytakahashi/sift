@@ -2,10 +2,17 @@ import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import type { NoteCreateTarget } from '../domain/notes/types';
 import type { ResolvedRepository } from '../domain/repository/repository';
 import { addNoteInputSchema, addNoteOutputSchema } from './add-note-schema';
-import type { CreateNoteResult, GetNotesResult } from './notes-http-client';
+import { deleteNoteInputSchema, deleteNoteOutputSchema } from './delete-note-schema';
+import type {
+  CreateNoteResult,
+  DeleteNoteResult,
+  GetNotesResult,
+  UpdateNoteResult,
+} from './notes-http-client';
 import type { NotesApiCompatibility } from './notes-compatibility';
 import { isLiveNote } from '../domain/notes/note-staleness';
 import { listNotesInputSchema, listNotesOutputSchema } from './notes-schema';
+import { updateNoteInputSchema, updateNoteOutputSchema } from './update-note-schema';
 import type { RepoRootResolver } from './repo-target';
 import {
   describeCapabilityMissing,
@@ -34,6 +41,13 @@ export interface RegisterNotesToolsOptions {
     target: NoteCreateTarget,
     body: string,
   ) => Promise<CreateNoteResult>;
+  updateNote: (
+    port: number,
+    repoId: string,
+    noteId: string,
+    body: string,
+  ) => Promise<UpdateNoteResult>;
+  deleteNote: (port: number, repoId: string, noteId: string) => Promise<DeleteNoteResult>;
 }
 
 function errorResult(message: string): CallToolResult {
@@ -63,7 +77,7 @@ function describeIncompatibility(
 type Preflight = { ok: true; repoId: string; port: number } | { ok: false; result: CallToolResult };
 
 /**
- * Shared pre-call sequence for both tools: resolve the git root (lazily,
+ * Shared pre-call sequence for every tool: resolve the git root (lazily,
  * cached after the first success), look up the repoId fresh on every call
  * (never cached; a `sift add` after this process started must take effect
  * without a restart), and probe server compatibility before ever touching
@@ -119,7 +133,8 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
         'match the current diff are returned; notes whose code has since changed are marked ' +
         'stale and left out, with "staleCount" reporting how many. Call this right after ' +
         'editing a file to see which notes went stale, which usually means they are addressed. ' +
-        'Pass includeStale: true to see them with the reason they no longer apply.',
+        'Pass includeStale: true to see them with the reason they no longer apply. The returned ' +
+        'ids are what update_note and delete_note take.',
       inputSchema: listNotesInputSchema,
       outputSchema: listNotesOutputSchema,
     },
@@ -177,6 +192,77 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
           return errorResult(describeInvalidResponse());
         case 'uncertain':
           return errorResult(UNCERTAIN_ADD_NOTE_MESSAGE);
+      }
+    },
+  );
+
+  server.registerTool(
+    'update_note',
+    {
+      description:
+        'Rewrite the body of an existing note, for example to correct or narrow a review ' +
+        'comment. The body is replaced in full, so send the complete new text. Get noteId from ' +
+        'list_notes: ids only live as long as the Sift server process, and a note that is gone ' +
+        'reports NOTE_NOT_FOUND. Only revise notes you wrote yourself; a note may have been ' +
+        'written by the person reviewing the diff.',
+      inputSchema: updateNoteInputSchema,
+      outputSchema: updateNoteOutputSchema,
+      // Replacing the whole body converges on the same note however many times
+      // it is sent, so a retry after an unclear failure is safe.
+      annotations: { idempotentHint: true },
+    },
+    async (args): Promise<CallToolResult> => {
+      const pre = await preflight(options);
+      if (!pre.ok) {
+        return pre.result;
+      }
+
+      const result = await options.updateNote(pre.port, pre.repoId, args.noteId, args.body);
+      switch (result.kind) {
+        case 'success':
+          return successResult({ note: result.note });
+        case 'http-error':
+          return errorResult(describeKnownError(result.code, result.message, result.status));
+        case 'invalid-response':
+        case 'invalid-error-response':
+          return errorResult(describeInvalidResponse());
+        case 'network-error':
+          return errorResult(describeUnreachable());
+      }
+    },
+  );
+
+  server.registerTool(
+    'delete_note',
+    {
+      description:
+        'Delete a note, for example to withdraw a review comment that no longer applies. Get ' +
+        'noteId from list_notes: ids only live as long as the Sift server process, and a note ' +
+        'that is already gone reports NOTE_NOT_FOUND. Only delete notes you wrote yourself; a ' +
+        'note may have been written by the person reviewing the diff, and deletion cannot be ' +
+        'undone.',
+      inputSchema: deleteNoteInputSchema,
+      outputSchema: deleteNoteOutputSchema,
+      annotations: { idempotentHint: true, destructiveHint: true },
+    },
+    async (args): Promise<CallToolResult> => {
+      const pre = await preflight(options);
+      if (!pre.ok) {
+        return pre.result;
+      }
+
+      const result = await options.deleteNote(pre.port, pre.repoId, args.noteId);
+      switch (result.kind) {
+        case 'success':
+          // The 204 carries no body, so the outcome is restated from the request.
+          return successResult({ deleted: true, noteId: args.noteId });
+        case 'http-error':
+          return errorResult(describeKnownError(result.code, result.message, result.status));
+        case 'invalid-response':
+        case 'invalid-error-response':
+          return errorResult(describeInvalidResponse());
+        case 'network-error':
+          return errorResult(describeUnreachable());
       }
     },
   );

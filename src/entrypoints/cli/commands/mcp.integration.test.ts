@@ -39,7 +39,7 @@ describe('sift mcp (real stdio child process)', () => {
     execSync('pnpm run build:server', { cwd: PROJECT_ROOT, stdio: 'inherit' });
   });
 
-  it('initializes over real stdio, lists both Notes tools, and shuts down cleanly on its own', async () => {
+  it('initializes over real stdio, lists every Notes tool, and shuts down cleanly on its own', async () => {
     const client = new Client({ name: 'sift-mcp-stdio-test', version: '0.0.0' });
     const transport = new StdioClientTransport({
       command: process.execPath,
@@ -62,7 +62,12 @@ describe('sift mcp (real stdio child process)', () => {
 
       const { tools } = await client.listTools();
 
-      expect(tools.map((tool) => tool.name).sort()).toEqual(['add_note', 'list_notes']);
+      expect(tools.map((tool) => tool.name).sort()).toEqual([
+        'add_note',
+        'delete_note',
+        'list_notes',
+        'update_note',
+      ]);
 
       const listNotes = tools.find((tool) => tool.name === 'list_notes')!;
       expect(listNotes.outputSchema).toBeDefined();
@@ -126,7 +131,12 @@ describe('sift mcp (real stdio child process)', () => {
       expect(client.getNegotiatedProtocolVersion()).toBe('2026-07-28');
 
       const { tools } = await client.listTools();
-      expect(tools.map((tool) => tool.name).sort()).toEqual(['add_note', 'list_notes']);
+      expect(tools.map((tool) => tool.name).sort()).toEqual([
+        'add_note',
+        'delete_note',
+        'list_notes',
+        'update_note',
+      ]);
     } finally {
       await client.close().catch(() => {});
     }

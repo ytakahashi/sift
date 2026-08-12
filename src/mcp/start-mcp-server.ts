@@ -4,7 +4,7 @@ import type { ResolvedRepository } from '../domain/repository/repository';
 import { APP_INFO } from '../server/app-info';
 import { resolvePort } from '../server/fixed-port';
 import { checkNotesApiCompatibility } from './notes-compatibility';
-import { createNote, getNotes } from './notes-http-client';
+import { createNote, deleteNote, getNotes, updateNote } from './notes-http-client';
 import { registerNotesTools } from './register-notes-tools';
 import { createRepoRootResolver } from './repo-target';
 
@@ -47,6 +47,8 @@ function createNotesServer(options: StartMcpServerOptions): McpServer {
     checkNotesApiCompatibility,
     getNotes,
     createNote,
+    updateNote,
+    deleteNote,
   });
 
   return server;

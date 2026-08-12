@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { Note, NoteCreateTarget } from '../domain/notes/types';
+import { noteBodySchema } from './note-body-schema';
 import { noteSchema } from './notes-schema';
 
 const lineTargetInputSchema = z
@@ -9,7 +10,7 @@ const lineTargetInputSchema = z
     startLine: z.number().int().min(1),
     endLine: z.number().int().min(1),
     bucket: z.enum(['working', 'staged']).optional(),
-    body: z.string().min(1),
+    body: noteBodySchema,
   })
   .strict();
 
@@ -17,7 +18,7 @@ const fileTargetInputSchema = z
   .object({
     kind: z.literal('file'),
     path: z.string().min(1),
-    body: z.string().min(1),
+    body: noteBodySchema,
   })
   .strict();
 

@@ -47,12 +47,14 @@ function createOptions(
     checkNotesApiCompatibility: vi.fn().mockResolvedValue({ kind: 'compatible' }),
     getNotes: vi.fn(),
     createNote: vi.fn(),
+    updateNote: vi.fn(),
+    deleteNote: vi.fn(),
     ...overrides,
   };
 }
 
 describe('registerNotesTools', () => {
-  describe('preflight (shared by both tools)', () => {
+  describe('preflight (shared by every tool)', () => {
     it('short-circuits list_notes when the repo root cannot be resolved, without calling the registry or compat probe', async () => {
       // Given
       const options = createOptions({
@@ -176,6 +178,25 @@ describe('registerNotesTools', () => {
       // Then
       expect(result.isError).toBe(true);
       expect(options.createNote).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['update_note' as const, { noteId: 'n1', body: 'x' }, 'updateNote' as const],
+      ['delete_note' as const, { noteId: 'n1' }, 'deleteNote' as const],
+    ])('also short-circuits %s through the same preflight', async (toolName, args, clientCall) => {
+      // Given
+      const options = createOptions({
+        findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get(toolName)!(args);
+
+      // Then
+      expect(result.isError).toBe(true);
+      expect(options[clientCall]).not.toHaveBeenCalled();
     });
   });
 
@@ -403,6 +424,166 @@ describe('registerNotesTools', () => {
     });
   });
 
+  describe('update_note', () => {
+    it('returns the updated note as structuredContent on success', async () => {
+      // Given
+      const note = { ...liveNote('n1'), body: 'revised' };
+      const options = createOptions({
+        updateNote: vi.fn().mockResolvedValue({ kind: 'success', note }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
+
+      // Then
+      expect(options.updateNote).toHaveBeenCalledWith(49321, 'sift-repo', 'n1', 'revised');
+      expect(result.isError).toBeUndefined();
+      expect(result.structuredContent).toEqual({ note });
+    });
+
+    it('points at list_notes when the note id is unknown to the server', async () => {
+      // Given
+      const options = createOptions({
+        updateNote: vi.fn().mockResolvedValue({
+          kind: 'http-error',
+          status: 404,
+          code: 'NOTE_NOT_FOUND',
+          message: 'Note not found: n1',
+        }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
+
+      // Then
+      expect(result.isError).toBe(true);
+      expect(result.content).toEqual([
+        { type: 'text', text: expect.stringContaining('list_notes') as unknown as string },
+      ]);
+    });
+
+    it.each([['invalid-response' as const], ['invalid-error-response' as const]])(
+      'returns update-or-restart guidance for %s',
+      async (kind) => {
+        // Given
+        const options = createOptions({ updateNote: vi.fn().mockResolvedValue({ kind }) });
+        const { server, tools } = createFakeServer();
+        registerNotesTools(server, options);
+
+        // When
+        const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
+
+        // Then
+        expect(result.isError).toBe(true);
+        expect(result.content).toEqual([
+          { type: 'text', text: expect.stringMatching(/update|restart/i) as unknown as string },
+        ]);
+      },
+    );
+
+    it('returns unreachable guidance when the request fails after preflight said compatible', async () => {
+      // Given
+      const options = createOptions({
+        updateNote: vi.fn().mockResolvedValue({ kind: 'network-error' }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
+
+      // Then
+      expect(result.isError).toBe(true);
+      expect(result.content).toEqual([
+        { type: 'text', text: expect.stringMatching(/sift open|sift serve/i) as unknown as string },
+      ]);
+    });
+  });
+
+  describe('delete_note', () => {
+    it('reports the deletion with the requested id, which the 204 response cannot carry', async () => {
+      // Given
+      const options = createOptions({
+        deleteNote: vi.fn().mockResolvedValue({ kind: 'success' }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get('delete_note')!({ noteId: 'n1' });
+
+      // Then
+      expect(options.deleteNote).toHaveBeenCalledWith(49321, 'sift-repo', 'n1');
+      expect(result.isError).toBeUndefined();
+      expect(result.structuredContent).toEqual({ deleted: true, noteId: 'n1' });
+    });
+
+    it('reports an already-deleted note as an error pointing at list_notes', async () => {
+      // Given
+      const options = createOptions({
+        deleteNote: vi.fn().mockResolvedValue({
+          kind: 'http-error',
+          status: 404,
+          code: 'NOTE_NOT_FOUND',
+          message: 'Note not found: n1',
+        }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get('delete_note')!({ noteId: 'n1' });
+
+      // Then
+      // Not folded into success: a 404 is indistinguishable from a wrong id.
+      expect(result.isError).toBe(true);
+      expect(result.content).toEqual([
+        { type: 'text', text: expect.stringContaining('list_notes') as unknown as string },
+      ]);
+    });
+
+    it.each([['invalid-response' as const], ['invalid-error-response' as const]])(
+      'returns update-or-restart guidance for %s',
+      async (kind) => {
+        // Given
+        const options = createOptions({ deleteNote: vi.fn().mockResolvedValue({ kind }) });
+        const { server, tools } = createFakeServer();
+        registerNotesTools(server, options);
+
+        // When
+        const result = await tools.get('delete_note')!({ noteId: 'n1' });
+
+        // Then
+        expect(result.isError).toBe(true);
+        expect(result.content).toEqual([
+          { type: 'text', text: expect.stringMatching(/update|restart/i) as unknown as string },
+        ]);
+      },
+    );
+
+    it('returns unreachable guidance when the request fails after preflight said compatible', async () => {
+      // Given
+      const options = createOptions({
+        deleteNote: vi.fn().mockResolvedValue({ kind: 'network-error' }),
+      });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options);
+
+      // When
+      const result = await tools.get('delete_note')!({ noteId: 'n1' });
+
+      // Then
+      expect(result.isError).toBe(true);
+      expect(result.content).toEqual([
+        { type: 'text', text: expect.stringMatching(/sift open|sift serve/i) as unknown as string },
+      ]);
+    });
+  });
+
   describe('tool registration shape', () => {
     it('declares idempotentHint: false for add_note', () => {
       // Given
@@ -416,6 +597,36 @@ describe('registerNotesTools', () => {
       // Then
       const addNoteCall = registerTool.mock.calls.find(([name]) => name === 'add_note');
       expect(addNoteCall?.[1]).toMatchObject({ annotations: { idempotentHint: false } });
+    });
+
+    it('declares idempotentHint: true for update_note (a full-body replace converges)', () => {
+      // Given
+      const options = createOptions();
+      const registerTool = vi.fn();
+      const server = { registerTool } as unknown as McpServer;
+
+      // When
+      registerNotesTools(server, options);
+
+      // Then
+      const updateNoteCall = registerTool.mock.calls.find(([name]) => name === 'update_note');
+      expect(updateNoteCall?.[1]).toMatchObject({ annotations: { idempotentHint: true } });
+    });
+
+    it('declares delete_note as idempotent and destructive', () => {
+      // Given
+      const options = createOptions();
+      const registerTool = vi.fn();
+      const server = { registerTool } as unknown as McpServer;
+
+      // When
+      registerNotesTools(server, options);
+
+      // Then
+      const deleteNoteCall = registerTool.mock.calls.find(([name]) => name === 'delete_note');
+      expect(deleteNoteCall?.[1]).toMatchObject({
+        annotations: { idempotentHint: true, destructiveHint: true },
+      });
     });
 
     it('does not set readOnlyHint for list_notes (reconcile can have side effects)', () => {
