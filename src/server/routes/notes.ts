@@ -1,6 +1,6 @@
 import { Hono, type Context } from 'hono';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
-import type { ConfirmedFileGeneration, FileGeneration } from '../../domain/diff/file-generation';
+import type { ConfirmedFileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNoteTarget } from '../../domain/notes/anchored-note';
 import { isNoteEligibleFile } from '../../domain/notes/note-eligibility';
@@ -9,7 +9,7 @@ import type { NoteBucket } from '../../domain/notes/types';
 import type { RepositoryId } from '../../domain/repository/repository';
 import type { Env } from './env';
 import type { FileGenerationProvider } from '../services/file-generation-provider';
-import type { NotesStore } from '../services/notes-store';
+import type { NotesCurrentState, NotesStore } from '../services/notes-store';
 import {
   NoteGenerationUnavailableError,
   NoteRequestValidationError,
@@ -28,11 +28,8 @@ export interface CreateNotesRoutesOptions {
 }
 
 /** Current repository state shared between reconcile and POST target resolution. */
-interface RepoNotesContext {
+interface RepoNotesContext extends NotesCurrentState {
   repoId: RepositoryId;
-  workingFiles: DiffFile[];
-  stagedFiles: DiffFile[];
-  generations: ReadonlyMap<string, FileGeneration>;
 }
 
 type NoteCreateRequest =

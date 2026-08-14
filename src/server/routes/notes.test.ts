@@ -85,6 +85,7 @@ describe('notesRoutes', () => {
     updateBody: Mock;
     remove: Mock;
     clear: Mock;
+    deleteStale: Mock;
   };
   let getWorktreeGenerations: Mock;
   let getFiles: Mock;
@@ -103,6 +104,7 @@ describe('notesRoutes', () => {
       updateBody: vi.fn().mockResolvedValue(createStoredNote('updated')),
       remove: vi.fn().mockResolvedValue(undefined),
       clear: vi.fn().mockResolvedValue(undefined),
+      deleteStale: vi.fn().mockResolvedValue({ deletedCount: 0, changed: false }),
     };
     getWorktreeGenerations = vi.fn(async () => generations);
     getFiles = vi.fn(async (bucket: string) => (bucket === 'working' ? workingFiles : stagedFiles));

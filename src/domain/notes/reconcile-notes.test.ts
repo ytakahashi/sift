@@ -377,6 +377,103 @@ describe('reconcileNotes', () => {
     expect(result.changed).toBe(false);
   });
 
+  it('keeps a content-changed note stale while the current generation is unavailable', () => {
+    // Given: a note that already went stale on the generation check, whose
+    // file is back in the diff but whose current generation cannot be read
+    const record = markedStale(createFileRecord('n1', 'a.ts'), 'content-changed');
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 1, content: 'x' }] })];
+
+    // When: reconcile runs while the generation is indeterminate
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', { kind: 'unavailable', reason: 'read error' }]]),
+    });
+
+    // Then: indeterminate cannot confirm recovery any more than it can confirm
+    // a change, so the earlier verdict stands instead of flipping to live
+    expect(result.records).toEqual([record]);
+    expect(result.changed).toBe(false);
+  });
+
+  it('keeps a file-out-of-diff note stale while the current generation is unavailable', () => {
+    // Given: a note stale because its file had left the diff, now back in the
+    // diff but with a generation that cannot be read
+    const record = markedStale(createFileRecord('n1', 'a.ts'), 'file-out-of-diff');
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 1, content: 'x' }] })];
+
+    // When: reconcile runs while the generation is indeterminate
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', { kind: 'unavailable', reason: 'read error' }]]),
+    });
+
+    // Then: the file being present again is not enough to declare the note
+    // live; the content it would apply to was never confirmed
+    expect(result.records).toEqual([record]);
+    expect(result.changed).toBe(false);
+  });
+
+  it('keeps a range-unresolved note stale while the current generation is unavailable', () => {
+    // Given: a line note stale for an unresolvable range, whose anchored line
+    // and content do match the current diff again
+    const record = markedStale(
+      createLineRecord({
+        id: 'n1',
+        path: 'a.ts',
+        bucket: 'working',
+        line: 5,
+        lineContents: ['x'],
+      }),
+      'range-unresolved',
+    );
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'x' }] })];
+
+    // When: reconcile runs while the generation is indeterminate
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', { kind: 'unavailable', reason: 'read error' }]]),
+    });
+
+    // Then: a re-resolvable range does not recover the note either, so what the
+    // notes list shows stale stays eligible for stale deletion
+    expect(result.records).toEqual([record]);
+    expect(result.changed).toBe(false);
+  });
+
+  it('still marks a live line note range-unresolved when the generation is unavailable', () => {
+    // Given: a live line note whose anchored content is no longer in the diff,
+    // while the file's current generation cannot be read
+    const record = createLineRecord({
+      id: 'n1',
+      path: 'a.ts',
+      bucket: 'working',
+      line: 5,
+      lineContents: ['x'],
+    });
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 5, content: 'y' }] })];
+
+    // When: reconcile runs while the generation is indeterminate
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', { kind: 'unavailable', reason: 'read error' }]]),
+    });
+
+    // Then: only the generation check is suspended. The range check reads the
+    // diff, which was fetched successfully, so an unreadable generation neither
+    // rescues the note nor is the cause of it going stale: a readable
+    // generation reaches the very same verdict here.
+    expect(result.records).toEqual([markedStale(record, 'range-unresolved')]);
+    expect(result.changed).toBe(true);
+  });
+
   it('marks notes stale when the path was replaced by a submodule', () => {
     // Given: the note's fileId now only matches a submodule entry
     const record = createFileRecord('n1', 'vendor/lib');

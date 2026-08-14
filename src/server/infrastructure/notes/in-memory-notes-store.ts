@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
-import type { FileGeneration } from '../../../domain/diff/file-generation';
-import type { DiffFile } from '../../../domain/diff/types';
 import type { AnchoredNote } from '../../../domain/notes/anchored-note';
 import type { NoteReconcileRecord } from '../../../domain/notes/reconcile-notes';
 import { reconcileNotes } from '../../../domain/notes/reconcile-notes';
 import type { RepositoryId } from '../../../domain/repository/repository';
-import type { NoteAnchor, NoteDraft, NotesStore } from '../../services/notes-store';
+import type {
+  DeleteStaleNotesResult,
+  NoteAnchor,
+  NoteDraft,
+  NotesCurrentState,
+  NotesStore,
+} from '../../services/notes-store';
 import { NoteNotFoundError } from '../../services/notes-store';
 
 /**
@@ -23,14 +27,7 @@ import { NoteNotFoundError } from '../../services/notes-store';
 export class InMemoryNotesStore implements NotesStore {
   private readonly records = new Map<RepositoryId, NoteReconcileRecord[]>();
 
-  async reconcile(
-    repoId: RepositoryId,
-    current: {
-      workingFiles: DiffFile[];
-      stagedFiles: DiffFile[];
-      generations: ReadonlyMap<string, FileGeneration>;
-    },
-  ): Promise<boolean> {
+  async reconcile(repoId: RepositoryId, current: NotesCurrentState): Promise<boolean> {
     const existing = this.records.get(repoId);
     if (!existing || existing.length === 0) {
       return false;
@@ -104,5 +101,42 @@ export class InMemoryNotesStore implements NotesStore {
 
   async clear(repoId: RepositoryId): Promise<void> {
     this.records.delete(repoId);
+  }
+
+  async deleteStale(
+    repoId: RepositoryId,
+    current: NotesCurrentState,
+  ): Promise<DeleteStaleNotesResult> {
+    const existing = this.records.get(repoId);
+    if (!existing || existing.length === 0) {
+      return { deletedCount: 0, changed: false };
+    }
+
+    // Everything below is computed synchronously and written back in a single
+    // step, so no other mutation can observe or interleave with the state
+    // between judging and deleting (see NotesStore.deleteStale).
+    const result = reconcileNotes({
+      records: existing,
+      workingFiles: current.workingFiles,
+      stagedFiles: current.stagedFiles,
+      generations: current.generations,
+    });
+    const retained = result.records.filter((record) => record.note.staleness.kind !== 'stale');
+    const deletedCount = result.records.length - retained.length;
+
+    if (deletedCount === 0) {
+      if (result.changed) {
+        this.records.set(repoId, result.records);
+      }
+      return { deletedCount: 0, changed: result.changed };
+    }
+
+    if (retained.length === 0) {
+      // Normalize to the same empty state clear() leaves behind.
+      this.records.delete(repoId);
+    } else {
+      this.records.set(repoId, retained);
+    }
+    return { deletedCount, changed: true };
   }
 }

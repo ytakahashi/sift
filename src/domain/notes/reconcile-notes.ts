@@ -48,7 +48,9 @@ const LIVE: NoteStaleness = { kind: 'live' };
  *    replaced by a submodule. Failure means 'file-out-of-diff'.
  * 2. Generation — the file's current worktree generation must equal the
  *    creation-time one. `unavailable` (or a missing map entry) means
- *    indeterminate, never "changed": the note keeps its current state.
+ *    indeterminate, never "changed", and equally never "recovered": every
+ *    already-stale note holds its verdict, whatever its reason, instead of
+ *    returning to live on a state nothing could read.
  *    Stage/unstage/commit do not touch the worktree, so they pass here.
  *    Failure means 'content-changed'.
  * 3. Re-anchor (line notes) — the target must re-resolve with path, line
@@ -87,7 +89,18 @@ function reconcileRecord(
     return withStaleness(record, { kind: 'stale', reason: 'file-out-of-diff' });
   }
 
-  if (hasGenerationChanged(record.generation, input.generations.get(paneFile.path))) {
+  const current = input.generations.get(paneFile.path);
+  if (isIndeterminate(current)) {
+    // An indeterminate current state can confirm a recovery no more than it can
+    // confirm a change, so an already-stale note holds its verdict whatever the
+    // reason: returning to live would claim the note matches content that could
+    // not be read. Only this check is suspended, not the pass: a live note goes
+    // on to the range check, which is decided from the diff that was read
+    // successfully and therefore stays in force.
+    if (record.note.staleness.kind === 'stale') {
+      return record;
+    }
+  } else if (hasGenerationChanged(record.generation, current)) {
     return withStaleness(record, { kind: 'stale', reason: 'content-changed' });
   }
 
@@ -162,14 +175,16 @@ function findEligiblePaneFile(fileId: string, input: ReconcileNotesInput): DiffF
   return null;
 }
 
+/** Indeterminate current state: a read error, a provider anomaly, or no entry. */
+function isIndeterminate(
+  current: FileGeneration | undefined,
+): current is undefined | Extract<FileGeneration, { kind: 'unavailable' }> {
+  return current === undefined || current.kind === 'unavailable';
+}
+
 function hasGenerationChanged(
   stored: ConfirmedFileGeneration,
-  current: FileGeneration | undefined,
+  current: ConfirmedFileGeneration,
 ): boolean {
-  // Indeterminate current state (read error, provider anomaly) must never be
-  // read as a change; the check is simply skipped for this pass.
-  if (current === undefined || current.kind === 'unavailable') {
-    return false;
-  }
   return serializeFileGeneration(current) !== serializeFileGeneration(stored);
 }
