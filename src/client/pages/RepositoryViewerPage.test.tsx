@@ -102,6 +102,7 @@ const testDependencies: AppDependencies = {
     updateNote: vi.fn(),
     deleteNote: vi.fn(async () => {}),
     clearNotes: vi.fn(async () => {}),
+    deleteStaleNotes: vi.fn(async () => 0),
   },
   repositoryChangeSource: {
     subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
@@ -132,6 +133,7 @@ function Page({
 describe('RepositoryViewerPage interactions', () => {
   const refresh = vi.fn();
   const clearNotes = vi.fn();
+  const deleteStaleNotes = vi.fn();
   const stageFile = vi.fn(async () => {});
   const unstageFile = vi.fn(async () => {});
   const stageAllWorkingFiles = vi.fn(async () => {});
@@ -173,6 +175,7 @@ describe('RepositoryViewerPage interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -728,6 +731,7 @@ describe('RepositoryViewerPage interactions', () => {
 describe('RepositoryViewerPage Notes Interactions', () => {
   const refresh = vi.fn();
   const clearNotes = vi.fn();
+  const deleteStaleNotes = vi.fn();
   const originalClipboard = navigator.clipboard;
 
   beforeEach(() => {
@@ -785,6 +789,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -815,6 +820,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -847,6 +853,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -902,6 +909,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -939,6 +947,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -960,6 +969,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -991,6 +1001,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,

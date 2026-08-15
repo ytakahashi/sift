@@ -22,6 +22,7 @@ interface GatewayMock extends NotesGateway {
   updateNote: Mock<NotesGateway['updateNote']>;
   deleteNote: Mock<NotesGateway['deleteNote']>;
   clearNotes: Mock<NotesGateway['clearNotes']>;
+  deleteStaleNotes: Mock<NotesGateway['deleteStaleNotes']>;
 }
 
 function createGateway(): GatewayMock {
@@ -31,6 +32,7 @@ function createGateway(): GatewayMock {
     updateNote: vi.fn(async () => createNote('updated')),
     deleteNote: vi.fn(async () => {}),
     clearNotes: vi.fn(async () => {}),
+    deleteStaleNotes: vi.fn(async () => 0),
   };
 }
 
@@ -148,6 +150,82 @@ describe('useNotes', () => {
     // Then: the stale failure banner is cleared along with the fresh data
     expect(result.current.error).toBeNull();
     expect(result.current.notes).toHaveLength(1);
+  });
+
+  describe('deleteStaleNotes', () => {
+    const staleNote: Note = {
+      ...createNote('n2'),
+      staleness: { kind: 'stale', reason: 'file-out-of-diff' },
+    };
+
+    it('shows the refetched list instead of filtering the stale notes locally', async () => {
+      // Given: the list holds a live and a stale note, and the server keeps the
+      // stale one because it went back to live before the request arrived
+      gateway.fetchNotes.mockResolvedValue([createNote('n1'), staleNote]);
+      const { result } = renderHook(() => useNotes(gateway, 'my-app'));
+      await waitFor(() => expect(result.current.notes).toHaveLength(2));
+      gateway.deleteStaleNotes.mockResolvedValue(0);
+      gateway.fetchNotes.mockResolvedValue([createNote('n1'), createNote('n2')]);
+
+      // When: the stale notes are deleted in bulk
+      await act(async () => {
+        await result.current.deleteStaleNotes();
+      });
+
+      // Then: one request goes out and the server's answer replaces the list
+      expect(gateway.deleteStaleNotes).toHaveBeenCalledTimes(1);
+      expect(gateway.deleteStaleNotes).toHaveBeenCalledWith('my-app');
+      expect(result.current.notes).toEqual([createNote('n1'), createNote('n2')]);
+    });
+
+    it('records failures in the error state and keeps the stale notes listed', async () => {
+      // Given: the server cannot determine the current staleness
+      gateway.fetchNotes.mockResolvedValue([staleNote]);
+      gateway.deleteStaleNotes.mockRejectedValue(new NotesActionError('git diff failed', 500));
+      const { result } = renderHook(() => useNotes(gateway, 'my-app'));
+      await waitFor(() => expect(result.current.notes).toHaveLength(1));
+
+      // When: the bulk deletion is attempted (no editor to catch a rejection)
+      await act(async () => {
+        await result.current.deleteStaleNotes();
+      });
+
+      // Then: the banner reports it and the notes stay, so it can be retried
+      expect(result.current.error).toBe('git diff failed');
+      expect(result.current.notes).toEqual([staleNote]);
+      expect(result.current.mutating).toBe(false);
+    });
+
+    it('exposes mutating=true while the bulk deletion is in flight', async () => {
+      // Given: a bulk deletion that resolves only when released
+      let release: (deletedCount: number) => void = () => {};
+      gateway.deleteStaleNotes.mockImplementation(
+        () =>
+          new Promise<number>((resolvePromise) => {
+            release = resolvePromise;
+          }),
+      );
+      const { result } = renderHook(() => useNotes(gateway, 'my-app'));
+      await waitFor(() => expect(result.current.notes).toHaveLength(1));
+
+      // When: the deletion starts
+      let pending: Promise<void> = Promise.resolve();
+      act(() => {
+        pending = result.current.deleteStaleNotes();
+      });
+
+      // Then: both the per-note and the bulk delete actions can be disabled
+      await waitFor(() => expect(result.current.mutating).toBe(true));
+
+      // When: the server responds
+      await act(async () => {
+        release(1);
+        await pending;
+      });
+
+      // Then: the flag resets
+      expect(result.current.mutating).toBe(false);
+    });
   });
 
   it('refetches on demand (SSE notes-changed / diff refresh)', async () => {

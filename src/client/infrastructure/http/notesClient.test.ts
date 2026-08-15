@@ -106,6 +106,48 @@ describe('httpNotesGateway', () => {
     });
   });
 
+  it('deletes the stale notes through the collection filter and returns the count', async () => {
+    // Given: the server removed the notes that were still stale on arrival
+    const fetchMock = stubFetchOk({ deletedCount: 3 });
+
+    // When
+    const deletedCount = await httpNotesGateway.deleteStaleNotes('my app');
+
+    // Then: the repository id is encoded and the filter selects only stale notes
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/my%20app/notes?staleness=stale', {
+      method: 'DELETE',
+    });
+    expect(deletedCount).toBe(3);
+  });
+
+  it('surfaces a failed stale deletion as NotesActionError', async () => {
+    // Given: the server could not load the current state to judge staleness
+    stubFetchError(500, 'git diff failed');
+
+    // When / Then: the caller sees the server message, not a count
+    await expect(httpNotesGateway.deleteStaleNotes('my-app')).rejects.toMatchObject({
+      name: 'NotesActionError',
+      message: 'git diff failed',
+      statusCode: 500,
+    });
+  });
+
+  it.each([
+    ['a missing count', {}],
+    ['a non-numeric count', { deletedCount: '3' }],
+    ['a negative count', { deletedCount: -1 }],
+    ['a fractional count', { deletedCount: 1.5 }],
+    ['a non-object body', 'ok'],
+  ])('rejects a malformed success body with %s', async (_label, payload) => {
+    // Given: a 200 whose body does not match the endpoint contract
+    stubFetchOk(payload);
+
+    // When / Then: the boundary refuses it rather than passing a bogus count on
+    await expect(httpNotesGateway.deleteStaleNotes('my-app')).rejects.toBeInstanceOf(
+      NotesActionError,
+    );
+  });
+
   it('throws NotesActionError carrying the server message and status', async () => {
     // Given: the server rejects with a recovery hint
     stubFetchError(422, 'Line 99 of "a.ts" is not part of the current diff.');

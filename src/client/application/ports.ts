@@ -47,9 +47,12 @@ export class WorkspaceActionError extends Error {
 }
 
 /**
- * Thrown by NotesGateway implementations on non-2xx responses. The message
- * comes from the server's `{ error }` body, so recovery guidance (e.g. the
- * 422 hints about file notes or buckets) can be shown to the user verbatim.
+ * Thrown by NotesGateway implementations when a request does not yield a
+ * usable result: a non-2xx response, or a success whose body violates the
+ * endpoint contract. For a non-2xx the message comes from the server's
+ * `{ error }` body, so recovery guidance (e.g. the 422 hints about file notes
+ * or buckets) can be shown to the user verbatim; for a contract violation the
+ * adapter supplies it and `statusCode` is the status that was received.
  */
 export class NotesActionError extends Error {
   constructor(
@@ -102,6 +105,13 @@ export interface NotesGateway {
   updateNote(repoId: RepositoryId, noteId: string, body: string): Promise<Note>;
   deleteNote(repoId: RepositoryId, noteId: string): Promise<void>;
   clearNotes(repoId: RepositoryId): Promise<void>;
+  /**
+   * Deletes the notes that are still stale when the server handles the
+   * request and resolves with how many were removed. The server re-derives
+   * staleness at that moment, so the count can differ from what the caller
+   * last displayed; zero is a normal success.
+   */
+  deleteStaleNotes(repoId: RepositoryId): Promise<number>;
 }
 
 export interface RepositoryChangeSubscription {

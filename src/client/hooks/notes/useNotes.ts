@@ -13,11 +13,12 @@ export interface UseNotesResult {
   addNote: (target: NoteCreateTarget, body: string) => Promise<void>;
   updateNote: (noteId: string, body: string) => Promise<void>;
   /**
-   * Input-less mutations (delete/clear) have no editor to report into, so
+   * Input-less mutations (the deletions) have no editor to report into, so
    * failures land in `error` (page banner) and the promise resolves normally.
    */
   deleteNote: (noteId: string) => Promise<void>;
   clearNotes: () => Promise<void>;
+  deleteStaleNotes: () => Promise<void>;
   /** Re-reads the server-side (reconciled) notes; used by SSE and diff refresh. */
   refetchNotes: () => Promise<void>;
   mutating: boolean;
@@ -117,12 +118,29 @@ export function useNotes(notesGateway: NotesGateway, repoId: RepositoryId): UseN
     }
   }, [notesGateway, refetchNotes, repoId]);
 
+  // The server reports how many notes it deleted, but the count is dropped
+  // here: the list is rebuilt from the refetch, never from filtering locally,
+  // because the server may also have re-anchored or re-marked the rest.
+  const deleteStaleNotes = useCallback(async (): Promise<void> => {
+    setMutating(true);
+    setError(null);
+    try {
+      await notesGateway.deleteStaleNotes(repoId);
+      await refetchNotes();
+    } catch (deleteError: unknown) {
+      setError(deleteError instanceof Error ? deleteError.message : String(deleteError));
+    } finally {
+      setMutating(false);
+    }
+  }, [notesGateway, refetchNotes, repoId]);
+
   return {
     notes,
     addNote,
     updateNote,
     deleteNote,
     clearNotes,
+    deleteStaleNotes,
     refetchNotes,
     mutating,
     error,
