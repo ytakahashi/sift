@@ -174,6 +174,7 @@ function RepositoryWorkspace({
     addNote,
     updateNote,
     deleteNote,
+    deleteStaleNotes,
     refetchNotes,
     mutating: notesMutating,
     error: notesError,
@@ -306,8 +307,9 @@ function RepositoryWorkspace({
             notes={notes}
             onClose={notesPanel.close}
             onDeleteNote={deleteNote}
+            onDeleteStaleNotes={() => void deleteStaleNotes()}
             onSelectLocation={handleSelectNoteLocation}
-            deleteDisabled={notesMutating}
+            mutationDisabled={notesMutating}
           />
         )}
         {isFileListOpen && (
