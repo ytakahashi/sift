@@ -116,6 +116,28 @@ function readCreateTarget(body: Record<string, unknown>): NoteCreateRequest {
   throw new NoteRequestValidationError('Note target kind must be "line" or "file".');
 }
 
+type NotesDeleteScope = 'all' | 'stale';
+
+/**
+ * The collection DELETE takes either no query at all (clear all) or exactly
+ * `staleness=stale`. Anything else — empty value, unknown name or value,
+ * repeated or extra parameters — is rejected instead of falling back to the
+ * clear-all, so a typo cannot turn into the more destructive operation.
+ * Parsed off the raw URL because Hono's query() collapses repeated names.
+ */
+function readNotesDeleteScope(url: string): NotesDeleteScope {
+  const entries = [...new URL(url).searchParams];
+  if (entries.length === 0) {
+    return 'all';
+  }
+  if (entries.length === 1 && entries[0][0] === 'staleness' && entries[0][1] === 'stale') {
+    return 'stale';
+  }
+  throw new NoteRequestValidationError(
+    'Deleting notes accepts no query parameters (clear all) or exactly "staleness=stale".',
+  );
+}
+
 function formatRequestedLineRange(startLine: number, endLine: number): string {
   return startLine === endLine ? `Line ${startLine}` : `Lines ${startLine}-${endLine}`;
 }
@@ -236,13 +258,11 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
   const resolver = options.repositoryResolver;
 
   /**
-   * Shared preprocessing for every handler except the explicit clear-all:
-   * fetch both pane diffs, batch-fetch worktree generations for the
-   * note-eligible paths, and reconcile the store so every note in the response
-   * reports its staleness against the diff as it is right now. Stale notes are
-   * returned like any other; it is the caller that decides what to do with them.
+   * Loads the current repository state notes are judged against: both pane
+   * diffs and the batch-fetched worktree generations of the note-eligible
+   * paths. Loading only, so each caller decides how the store consumes it.
    */
-  const reconcileRepo = async (c: Context<Env>): Promise<RepoNotesContext> => {
+  const loadRepoNotesContext = async (c: Context<Env>): Promise<RepoNotesContext> => {
     const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
     const diffProvider = options.createDiffProvider(repository.path);
     const [workingFiles, stagedFiles] = await Promise.all([
@@ -259,15 +279,26 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       .createFileGenerationProvider(repository.path)
       .getWorktreeGenerations(paths);
 
-    const context: RepoNotesContext = {
+    return {
       repoId: repository.id,
       workingFiles,
       stagedFiles,
       generations,
     };
-    const changed = await options.notesStore.reconcile(repository.id, context);
+  };
+
+  /**
+   * Shared preprocessing for every handler except the collection DELETE:
+   * loads the current state and reconciles the store so every note in the
+   * response reports its staleness against the diff as it is right now. Stale
+   * notes are returned like any other; it is the caller that decides what to do
+   * with them.
+   */
+  const reconcileRepo = async (c: Context<Env>): Promise<RepoNotesContext> => {
+    const context = await loadRepoNotesContext(c);
+    const changed = await options.notesStore.reconcile(context.repoId, context);
     if (changed) {
-      options.notifyNotesChanged(repository.id);
+      options.notifyNotesChanged(context.repoId);
     }
     return context;
   };
@@ -335,6 +366,19 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
 
   notesRoutes.delete('/repositories/:repoId/notes', async (c) => {
     try {
+      const scope = readNotesDeleteScope(c.req.url);
+
+      if (scope === 'stale') {
+        // Judging and deleting have to share one state, so the store reconciles
+        // as part of the deletion instead of the route reconciling first.
+        const context = await loadRepoNotesContext(c);
+        const result = await options.notesStore.deleteStale(context.repoId, context);
+        if (result.changed) {
+          options.notifyNotesChanged(context.repoId);
+        }
+        return c.json({ deletedCount: result.deletedCount });
+      }
+
       // The explicit clear-all skips reconcile: everything is removed anyway.
       const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
       await options.notesStore.clear(repository.id);
