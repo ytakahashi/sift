@@ -1,4 +1,5 @@
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { FileNote, LineNote } from '../../../domain/notes/types';
 import { NotesListModal } from './NotesListModal';
@@ -52,6 +53,7 @@ describe('NotesListModal', () => {
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -79,6 +81,7 @@ describe('NotesListModal', () => {
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -104,6 +107,7 @@ describe('NotesListModal', () => {
         notes={[createLineNote()]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -124,6 +128,7 @@ describe('NotesListModal', () => {
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -154,6 +159,7 @@ describe('NotesListModal', () => {
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -169,6 +175,146 @@ describe('NotesListModal', () => {
     );
   });
 
+  describe('bulk stale deletion', () => {
+    const staleNote = createFileNote({
+      id: 'stale',
+      body: 'stale note body',
+      staleness: { kind: 'stale', reason: 'file-out-of-diff' },
+    });
+
+    function renderModal(
+      overrides: Partial<ComponentProps<typeof NotesListModal>> = {},
+    ): ReturnType<typeof render> {
+      return render(
+        <NotesListModal
+          notes={[createLineNote(), staleNote]}
+          onClose={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onDeleteStaleNotes={vi.fn()}
+          onSelectLocation={vi.fn()}
+          {...overrides}
+        />,
+      );
+    }
+
+    function bulkDeleteButton(): HTMLElement {
+      return screen.getByRole('button', { name: 'Delete stale notes' });
+    }
+
+    it('offers the bulk action only while something is stale', () => {
+      // Given / When: nothing is stale, so there is no stale section
+      const { rerender } = renderModal({ notes: [createLineNote()] });
+
+      // Then: the action has no notes to act on and is not shown
+      expect(screen.queryByRole('button', { name: 'Delete stale notes' })).toBeNull();
+
+      // When: a note goes stale
+      rerender(
+        <NotesListModal
+          notes={[createLineNote(), staleNote]}
+          onClose={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onDeleteStaleNotes={vi.fn()}
+          onSelectLocation={vi.fn()}
+        />,
+      );
+
+      // Then: the action appears next to the stale heading
+      expect(bulkDeleteButton()).toBeDefined();
+    });
+
+    it('deletes nothing until the confirmation is accepted', () => {
+      // Given: a stale note and a modal that reports bulk deletions
+      const onDeleteStaleNotes = vi.fn();
+      renderModal({ onDeleteStaleNotes });
+
+      // When: the bulk action is clicked
+      fireEvent.click(bulkDeleteButton());
+
+      // Then: a confirmation asks first, naming what goes and what stays
+      expect(screen.getByText('Delete 1 stale note?')).toBeDefined();
+      expect(
+        screen.getByText(
+          'Only notes that are still stale will be deleted. Live notes will remain.',
+        ),
+      ).toBeDefined();
+      expect(onDeleteStaleNotes).not.toHaveBeenCalled();
+
+      // When: the confirmation is dismissed
+      fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      // Then: nothing was requested and the dialog is gone
+      expect(onDeleteStaleNotes).not.toHaveBeenCalled();
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('requests the deletion once when confirmed', () => {
+      // Given: the confirmation is open
+      const onDeleteStaleNotes = vi.fn();
+      renderModal({ onDeleteStaleNotes });
+      fireEvent.click(bulkDeleteButton());
+
+      // When: the deletion is confirmed (the dialog's Delete, not a note's)
+      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+
+      // Then: one request goes out and the dialog closes
+      expect(onDeleteStaleNotes).toHaveBeenCalledTimes(1);
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('disables both deletions while a notes mutation is in flight', () => {
+      // Given: a mutation started elsewhere in the page
+      renderModal({ mutationDisabled: true });
+
+      // Then: neither the per-note nor the bulk action can start a second one
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Delete stale notes' }).disabled,
+      ).toBe(true);
+      const perNoteDeletes = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Delete' });
+      expect(perNoteDeletes.every((button) => button.disabled)).toBe(true);
+    });
+
+    it('closes the confirmation when the last stale note is gone', () => {
+      // Given: the confirmation is open for the only stale note
+      const { rerender } = renderModal();
+      fireEvent.click(bulkDeleteButton());
+      expect(screen.getByText('Delete 1 stale note?')).toBeDefined();
+
+      // When: a refetch shows that note back as live (file restored elsewhere)
+      rerender(
+        <NotesListModal
+          notes={[createLineNote()]}
+          onClose={vi.fn()}
+          onDeleteNote={vi.fn()}
+          onDeleteStaleNotes={vi.fn()}
+          onSelectLocation={vi.fn()}
+        />,
+      );
+
+      // Then: there is nothing left to confirm, so the dialog closes
+      expect(screen.queryByRole('dialog')).toBeNull();
+    });
+
+    it('counts every stale note in the confirmation', () => {
+      // Given: more than one stale note
+      renderModal({
+        notes: [
+          staleNote,
+          createLineNote({
+            id: 'stale-2',
+            staleness: { kind: 'stale', reason: 'content-changed' },
+          }),
+        ],
+      });
+
+      // When: the bulk action is clicked
+      fireEvent.click(bulkDeleteButton());
+
+      // Then: the wording matches the number currently displayed
+      expect(screen.getByText('Delete 2 stale notes?')).toBeDefined();
+    });
+  });
+
   it('calls onSelectLocation with the note when its location is clicked', () => {
     // Given: a rendered modal with a line note
     const note = createLineNote({ startLine: 10, endLine: 12 });
@@ -178,6 +324,7 @@ describe('NotesListModal', () => {
         notes={[note]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
         onSelectLocation={onSelectLocation}
       />,
     );

@@ -15,6 +15,19 @@ async function requireOk(res: Response, fallback: string): Promise<Response> {
   return res;
 }
 
+/**
+ * Reads `deletedCount` out of the delete-stale response. Unlike the note
+ * payloads, a wrong value here surfaces in no rendering that would expose it,
+ * so the field is checked at the boundary instead of being asserted.
+ */
+function readDeletedCount(body: unknown): number {
+  const count = (body as { deletedCount?: unknown } | null)?.deletedCount;
+  if (typeof count !== 'number' || !Number.isSafeInteger(count) || count < 0) {
+    throw new NotesActionError('Invalid delete stale notes response', 200);
+  }
+  return count;
+}
+
 export const httpNotesGateway: NotesGateway = {
   async fetchNotes(repoId: RepositoryId): Promise<Note[]> {
     const res = await requireOk(await fetch(notesUrl(repoId)), 'Failed to fetch notes');
@@ -55,5 +68,13 @@ export const httpNotesGateway: NotesGateway = {
 
   async clearNotes(repoId: RepositoryId): Promise<void> {
     await requireOk(await fetch(notesUrl(repoId), { method: 'DELETE' }), 'Failed to clear notes');
+  },
+
+  async deleteStaleNotes(repoId: RepositoryId): Promise<number> {
+    const res = await requireOk(
+      await fetch(`${notesUrl(repoId)}?staleness=stale`, { method: 'DELETE' }),
+      'Failed to delete stale notes',
+    );
+    return readDeletedCount((await res.json().catch(() => null)) as unknown);
   },
 };

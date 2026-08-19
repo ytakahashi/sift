@@ -5,7 +5,13 @@ import type { AnchoredNote } from '../../../domain/notes/anchored-note';
 import { NoteNotFoundError } from '../../services/notes-store';
 import { InMemoryNotesStore } from './in-memory-notes-store';
 
-function createFile(path: string): DiffFile {
+interface FileFixtureOptions {
+  hunkId?: string;
+  lines?: Array<{ line: number; content: string }>;
+}
+
+function createFile(path: string, options: FileFixtureOptions = {}): DiffFile {
+  const lines = options.lines ?? [{ line: 1, content: 'x' }];
   return {
     id: `file-${path}`,
     bucket: 'working',
@@ -15,13 +21,18 @@ function createFile(path: string): DiffFile {
     displayPath: path,
     hunks: [
       {
-        id: `hunk-${path}-0`,
+        id: options.hunkId ?? `hunk-${path}-0`,
         header: '@@ -1,1 +1,1 @@',
         oldStart: 1,
         oldLines: 1,
         newStart: 1,
         newLines: 1,
-        lines: [{ id: `line-${path}-0`, type: 'add', newLineNumber: 1, content: 'x' }],
+        lines: lines.map(({ line, content }, index) => ({
+          id: `line-${path}-${index}`,
+          type: 'add' as const,
+          newLineNumber: line,
+          content,
+        })),
       },
     ],
   };
@@ -47,6 +58,40 @@ async function addFileNote(
     repoId,
     { path, target: { kind: 'file', fileId: `file-${path}` }, body: 'body' },
     { generation },
+  );
+  return note.id;
+}
+
+interface LineNoteOptions {
+  path: string;
+  line: number;
+  lineContents?: string[];
+  generation?: ConfirmedFileGeneration;
+}
+
+async function addLineNote(
+  store: InMemoryNotesStore,
+  repoId: string,
+  options: LineNoteOptions,
+): Promise<string> {
+  const note = await store.add(
+    repoId,
+    {
+      path: options.path,
+      target: {
+        kind: 'line',
+        fileId: `file-${options.path}`,
+        bucket: 'working',
+        hunkId: `hunk-${options.path}-0`,
+        startNewLineNumber: options.line,
+        endNewLineNumber: options.line,
+      },
+      body: 'body',
+    },
+    {
+      generation: options.generation ?? fileGeneration('blob-1'),
+      lineContents: options.lineContents,
+    },
   );
   return note.id;
 }
@@ -217,5 +262,203 @@ describe('InMemoryNotesStore', () => {
 
     // Then: nothing to do
     expect(changed).toBe(false);
+  });
+
+  describe('deleteStale', () => {
+    it('deletes the stale notes and keeps the live ones', async () => {
+      // Given: a stored note already marked stale by an earlier reconcile, next
+      // to an intact one
+      const store = new InMemoryNotesStore();
+      const stale = await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-old'));
+      const live = await addFileNote(store, 'repo-1', 'b.ts', fileGeneration('blob-1'));
+      const current = {
+        workingFiles: [createFile('a.ts'), createFile('b.ts')],
+        stagedFiles: [],
+        generations: generationsOf([
+          ['a.ts', fileGeneration('blob-new')],
+          ['b.ts', fileGeneration('blob-1')],
+        ]),
+      };
+      await store.reconcile('repo-1', current);
+
+      // When: stale notes are deleted against the same state
+      const result = await store.deleteStale('repo-1', current);
+
+      // Then: only the stale one is gone
+      expect(result).toEqual({ deletedCount: 1, changed: true });
+      const listed = await store.list('repo-1');
+      expect(listed.map((note) => note.id)).toEqual([live]);
+      expect(listed[0].id).not.toBe(stale);
+    });
+
+    it('deletes stale notes regardless of the reason they are stale', async () => {
+      // Given: one note per stale reason plus a live one
+      const store = new InMemoryNotesStore();
+      await addFileNote(store, 'repo-1', 'gone.ts', fileGeneration('blob-1'));
+      await addFileNote(store, 'repo-1', 'changed.ts', fileGeneration('blob-old'));
+      await addLineNote(store, 'repo-1', { path: 'moved.ts', line: 1, lineContents: ['x'] });
+      const live = await addFileNote(store, 'repo-1', 'keep.ts', fileGeneration('blob-1'));
+
+      // When: stale notes are deleted while gone.ts left the diff, changed.ts
+      // has a new generation, and moved.ts no longer holds the anchored content
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [
+          createFile('changed.ts'),
+          createFile('moved.ts', { lines: [{ line: 1, content: 'y' }] }),
+          createFile('keep.ts'),
+        ],
+        stagedFiles: [],
+        generations: generationsOf([
+          ['changed.ts', fileGeneration('blob-new')],
+          ['moved.ts', fileGeneration('blob-1')],
+          ['keep.ts', fileGeneration('blob-1')],
+        ]),
+      });
+
+      // Then: all three reasons are treated the same
+      expect(result).toEqual({ deletedCount: 3, changed: true });
+      await expect(store.list('repo-1')).resolves.toEqual([
+        expect.objectContaining({ id: live, staleness: { kind: 'live' } }),
+      ]);
+    });
+
+    it('keeps a stale note that the current state brings back to live', async () => {
+      // Given: a note marked stale by an earlier reconcile
+      const store = new InMemoryNotesStore();
+      const noteId = await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-1'));
+      await store.reconcile('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', fileGeneration('blob-new')]]),
+      });
+
+      // When: deletion runs after the file was restored to its creation state
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+      });
+
+      // Then: nothing is deleted, but the recovered staleness is stored and
+      // reported so subscribers still learn about it
+      expect(result).toEqual({ deletedCount: 0, changed: true });
+      await expect(store.list('repo-1')).resolves.toEqual([
+        expect.objectContaining({ id: noteId, staleness: { kind: 'live' } }),
+      ]);
+    });
+
+    it('deletes a note that only the current state turns stale', async () => {
+      // Given: a note still stored as live (no reconcile ran since creation)
+      const store = new InMemoryNotesStore();
+      await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-old'));
+
+      // When: deletion runs against a state where its file changed
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', fileGeneration('blob-new')]]),
+      });
+
+      // Then: reconcile and deletion happen as one step, so the note goes
+      expect(result).toEqual({ deletedCount: 1, changed: true });
+      await expect(store.list('repo-1')).resolves.toEqual([]);
+    });
+
+    it('stores the re-anchored target of a retained line note', async () => {
+      // Given: a working-pane line note whose hunk has since been staged
+      const store = new InMemoryNotesStore();
+      await addLineNote(store, 'repo-1', { path: 'a.ts', line: 5, lineContents: ['x'] });
+
+      // When: stale notes are deleted against the post-stage state
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [],
+        stagedFiles: [
+          createFile('a.ts', { hunkId: 'hunk-a.ts-9', lines: [{ line: 5, content: 'x' }] }),
+        ],
+        generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+      });
+
+      // Then: the note survives with the re-anchored bucket and hunk persisted
+      expect(result).toEqual({ deletedCount: 0, changed: true });
+      const listed = await store.list('repo-1');
+      expect(listed[0].target).toEqual(
+        expect.objectContaining({ bucket: 'staged', hunkId: 'hunk-a.ts-9' }),
+      );
+    });
+
+    it('deletes an already-stale note whose current generation is unavailable', async () => {
+      // Given: a note marked stale by an earlier reconcile
+      const store = new InMemoryNotesStore();
+      await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-1'));
+      await store.reconcile('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', fileGeneration('blob-new')]]),
+      });
+
+      // When: deletion runs while the current generation cannot be read
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', { kind: 'unavailable', reason: 'read error' }]]),
+      });
+
+      // Then: an unreadable generation neither restores the note nor shields it
+      // from deletion, matching what the notes list shows as stale
+      expect(result).toEqual({ deletedCount: 1, changed: true });
+      await expect(store.list('repo-1')).resolves.toEqual([]);
+    });
+
+    it('reports no change when nothing is stale and nothing moved', async () => {
+      // Given: a note matching the current state
+      const store = new InMemoryNotesStore();
+      await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-1'));
+
+      // When: stale notes are deleted
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+      });
+
+      // Then: the caller can skip notifying subscribers
+      expect(result).toEqual({ deletedCount: 0, changed: false });
+      await expect(store.list('repo-1')).resolves.toHaveLength(1);
+    });
+
+    it('reports no change for a repository without notes', async () => {
+      // Given: an empty store
+      const store = new InMemoryNotesStore();
+
+      // When: stale notes are deleted for an unknown repository
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [],
+        stagedFiles: [],
+        generations: generationsOf([]),
+      });
+
+      // Then: nothing to do
+      expect(result).toEqual({ deletedCount: 0, changed: false });
+    });
+
+    it('deletes stale notes of the requested repository only', async () => {
+      // Given: two repositories whose notes are both stale against the state
+      // passed below
+      const store = new InMemoryNotesStore();
+      await addFileNote(store, 'repo-1', 'a.ts', fileGeneration('blob-old'));
+      await addFileNote(store, 'repo-2', 'a.ts', fileGeneration('blob-old'));
+
+      // When: only the first repository is targeted
+      const result = await store.deleteStale('repo-1', {
+        workingFiles: [createFile('a.ts')],
+        stagedFiles: [],
+        generations: generationsOf([['a.ts', fileGeneration('blob-new')]]),
+      });
+
+      // Then: the other repository keeps its note
+      expect(result).toEqual({ deletedCount: 1, changed: true });
+      await expect(store.list('repo-1')).resolves.toEqual([]);
+      await expect(store.list('repo-2')).resolves.toHaveLength(1);
+    });
   });
 });

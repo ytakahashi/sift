@@ -4,6 +4,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../domain/diff/types';
 import type { HeadRef } from '../../domain/git/head-ref';
+import type { Note } from '../../domain/notes/types';
 import type { AppDependencies } from '../composition/dependencies';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
@@ -102,6 +103,7 @@ const testDependencies: AppDependencies = {
     updateNote: vi.fn(),
     deleteNote: vi.fn(async () => {}),
     clearNotes: vi.fn(async () => {}),
+    deleteStaleNotes: vi.fn(async () => 0),
   },
   repositoryChangeSource: {
     subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
@@ -132,6 +134,7 @@ function Page({
 describe('RepositoryViewerPage interactions', () => {
   const refresh = vi.fn();
   const clearNotes = vi.fn();
+  const deleteStaleNotes = vi.fn();
   const stageFile = vi.fn(async () => {});
   const unstageFile = vi.fn(async () => {});
   const stageAllWorkingFiles = vi.fn(async () => {});
@@ -173,6 +176,7 @@ describe('RepositoryViewerPage interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -728,6 +732,7 @@ describe('RepositoryViewerPage interactions', () => {
 describe('RepositoryViewerPage Notes Interactions', () => {
   const refresh = vi.fn();
   const clearNotes = vi.fn();
+  const deleteStaleNotes = vi.fn();
   const originalClipboard = navigator.clipboard;
 
   beforeEach(() => {
@@ -785,6 +790,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -815,6 +821,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -847,6 +854,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -902,6 +910,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -939,6 +948,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -960,6 +970,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -991,6 +1002,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
+      deleteStaleNotes,
       refetchNotes: vi.fn(async () => {}),
       mutating: false,
       error: null,
@@ -1024,5 +1036,90 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     // Then: tooltip disappears
     expect(screen.queryByText('Copied!')).toBeNull();
     vi.useRealTimers();
+  });
+
+  describe('bulk stale deletion', () => {
+    const liveNote: Note = {
+      id: 'live',
+      kind: 'line',
+      path: 'f1',
+      startLine: 1,
+      endLine: 1,
+      bucket: 'working',
+      body: 'live note',
+      createdAt: 100,
+      staleness: { kind: 'live' },
+    };
+    const staleNote: Note = {
+      id: 'stale',
+      kind: 'file',
+      path: 'f2',
+      body: 'stale note',
+      createdAt: 200,
+      staleness: { kind: 'stale', reason: 'file-out-of-diff' },
+    };
+
+    function mockNotes(notes: Note[], mutating = false): void {
+      vi.mocked(useNotes).mockReturnValue({
+        notes,
+        addNote: vi.fn(),
+        updateNote: vi.fn(),
+        deleteNote: vi.fn(),
+        clearNotes,
+        deleteStaleNotes,
+        refetchNotes: vi.fn(async () => {}),
+        mutating,
+        error: null,
+      });
+    }
+
+    it('runs the bulk deletion through the notes hook', async () => {
+      // Given: the notes modal is open with a stale note
+      mockNotes([liveNote, staleNote]);
+      const user = userEvent.setup();
+      render(<Page />);
+      await user.click(screen.getByRole('button', { name: 'View Notes (2)' }));
+
+      // When: the bulk action is confirmed
+      await user.click(screen.getByRole('button', { name: 'Delete stale notes' }));
+      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+
+      // Then: the page delegates to the hook, which owns the request and refetch
+      expect(deleteStaleNotes).toHaveBeenCalledTimes(1);
+    });
+
+    it('disables the notes deletions while a mutation is in flight', async () => {
+      // Given: a notes mutation is already running
+      mockNotes([liveNote, staleNote], true);
+      const user = userEvent.setup();
+      render(<Page />);
+
+      // When: the notes modal is opened
+      await user.click(screen.getByRole('button', { name: 'View Notes (2)' }));
+
+      // Then: the modal blocks a second request through either delete action
+      expect(
+        screen.getByRole<HTMLButtonElement>('button', { name: 'Delete stale notes' }).disabled,
+      ).toBe(true);
+      const perNoteDeletes = screen.getAllByRole<HTMLButtonElement>('button', { name: 'Delete' });
+      expect(perNoteDeletes.every((button) => button.disabled)).toBe(true);
+    });
+
+    it('keeps the modal open when only the stale notes disappear', async () => {
+      // Given: the notes modal is open with a live and a stale note
+      mockNotes([liveNote, staleNote]);
+      const user = userEvent.setup();
+      const { rerender } = render(<Page />);
+      await user.click(screen.getByRole('button', { name: 'View Notes (2)' }));
+
+      // When: the refetch after the deletion leaves the live note behind
+      mockNotes([liveNote]);
+      rerender(<Page />);
+
+      // Then: the modal stays open, only the stale section is gone
+      expect(screen.getByText('Your Notes (1)')).toBeDefined();
+      expect(screen.queryByText('Stale (1)')).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Delete stale notes' })).toBeNull();
+    });
   });
 });

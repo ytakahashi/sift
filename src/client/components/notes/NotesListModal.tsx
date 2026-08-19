@@ -1,4 +1,4 @@
-import type { ReactElement } from 'react';
+import { useState, type ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import {
   describeNoteStaleReason,
@@ -7,6 +7,7 @@ import {
 } from '../../../domain/notes/format';
 import { isLiveNote } from '../../../domain/notes/note-staleness';
 import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
+import { DeleteStaleNotesConfirmModal } from './DeleteStaleNotesConfirmModal';
 import { NoteActionButton } from './NoteActionButton';
 import { useCopyFeedback } from './useCopyFeedback';
 
@@ -14,22 +15,32 @@ interface NotesListModalProps {
   notes: Note[];
   onClose: () => void;
   onDeleteNote: (id: string) => void | Promise<void>;
+  /** Deletes every note the server still considers stale, in one request. */
+  onDeleteStaleNotes: () => void;
   /** Jumps to the note's file/pane in the main diff pane. */
   onSelectLocation: (note: Note) => void;
-  /** Disables Delete while another notes mutation is in flight. */
-  deleteDisabled?: boolean;
+  /** Disables both deletions while another notes mutation is in flight. */
+  mutationDisabled?: boolean;
 }
 
 export function NotesListModal({
   notes,
   onClose,
   onDeleteNote,
+  onDeleteStaleNotes,
   onSelectLocation,
-  deleteDisabled = false,
+  mutationDisabled = false,
 }: NotesListModalProps): ReactElement {
   const { copied, copy } = useCopyFeedback();
+  const [confirmingDeleteStale, setConfirmingDeleteStale] = useState(false);
   const liveNotes = notes.filter(isLiveNote);
   const staleNotes = notes.filter((note) => !isLiveNote(note));
+  // The confirmation is about the notes that are stale right now. If the last
+  // one recovers (file restored) or another client deletes it while the dialog
+  // is open, there is nothing left to confirm.
+  if (confirmingDeleteStale && staleNotes.length === 0) {
+    setConfirmingDeleteStale(false);
+  }
   // Lead with the count that represents outstanding work. The stale count is
   // spelled out rather than folded into the total, so the header cannot be
   // read as "you still have this many things to look at".
@@ -78,7 +89,7 @@ export function NotesListModal({
               label="Delete"
               onClick={() => void onDeleteNote(note.id)}
               variant="danger"
-              disabled={deleteDisabled}
+              disabled={mutationDisabled}
             />
           </div>
         </div>
@@ -164,9 +175,18 @@ export function NotesListModal({
                   fontSize: '0.75rem',
                   borderTop: '1px solid #30363d',
                   paddingTop: '0.8rem',
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'center',
                 }}
               >
-                Stale ({staleNotes.length})
+                <span>Stale ({staleNotes.length})</span>
+                <NoteActionButton
+                  label="Delete stale notes"
+                  onClick={() => setConfirmingDeleteStale(true)}
+                  variant="danger"
+                  disabled={mutationDisabled}
+                />
               </div>
               {staleNotes.map(renderNote)}
             </>
@@ -193,6 +213,17 @@ export function NotesListModal({
           </div>
         </div>
       </div>
+      {confirmingDeleteStale && (
+        <DeleteStaleNotesConfirmModal
+          staleCount={staleNotes.length}
+          disabled={mutationDisabled}
+          onCancel={() => setConfirmingDeleteStale(false)}
+          onConfirm={() => {
+            setConfirmingDeleteStale(false);
+            onDeleteStaleNotes();
+          }}
+        />
+      )}
     </>
   );
 }

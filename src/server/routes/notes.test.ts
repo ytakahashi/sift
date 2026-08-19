@@ -85,6 +85,7 @@ describe('notesRoutes', () => {
     updateBody: Mock;
     remove: Mock;
     clear: Mock;
+    deleteStale: Mock;
   };
   let getWorktreeGenerations: Mock;
   let getFiles: Mock;
@@ -103,6 +104,7 @@ describe('notesRoutes', () => {
       updateBody: vi.fn().mockResolvedValue(createStoredNote('updated')),
       remove: vi.fn().mockResolvedValue(undefined),
       clear: vi.fn().mockResolvedValue(undefined),
+      deleteStale: vi.fn().mockResolvedValue({ deletedCount: 0, changed: false }),
     };
     getWorktreeGenerations = vi.fn(async () => generations);
     getFiles = vi.fn(async (bucket: string) => (bucket === 'working' ? workingFiles : stagedFiles));
@@ -706,19 +708,123 @@ describe('notesRoutes', () => {
     });
   });
 
-  describe('DELETE /notes (clear all)', () => {
-    it('clears without reconciling and notifies', async () => {
-      // When: all notes are cleared explicitly
-      const response = await app.request('/api/repositories/my-repo/notes', {
-        method: 'DELETE',
-      });
+  describe('DELETE /notes', () => {
+    async function deleteNotes(query = ''): Promise<Response> {
+      return app.request(`/api/repositories/my-repo/notes${query}`, { method: 'DELETE' });
+    }
+
+    it('clears every note without reconciling and notifies', async () => {
+      // When: all notes are cleared explicitly, without any query parameter
+      const response = await deleteNotes();
 
       // Then: everything is removed anyway, so reconcile is skipped
       expect(response.status).toBe(204);
       expect(notesStore.clear).toHaveBeenCalledWith('my-repo');
       expect(notesStore.reconcile).not.toHaveBeenCalled();
+      expect(notesStore.deleteStale).not.toHaveBeenCalled();
       expect(getWorktreeGenerations).not.toHaveBeenCalled();
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
+    });
+
+    it('hands the current repository state to the store for staleness=stale', async () => {
+      // Given: the panes contain a text file and a submodule
+      workingFiles = [
+        createFile({ path: 'a.ts', lines: [{ line: 5, content: 'alpha' }] }),
+        createFile({ path: 'vendor/lib', kind: 'submodule' }),
+      ];
+      stagedFiles = [createFile({ path: 'a.ts', lines: [{ line: 1, content: 'beta' }] })];
+
+      // When: only the stale notes are deleted
+      const response = await deleteNotes('?staleness=stale');
+
+      // Then: the store judges and deletes against one freshly loaded state,
+      // so the route does not reconcile separately
+      expect(response.status).toBe(200);
+      expect(getWorktreeGenerations).toHaveBeenCalledWith(['a.ts']);
+      expect(notesStore.deleteStale).toHaveBeenCalledWith('my-repo', {
+        repoId: 'my-repo',
+        workingFiles,
+        stagedFiles,
+        generations,
+      });
+      expect(notesStore.reconcile).not.toHaveBeenCalled();
+      expect(notesStore.clear).not.toHaveBeenCalled();
+    });
+
+    it('returns the number of notes the server actually deleted', async () => {
+      // Given: the store deleted three notes that were still stale on arrival
+      notesStore.deleteStale.mockResolvedValue({ deletedCount: 3, changed: true });
+
+      // When: only the stale notes are deleted
+      const response = await deleteNotes('?staleness=stale');
+
+      // Then: the count reflects the server-side selection, not a client snapshot
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ deletedCount: 3 });
+    });
+
+    it('notifies subscribers once when the stored notes changed', async () => {
+      // Given: reconcile alone changed the retained notes, deleting nothing
+      notesStore.deleteStale.mockResolvedValue({ deletedCount: 0, changed: true });
+
+      // When: only the stale notes are deleted
+      const response = await deleteNotes('?staleness=stale');
+
+      // Then: deleting nothing still succeeds, and one notification goes out
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({ deletedCount: 0 });
+      expect(notifyNotesChanged).toHaveBeenCalledTimes(1);
+      expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
+    });
+
+    it('does not notify subscribers when nothing changed', async () => {
+      // Given: every note was already live and up to date
+      notesStore.deleteStale.mockResolvedValue({ deletedCount: 0, changed: false });
+
+      // When: only the stale notes are deleted
+      const response = await deleteNotes('?staleness=stale');
+
+      // Then: clients are not woken up for a no-op
+      expect(response.status).toBe(200);
+      expect(notifyNotesChanged).not.toHaveBeenCalled();
+    });
+
+    it('does not delete anything when a pane diff cannot be loaded', async () => {
+      // Given: Git fails while loading one of the pane diffs
+      getFiles.mockRejectedValueOnce(new Error('git diff failed'));
+
+      // When: only the stale notes are deleted
+      const response = await deleteNotes('?staleness=stale');
+
+      // Then: without the current state there is nothing to judge staleness
+      // against, so the request fails instead of falling back
+      expect(response.status).toBe(500);
+      expect(notesStore.deleteStale).not.toHaveBeenCalled();
+      expect(notifyNotesChanged).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      ['an empty value', '?staleness='],
+      ['an unknown value', '?staleness=live'],
+      ['a valueless name', '?stale'],
+      ['a repeated parameter', '?staleness=stale&staleness=stale'],
+      ['an extra parameter', '?staleness=stale&force=1'],
+      ['an unknown name', '?force=1'],
+    ])('rejects %s instead of clearing every note', async (_label, query) => {
+      // When: the collection is deleted with a query that is not an exact
+      // staleness=stale
+      const response = await deleteNotes(query);
+
+      // Then: the typo is a request error, never the more destructive clear-all
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toEqual({
+        error: expect.stringContaining('staleness=stale') as unknown as string,
+        code: 'NOTE_REQUEST_INVALID',
+      });
+      expect(notesStore.clear).not.toHaveBeenCalled();
+      expect(notesStore.deleteStale).not.toHaveBeenCalled();
+      expect(getFiles).not.toHaveBeenCalled();
+      expect(notifyNotesChanged).not.toHaveBeenCalled();
     });
   });
 });

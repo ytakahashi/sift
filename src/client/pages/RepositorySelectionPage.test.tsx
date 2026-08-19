@@ -57,6 +57,7 @@ const testDependencies: AppDependencies = {
     updateNote: vi.fn(),
     deleteNote: vi.fn(async () => {}),
     clearNotes: vi.fn(async () => {}),
+    deleteStaleNotes: vi.fn(async () => 0),
   },
   repositoryChangeSource: {
     subscribe: vi.fn(() => ({ unsubscribe: vi.fn() })),
