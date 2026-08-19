@@ -1,11 +1,15 @@
 import { useState, type DragEvent, type FormEvent, type ReactElement } from 'react';
-import { GripVertical, X } from 'lucide-react';
+import { GripVertical, Search, X } from 'lucide-react';
 import type {
   InvalidRepository,
   RepositoryId,
   RepositoryList,
   ResolvedRepository,
 } from '../../../domain/repository/repository';
+import {
+  matchesRepositoryFilter,
+  normalizeRepositoryFilterQuery,
+} from '../../presentation/repository-selection/repository-filter';
 import { AppHeader } from '../app-header/AppHeader';
 
 export interface RepositorySelectionProps {
@@ -38,6 +42,7 @@ function RepositoryRow({
   onToggleDelete,
   onSelectRepository,
   pendingDelete,
+  reorderingEnabled,
   repository,
   saving,
 }: {
@@ -51,10 +56,11 @@ function RepositoryRow({
   onToggleDelete: (repoId: RepositoryId) => void;
   onSelectRepository: (repoId: RepositoryId) => void;
   pendingDelete: boolean;
+  reorderingEnabled: boolean;
   repository: ResolvedRepository;
   saving: boolean;
 }): ReactElement {
-  const draggable = isEditing && !pendingDelete && !saving;
+  const draggable = isEditing && reorderingEnabled && !pendingDelete && !saving;
   const content = (
     <button
       className="repository-button"
@@ -187,10 +193,20 @@ export function RepositorySelection({
   const [dragOverId, setDragOverId] = useState<RepositoryId | null>(null);
   const [dropPosition, setDropPosition] = useState<'before' | 'after'>('before');
   const [repositoryPath, setRepositoryPath] = useState('');
+  const [filterQuery, setFilterQuery] = useState('');
   const items = repositories?.repositories ?? [];
   const invalidItems = repositories?.invalidRepositories ?? [];
   const orderedItems = orderRepositories(items, pendingOrder);
   const itemCount = items.length + invalidItems.length;
+  const normalizedQuery = normalizeRepositoryFilterQuery(filterQuery);
+  const isFiltering = normalizedQuery.length > 0;
+  // Done commits every pending delete, so rows that will be committed must
+  // remain visible even when they no longer match the current filter.
+  const isVisible = (repository: ResolvedRepository | InvalidRepository): boolean =>
+    matchesRepositoryFilter(repository, normalizedQuery) || pendingDeleteIds.has(repository.id);
+  const visibleItems = orderedItems.filter(isVisible);
+  const visibleInvalidItems = invalidItems.filter(isVisible);
+  const visibleItemCount = visibleItems.length + visibleInvalidItems.length;
   const trimmedRepositoryPath = repositoryPath.trim();
   const canSubmitRepository = trimmedRepositoryPath.length > 0 && !adding;
 
@@ -203,6 +219,7 @@ export function RepositorySelection({
     const added = await onAddRepository(trimmedRepositoryPath);
     if (added) {
       setRepositoryPath('');
+      setFilterQuery('');
       setIsAddingRepository(false);
     }
   };
@@ -281,7 +298,7 @@ export function RepositorySelection({
   };
 
   const handleDragStart = (event: DragEvent<HTMLLIElement>, repoId: RepositoryId): void => {
-    if (saving || pendingDeleteIds.has(repoId)) {
+    if (isFiltering || saving || pendingDeleteIds.has(repoId)) {
       event.preventDefault();
       return;
     }
@@ -292,6 +309,10 @@ export function RepositorySelection({
   };
 
   const handleDragOver = (event: DragEvent<HTMLLIElement>, repoId: RepositoryId): void => {
+    if (isFiltering) {
+      return;
+    }
+
     const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
     if (
       !sourceId ||
@@ -318,6 +339,7 @@ export function RepositorySelection({
     event.preventDefault();
     const sourceId = draggingId ?? event.dataTransfer.getData('text/plain');
     if (
+      !isFiltering &&
       sourceId &&
       sourceId !== repoId &&
       !pendingDeleteIds.has(sourceId) &&
@@ -359,11 +381,46 @@ export function RepositorySelection({
         <section className="repository-selection-content">
           <div className="repository-selection-heading">
             <h1>Repositories</h1>
-            <span>{loading ? 'Loading...' : `${itemCount} configured`}</span>
+            <span>
+              {loading
+                ? 'Loading...'
+                : isFiltering
+                  ? `${visibleItemCount} of ${itemCount} shown`
+                  : `${itemCount} configured`}
+            </span>
           </div>
-          {itemCount > 0 ? (
+          {itemCount > 0 && (
+            <div aria-label="Repository filter" className="repository-filter" role="search">
+              <Search aria-hidden="true" className="repository-filter-icon" size={16} />
+              <input
+                aria-label="Filter repositories"
+                className="repository-filter-input"
+                onChange={(event) => setFilterQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  // Escape during IME composition cancels the conversion, not the filter.
+                  if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
+                    setFilterQuery('');
+                  }
+                }}
+                placeholder="Filter repositories"
+                type="text"
+                value={filterQuery}
+              />
+              {filterQuery.length > 0 && (
+                <button
+                  aria-label="Clear repository filter"
+                  className="repository-filter-clear"
+                  onClick={() => setFilterQuery('')}
+                  type="button"
+                >
+                  <X size={16} />
+                </button>
+              )}
+            </div>
+          )}
+          {visibleItemCount > 0 ? (
             <ul className="repository-list">
-              {orderedItems.map((repository) => (
+              {visibleItems.map((repository) => (
                 <RepositoryRow
                   dragOverPosition={dragOverId === repository.id ? dropPosition : null}
                   dragging={draggingId === repository.id}
@@ -376,11 +433,12 @@ export function RepositorySelection({
                   onToggleDelete={handleToggleDelete}
                   onSelectRepository={onSelectRepository}
                   pendingDelete={pendingDeleteIds.has(repository.id)}
+                  reorderingEnabled={!isFiltering}
                   repository={repository}
                   saving={saving}
                 />
               ))}
-              {invalidItems.map((repository) => (
+              {visibleInvalidItems.map((repository) => (
                 <InvalidRepositoryRow
                   isEditing={isEditingRepositoryList}
                   key={repository.id}
@@ -393,7 +451,22 @@ export function RepositorySelection({
             </ul>
           ) : (
             <div className="repository-empty">
-              {loading ? 'Loading repositories...' : 'No repositories available.'}
+              {loading ? (
+                'Loading repositories...'
+              ) : itemCount === 0 ? (
+                'No repositories available.'
+              ) : (
+                <>
+                  <span>{`No repositories match "${filterQuery.trim()}".`}</span>
+                  <button
+                    className="secondary-button"
+                    onClick={() => setFilterQuery('')}
+                    type="button"
+                  >
+                    Clear repository filter
+                  </button>
+                </>
+              )}
             </div>
           )}
           <div className="repository-actions">

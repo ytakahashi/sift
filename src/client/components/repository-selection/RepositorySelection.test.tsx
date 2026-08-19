@@ -1,4 +1,4 @@
-import { cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -93,6 +93,197 @@ describe('RepositorySelection', () => {
     expect(onSelectRepository).not.toHaveBeenCalled();
   });
 
+  it('filters repositories by name without distinguishing case and updates the count', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'Sift', path: '/repo/sift' },
+        { id: 'website', name: 'Website', path: '/repo/website' },
+      ],
+    });
+
+    // When
+    await user.type(screen.getByRole('textbox', { name: 'Filter repositories' }), 'SIFT');
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Sift/repo/sift' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Website/repo/website' })).toBeNull();
+    expect(screen.getByText('1 of 2 shown')).toBeDefined();
+  });
+
+  it('filters repositories by a substring in the path', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'first-repo', name: 'First', path: '/work/github/sift' },
+        { id: 'second-repo', name: 'Second', path: '/work/gitlab/other' },
+      ],
+    });
+
+    // When
+    await user.type(screen.getByRole('textbox', { name: 'Filter repositories' }), 'GITHUB/SIFT');
+
+    // Then
+    expect(screen.getByRole('button', { name: 'First/work/github/sift' })).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'Second/work/gitlab/other' })).toBeNull();
+  });
+
+  it('filters invalid repositories by name and path but not by reason', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [
+        {
+          id: 'missing-repo',
+          name: 'missing-repo',
+          path: '/work/legacy/missing-repo',
+          reason: 'Permission denied',
+        },
+      ],
+      repositories: [{ id: 'sift', name: 'sift', path: '/work/sift' }],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+
+    // When
+    await user.type(filterInput, 'legacy');
+
+    // Then
+    expect(screen.getByText('missing-repo')).toBeDefined();
+    expect(screen.getByText('Permission denied')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'sift/work/sift' })).toBeNull();
+
+    // When
+    await user.clear(filterInput);
+    await user.type(filterInput, 'permission');
+
+    // Then
+    expect(screen.queryByText('missing-repo')).toBeNull();
+    expect(screen.getByText('No repositories match "permission".')).toBeDefined();
+  });
+
+  it('distinguishes no filter matches from an unconfigured list and can clear the filter', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+
+    // When
+    await user.type(screen.getByRole('textbox', { name: 'Filter repositories' }), 'missing');
+
+    // Then
+    expect(screen.getByText('No repositories match "missing".')).toBeDefined();
+    expect(screen.queryByText('No repositories available.')).toBeNull();
+
+    // When
+    await user.click(screen.getByText('Clear repository filter'));
+
+    // Then
+    expect(screen.getByRole('button', { name: 'sift/repo/sift' })).toBeDefined();
+    expect(screen.getByText('1 configured')).toBeDefined();
+  });
+
+  it('clears the repository filter with the search field clear button', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'website', name: 'website', path: '/repo/website' },
+      ],
+    });
+    const search = screen.getByRole('search', { name: 'Repository filter' });
+    await user.type(within(search).getByRole('textbox', { name: 'Filter repositories' }), 'sift');
+
+    // When
+    await user.click(within(search).getByRole('button', { name: 'Clear repository filter' }));
+
+    // Then
+    expect(screen.getByRole('button', { name: 'website/repo/website' })).toBeDefined();
+    expect(within(search).queryByRole('button', { name: 'Clear repository filter' })).toBeNull();
+  });
+
+  it('clears the repository filter with Escape', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'website', name: 'website', path: '/repo/website' },
+      ],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    await user.type(filterInput, 'sift');
+
+    // When
+    await user.type(filterInput, '{Escape}');
+
+    // Then
+    expect(filterInput).toHaveProperty('value', '');
+    expect(screen.getByRole('button', { name: 'website/repo/website' })).toBeDefined();
+  });
+
+  it('does not clear the repository filter with Escape during IME composition', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'sift', name: 'sift', path: '/repo/sift' },
+        { id: 'website', name: 'website', path: '/repo/website' },
+      ],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    await user.type(filterInput, 'sif');
+
+    // When
+    fireEvent.keyDown(filterInput, { isComposing: true, key: 'Escape' });
+
+    // Then
+    expect(filterInput).toHaveProperty('value', 'sif');
+    expect(screen.queryByRole('button', { name: 'website/repo/website' })).toBeNull();
+  });
+
+  it('does not show the repository filter for an unconfigured list', () => {
+    // Given / When
+    renderRepositorySelection({ invalidRepositories: [], repositories: [] });
+
+    // Then
+    expect(screen.queryByRole('textbox', { name: 'Filter repositories' })).toBeNull();
+    expect(screen.getByText('No repositories available.')).toBeDefined();
+  });
+
+  it('shows the unconfigured state when a filtered repository list becomes empty', async () => {
+    // Given
+    const user = userEvent.setup();
+    const initialProps = createRepositorySelectionProps({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+    const { rerender } = render(<RepositorySelection {...initialProps} />);
+    await user.type(screen.getByRole('textbox', { name: 'Filter repositories' }), 'website');
+
+    // When
+    rerender(
+      <RepositorySelection
+        {...initialProps}
+        repositories={{ invalidRepositories: [], repositories: [] }}
+      />,
+    );
+
+    // Then
+    expect(screen.getByText('No repositories available.')).toBeDefined();
+    expect(screen.queryByText('No repositories match "website".')).toBeNull();
+    expect(screen.queryByRole('textbox', { name: 'Filter repositories' })).toBeNull();
+  });
+
   it('shows the config missing error from the fetch status handling', () => {
     // Given / When
     render(
@@ -157,6 +348,49 @@ describe('RepositorySelection', () => {
     expect(screen.getByRole('textbox', { name: 'Repository path' })).toBeDefined();
     expect(screen.getByText('Repository path is not a directory.')).toBeDefined();
     expect(screen.queryByText('Repository path is not a directory.')?.closest('header')).toBeNull();
+  });
+
+  it('clears the repository filter after adding a repository succeeds', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    await user.type(filterInput, 'website');
+    await user.click(screen.getByRole('button', { name: 'Add Repository' }));
+    await user.type(screen.getByRole('textbox', { name: 'Repository path' }), '/repo/website');
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    // Then
+    expect(filterInput).toHaveProperty('value', '');
+    expect(screen.getByRole('button', { name: 'sift/repo/sift' })).toBeDefined();
+  });
+
+  it('keeps the repository filter when adding a repository fails', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection(
+      {
+        invalidRepositories: [],
+        repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+      },
+      { onAddRepository: vi.fn().mockResolvedValue(false) },
+    );
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    await user.type(filterInput, 'website');
+    await user.click(screen.getByRole('button', { name: 'Add Repository' }));
+    await user.type(screen.getByRole('textbox', { name: 'Repository path' }), '/repo/website');
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'OK' }));
+
+    // Then
+    expect(filterInput).toHaveProperty('value', 'website');
+    expect(screen.getByRole('textbox', { name: 'Repository path' })).toBeDefined();
   });
 
   it('disables add repository controls while adding', async () => {
@@ -414,6 +648,79 @@ describe('RepositorySelection', () => {
 
     // Then
     expect(screen.getByRole('button', { name: 'Drag sift' })).toHaveProperty('disabled', true);
+  });
+
+  it('disables drag handles while filtering in edit mode', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'sift', path: '/repo/sift' }],
+    });
+    await user.type(screen.getByRole('textbox', { name: 'Filter repositories' }), 'sift');
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Drag sift' })).toHaveProperty('disabled', true);
+    expect(screen.getByRole('listitem')).toHaveProperty('draggable', false);
+  });
+
+  it('does not reorder repositories when drag events are dispatched while filtering', async () => {
+    // Given
+    const user = userEvent.setup();
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [
+        { id: 'first-repo', name: 'first-repo', path: '/repo/first' },
+        { id: 'second-repo', name: 'second-repo', path: '/repo/second' },
+      ],
+    });
+    await user.type(screen.getByRole('textbox', { name: 'Filter repositories' }), 'repo');
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+    const dataTransfer = createDataTransfer();
+    dataTransfer.setData('text/plain', 'second-repo');
+
+    // When
+    fireEvent.dragStart(screen.getAllByRole('listitem')[1], { dataTransfer });
+    fireEvent.dragOver(screen.getAllByRole('listitem')[0], { dataTransfer });
+    fireEvent.drop(screen.getAllByRole('listitem')[0], { dataTransfer });
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    // Then
+    expect(onCommitRepositoryListEdits).not.toHaveBeenCalled();
+  });
+
+  it('keeps pending resolved and invalid deletes visible across filter changes', async () => {
+    // Given
+    const user = userEvent.setup();
+    const { onCommitRepositoryListEdits } = renderRepositorySelection({
+      invalidRepositories: [
+        { id: 'missing-repo', name: 'missing-repo', path: '/repo/missing', reason: 'Missing' },
+      ],
+      repositories: [{ id: 'sift-repo', name: 'sift-repo', path: '/repo/sift' }],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    await user.type(filterInput, 'repo');
+    await user.click(screen.getByRole('button', { name: 'Edit Repository List' }));
+    await user.click(screen.getByRole('button', { name: 'Remove sift-repo' }));
+    await user.click(screen.getByRole('button', { name: 'Remove missing-repo' }));
+
+    // When
+    await user.clear(filterInput);
+    await user.type(filterInput, 'website');
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Undo remove sift-repo' })).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Undo remove missing-repo' })).toBeDefined();
+    expect(screen.getByText('2 of 2 shown')).toBeDefined();
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Done' }));
+
+    // Then
+    expect(onCommitRepositoryListEdits).toHaveBeenCalledWith(['sift-repo', 'missing-repo'], []);
   });
 
   it('marks a repository as pending delete without committing immediately', async () => {
