@@ -8,10 +8,11 @@
 import boundaries from 'eslint-plugin-boundaries';
 
 const element = (type, captured) => ({ element: captured ? { type, captured } : { type } });
+const dependency = (type, captured) => ({ to: element(type, captured) });
 
 /** Layers every element may depend on, since domain/ is pure shared logic. */
-const domain = element('domain');
-const projectMetadata = { file: { categories: 'project-metadata' } };
+const domain = dependency('domain');
+const projectMetadata = { to: { file: { categories: 'project-metadata' } } };
 
 export const boundariesConfig = {
   files: ['src/**/*.{ts,tsx}'],
@@ -96,51 +97,51 @@ export const boundariesConfig = {
           {
             from: [element('client-root')],
             allow: [
-              element('client-pages'),
-              element('client-components'),
-              element('client-hooks'),
-              element('client-hooks-root'),
-              element('client-presentation'),
-              element('client-application'),
-              element('client-composition'),
-              element('client-infrastructure'),
+              dependency('client-pages'),
+              dependency('client-components'),
+              dependency('client-hooks'),
+              dependency('client-hooks-root'),
+              dependency('client-presentation'),
+              dependency('client-application'),
+              dependency('client-composition'),
+              dependency('client-infrastructure'),
               domain,
             ],
           },
           {
             from: [element('client-pages')],
             allow: [
-              element('client-hooks'),
-              element('client-hooks-root'),
-              element('client-components'),
-              element('client-presentation'),
-              element('client-application'),
-              element('client-composition'),
+              dependency('client-hooks'),
+              dependency('client-hooks-root'),
+              dependency('client-components'),
+              dependency('client-presentation'),
+              dependency('client-application'),
+              dependency('client-composition'),
               domain,
             ],
           },
           { from: [element('client-application')], allow: [domain] },
           {
             from: [element('client-composition')],
-            allow: [element('client-application'), element('client-infrastructure'), domain],
+            allow: [dependency('client-application'), dependency('client-infrastructure'), domain],
           },
           {
             from: [element('client-infrastructure')],
-            allow: [element('client-application'), domain],
+            allow: [dependency('client-application'), domain],
           },
           { from: [element('client-presentation')], allow: [domain] },
           {
             from: [element('client-hooks')],
-            allow: [element('client-application'), element('client-presentation'), domain],
+            allow: [dependency('client-application'), dependency('client-presentation'), domain],
           },
           {
             // Same constraints as a feature hook, plus the one thing that is
             // its reason to exist: composing hooks across features.
             from: [element('client-hooks-root')],
             allow: [
-              element('client-hooks'),
-              element('client-application'),
-              element('client-presentation'),
+              dependency('client-hooks'),
+              dependency('client-application'),
+              dependency('client-presentation'),
               domain,
             ],
           },
@@ -149,7 +150,7 @@ export const boundariesConfig = {
             // never checked, so this only catches sibling features. Stated as
             // an explicit disallow to carry its own message.
             from: [element('client-hooks')],
-            disallow: [element('client-hooks')],
+            disallow: [dependency('client-hooks')],
             message:
               'hooks/{{ from.captured.family }} may not import hooks/{{ to.captured.family }}; compose cross-feature hooks in pages/',
           },
@@ -158,9 +159,9 @@ export const boundariesConfig = {
             // another component directory.
             from: [element('client-components')],
             allow: [
-              element('client-components'),
-              element('client-application'),
-              element('client-presentation'),
+              dependency('client-components'),
+              dependency('client-application'),
+              dependency('client-presentation'),
               domain,
             ],
           },
@@ -170,9 +171,9 @@ export const boundariesConfig = {
           {
             from: [element('server-routes')],
             allow: [
-              element('server-contract'),
-              element('server-services'),
-              element('server-watch'),
+              dependency('server-contract'),
+              dependency('server-services'),
+              dependency('server-watch'),
               domain,
             ],
           },
@@ -180,16 +181,16 @@ export const boundariesConfig = {
           { from: [element('server-watch')], allow: [domain] },
           {
             from: [element('server-infrastructure')],
-            allow: [element('server-services'), element('server-watch'), domain],
+            allow: [dependency('server-services'), dependency('server-watch'), domain],
           },
           {
             from: [element('server-root')],
             allow: [
-              element('server-contract'),
-              element('server-routes'),
-              element('server-services'),
-              element('server-watch'),
-              element('server-infrastructure'),
+              dependency('server-contract'),
+              dependency('server-routes'),
+              dependency('server-services'),
+              dependency('server-watch'),
+              dependency('server-infrastructure'),
               domain,
               projectMetadata,
             ],
@@ -202,7 +203,7 @@ export const boundariesConfig = {
             // such as the port resolver and health probe from the server root.
             // It never reaches into routes/, services/, or infrastructure/.
             from: [element('mcp')],
-            allow: [element('server-contract'), element('server-root'), domain],
+            allow: [dependency('server-contract'), dependency('server-root'), domain],
           },
 
           // --- entry points ---------------------------------------------
@@ -210,22 +211,22 @@ export const boundariesConfig = {
           {
             from: [element('entrypoint')],
             allow: [
-              element('entrypoint-shared'),
-              element('server-root'),
-              element('server-infrastructure'),
+              dependency('entrypoint-shared'),
+              dependency('server-root'),
+              dependency('server-infrastructure'),
               domain,
             ],
           },
           {
             from: [element('entrypoint')],
-            disallow: [element('entrypoint')],
+            disallow: [dependency('entrypoint')],
             message:
               'entrypoints/{{ from.captured.name }} may not import entrypoints/{{ to.captured.name }}; share code through entrypoints/shared/',
           },
           {
             // Only the CLI hosts the mcp subcommand.
             from: [element('entrypoint', { name: 'cli' })],
-            allow: [element('mcp')],
+            allow: [dependency('mcp')],
           },
         ],
       },
