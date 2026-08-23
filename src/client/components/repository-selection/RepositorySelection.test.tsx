@@ -284,6 +284,102 @@ describe('RepositorySelection', () => {
     expect(screen.queryByRole('textbox', { name: 'Filter repositories' })).toBeNull();
   });
 
+  it('selects the repository filter text when slash is pressed outside an editable control', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
+    });
+    const filterInput = screen.getByRole<HTMLInputElement>('textbox', {
+      name: 'Filter repositories',
+    });
+    await user.type(filterInput, 'sift');
+    filterInput.blur();
+    const shortcutEvent = createEvent.keyDown(document, { cancelable: true, key: '/' });
+
+    // When
+    fireEvent(document, shortcutEvent);
+
+    // Then
+    expect(document.activeElement).toBe(filterInput);
+    expect(filterInput.selectionStart).toBe(0);
+    expect(filterInput.selectionEnd).toBe(4);
+    expect(shortcutEvent.defaultPrevented).toBe(true);
+  });
+
+  it('preserves slash input in the repository path field', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Add Repository' }));
+    const pathInput = screen.getByRole('textbox', { name: 'Repository path' });
+
+    // When
+    await user.type(pathInput, '/repo/other');
+
+    // Then
+    expect(document.activeElement).toBe(pathInput);
+    expect(pathInput).toHaveProperty('value', '/repo/other');
+  });
+
+  it('does not activate the repository filter shortcut while the add form is open', async () => {
+    // Given
+    const user = userEvent.setup();
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    await user.click(screen.getByRole('button', { name: 'Add Repository' }));
+    const shortcutEvent = createEvent.keyDown(document, { cancelable: true, key: '/' });
+
+    // When
+    fireEvent(document, shortcutEvent);
+
+    // Then
+    expect(document.activeElement).not.toBe(filterInput);
+    expect(shortcutEvent.defaultPrevented).toBe(false);
+  });
+
+  it('does not focus the repository filter for modified slash shortcuts', () => {
+    // Given
+    renderRepositorySelection({
+      invalidRepositories: [],
+      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
+    });
+    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
+    const ctrlShortcutEvent = createEvent.keyDown(document, {
+      cancelable: true,
+      ctrlKey: true,
+      key: '/',
+    });
+    const metaShortcutEvent = createEvent.keyDown(document, {
+      cancelable: true,
+      key: '/',
+      metaKey: true,
+    });
+    const altShortcutEvent = createEvent.keyDown(document, {
+      altKey: true,
+      cancelable: true,
+      key: '/',
+    });
+
+    // When
+    fireEvent(document, ctrlShortcutEvent);
+    fireEvent(document, metaShortcutEvent);
+    fireEvent(document, altShortcutEvent);
+
+    // Then
+    expect(document.activeElement).not.toBe(filterInput);
+    expect(ctrlShortcutEvent.defaultPrevented).toBe(false);
+    expect(metaShortcutEvent.defaultPrevented).toBe(false);
+    expect(altShortcutEvent.defaultPrevented).toBe(false);
+  });
+
   it('shows the config missing error from the fetch status handling', () => {
     // Given / When
     render(
