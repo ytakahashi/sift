@@ -63,6 +63,43 @@ function createTextFile(): DiffFile {
   };
 }
 
+function createCopyableDiffFile(): DiffFile {
+  return {
+    ...createTextFile(),
+    hunks: [
+      {
+        id: 'hunk-1',
+        header: '@@ -1,2 +1,2 @@',
+        oldStart: 1,
+        oldLines: 2,
+        newStart: 1,
+        newLines: 2,
+        lines: [
+          {
+            id: 'line-context',
+            type: 'context',
+            oldLineNumber: 1,
+            newLineNumber: 1,
+            content: '  const unchanged = true;',
+          },
+          {
+            id: 'line-delete',
+            type: 'delete',
+            oldLineNumber: 2,
+            content: 'const value = 1;',
+          },
+          {
+            id: 'line-add',
+            type: 'add',
+            newLineNumber: 2,
+            content: 'const value = 2;',
+          },
+        ],
+      },
+    ],
+  };
+}
+
 function createExpandableFile(): DiffFile {
   return {
     ...createTextFile(),
@@ -155,6 +192,46 @@ describe('UnifiedDiffViewer', () => {
       .querySelectorAll('[data-full-view-toolbar-target="true"]')
       .forEach((target) => target.remove());
     vi.clearAllMocks();
+  });
+
+  it('keeps diff markers separate from source line content', () => {
+    // Given: a diff containing context, deleted, and added source lines
+    const file = createCopyableDiffFile();
+
+    // When: the unified diff is rendered
+    const { container } = render(
+      <UnifiedDiffViewer {...viewerDependencies} file={file} paneMode="working" />,
+    );
+
+    // Then: every source row has one marker with the class that connects the
+    // DOM structure to global.css's browser-compatible selection exclusion
+    const markers = Array.from(container.querySelectorAll<HTMLElement>('.diff-line-marker'));
+    expect(markers.map((marker) => marker.textContent)).toEqual([' ', '-', '+']);
+    expect(markers.every((marker) => marker.classList.contains('diff-selection-decoration'))).toBe(
+      true,
+    );
+
+    // The line-number and note-gutter cells share the same browser-compatible
+    // selection exclusion as the markers, including on the hunk-header row.
+    const rows = Array.from(container.querySelectorAll('tbody > tr'));
+    expect(rows).toHaveLength(4);
+    expect(
+      rows.every((row) =>
+        Array.from(row.children)
+          .slice(0, 3)
+          .every((cell) => cell.classList.contains('diff-selection-decoration')),
+      ),
+    ).toBe(true);
+
+    // Removing the non-source marker must preserve the complete source text,
+    // including indentation that belongs to a context line.
+    const sourceContents = markers.map((marker) => {
+      const codeCell = marker.closest('td');
+      const copy = codeCell?.cloneNode(true) as HTMLTableCellElement | undefined;
+      copy?.querySelector('.diff-line-marker')?.remove();
+      return copy?.textContent;
+    });
+    expect(sourceContents).toEqual(file.hunks[0].lines.map((line) => line.content));
   });
 
   it('adds a file note from the top editor', async () => {
