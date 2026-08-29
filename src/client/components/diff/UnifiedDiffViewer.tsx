@@ -288,12 +288,12 @@ export function UnifiedDiffViewer({
                   }}
                 >
                   <td
+                    className="diff-selection-decoration"
                     style={{
                       textAlign: 'right',
                       padding: '0 0.5rem',
                       color: '#8b949e',
                       borderRight: '1px solid #30363d',
-                      userSelect: 'none',
                     }}
                   >
                     {row.type === 'hunk-header' &&
@@ -320,23 +320,23 @@ export function UnifiedDiffViewer({
                     )}
                   </td>
                   <td
+                    className="diff-selection-decoration"
                     style={{
                       textAlign: 'right',
                       padding: '0 0.5rem',
                       color: '#8b949e',
                       borderRight: '1px solid #30363d',
-                      userSelect: 'none',
                     }}
                   >
                     {row.type !== 'hunk-header' && row.newLineNumber}
                   </td>
                   <td
+                    className="diff-selection-decoration"
                     style={{
                       textAlign: 'center',
                       padding: '0',
                       color: '#8b949e',
                       borderRight: '1px solid #30363d',
-                      userSelect: 'none',
                       position: 'relative',
                     }}
                   >
@@ -374,9 +374,13 @@ export function UnifiedDiffViewer({
                         color: row.type === 'hunk-header' ? '#79c0ff' : 'inherit',
                       }}
                     >
-                      {row.type === 'add' && '+'}
-                      {row.type === 'delete' && '-'}
-                      {row.type === 'context' && ' '}
+                      {row.type !== 'hunk-header' && (
+                        // Markers stay exposed to assistive technology while this class excludes
+                        // them from text selection, so copied diff lines contain source text only.
+                        <span className="diff-line-marker diff-selection-decoration">
+                          {row.type === 'add' ? '+' : row.type === 'delete' ? '-' : ' '}
+                        </span>
+                      )}
                       {row.type === 'hunk-header' ? (
                         row.content
                       ) : (

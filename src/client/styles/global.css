@@ -1016,6 +1016,13 @@ button.app-brand-home {
   font-size: 0.82rem;
 }
 
+/* Safari requires the prefixed property to keep diff UI decorations out of
+   text selection; use one class for markers, line numbers, and note gutters. */
+.unified-diff-viewer .diff-selection-decoration {
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 /* Prism Syntax Highlighting (GitHub Dark Theme) */
 .token.comment,
 .token.prolog,
