@@ -83,11 +83,12 @@ export interface DeleteStaleNotesResult {
 export interface NotesStore {
   /**
    * Revalidates stored notes against the current diff and worktree
-   * generations: marks notes whose file changed or left the diff as stale, and
-   * re-anchors line notes whose content moved between panes (delegated to
-   * domain reconcileNotes). Notes are never removed here, so the stored count
-   * only changes through explicit deletion. Returns whether any staleness or
-   * anchor changed, so the caller can decide whether to notify subscribers.
+   * generations: marks changed files and missing required diff anchors as
+   * stale, and re-anchors line notes whose content moved between panes
+   * (delegated to domain reconcileNotes). Notes are never removed here, so the
+   * stored count only changes through explicit deletion. Returns whether any
+   * staleness or anchor changed, so the caller can decide whether to notify
+   * subscribers.
    */
   reconcile(repoId: RepositoryId, current: NotesCurrentState): Promise<boolean>;
   list(repoId: RepositoryId): Promise<AnchoredNote[]>;

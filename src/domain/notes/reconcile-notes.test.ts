@@ -82,12 +82,13 @@ function createFileRecord(
   id: string,
   path: string,
   generation: ConfirmedFileGeneration = fileGeneration('blob-1'),
+  scope: 'diff' | 'repository' = 'diff',
 ): NoteReconcileRecord {
   return {
     note: {
       id,
       path,
-      target: { kind: 'file', fileId: `file-${path}` },
+      target: { kind: 'file', fileId: `file-${path}`, scope },
       body: `note-${id}`,
       createdAt: 1,
       staleness: { kind: 'live' },
@@ -267,6 +268,147 @@ describe('reconcileNotes', () => {
     // Then: the presence check marks the note but keeps it
     expect(result.records).toEqual([markedStale(record, 'file-out-of-diff')]);
     expect(result.changed).toBe(true);
+  });
+
+  it('keeps a repository-scoped file note live without a pane file', () => {
+    // Given: a note created for a tracked file outside the current diff
+    const record = createFileRecord('n1', 'a.ts', fileGeneration('blob-1'), 'repository');
+
+    // When: reconcile sees the same worktree generation and no pane files
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles: [],
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: diff presence is not required and the original record remains live
+    expect(result).toEqual({ records: [record], changed: false });
+  });
+
+  it('marks a repository-scoped file note stale when its file enters the diff by changing', () => {
+    // Given: an outside-diff note whose target is now present in a pane
+    const record = createFileRecord('n1', 'a.ts', fileGeneration('blob-1'), 'repository');
+    const workingFiles = [createFile({ path: 'a.ts', lines: [{ line: 1, content: 'changed' }] })];
+
+    // When: reconcile sees that the target's worktree generation changed
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-2')]]),
+    });
+
+    // Then: entering the diff does not shield the note, the generation change still applies
+    expect(result).toEqual({
+      records: [markedStale(record, 'content-changed')],
+      changed: true,
+    });
+  });
+
+  it('keeps a repository-scoped file note live when only another file enters the diff', () => {
+    // Given: an outside-diff note and an unrelated changed file in a pane
+    const record = createFileRecord('n1', 'a.ts', fileGeneration('blob-1'), 'repository');
+    const workingFiles = [createFile({ path: 'b.ts', lines: [{ line: 1, content: 'changed' }] })];
+
+    // When: the target's own generation remains unchanged
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles,
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: the note does not react to the repository's diff as a whole
+    expect(result).toEqual({ records: [record], changed: false });
+  });
+
+  it.each([
+    ['different content', fileGeneration('blob-2')],
+    ['a deleted worktree entry', { kind: 'deleted' } as const],
+  ])('marks a repository-scoped file note stale for %s', (_scenario, current) => {
+    // Given: a repository-scoped note anchored to the original file generation
+    const record = createFileRecord('n1', 'a.ts', fileGeneration('blob-1'), 'repository');
+
+    // When: the current confirmed generation no longer matches the anchor
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles: [],
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', current]]),
+    });
+
+    // Then: the generation check marks the note as content-changed
+    expect(result).toEqual({
+      records: [markedStale(record, 'content-changed')],
+      changed: true,
+    });
+  });
+
+  it('marks a repository-scoped file note stale when the path becomes ineligible', () => {
+    // Given: a repository-scoped note whose path is now a confirmed non-file entry
+    const record = createFileRecord('n1', 'vendor/lib', fileGeneration('blob-1'), 'repository');
+
+    // When: reconcile receives the deterministic ineligible generation
+    const result = reconcileNotes({
+      records: [record],
+      workingFiles: [],
+      stagedFiles: [],
+      generations: generationsOf([
+        ['vendor/lib', { kind: 'ineligible', reason: 'not a regular file or symlink' }],
+      ]),
+    });
+
+    // Then: it is treated as changed rather than as an indeterminate read
+    expect(result).toEqual({
+      records: [markedStale(record, 'content-changed')],
+      changed: true,
+    });
+  });
+
+  it('holds repository-scoped file notes when their generation is indeterminate', () => {
+    // Given: live and stale repository-scoped notes outside the current diff
+    const live = createFileRecord('n1', 'a.ts', fileGeneration('blob-1'), 'repository');
+    const stale = markedStale(
+      createFileRecord('n2', 'b.ts', fileGeneration('blob-1'), 'repository'),
+      'content-changed',
+    );
+
+    // When: one generation is unavailable and the other is missing
+    const result = reconcileNotes({
+      records: [live, stale],
+      workingFiles: [],
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', { kind: 'unavailable', reason: 'read error' }]]),
+    });
+
+    // Then: neither uncertainty changes the last confirmed verdict
+    expect(result).toEqual({ records: [live, stale], changed: false });
+  });
+
+  it('settles and recovers a repository-scoped file note from its generation anchor', () => {
+    // Given: a repository-scoped note whose file has changed
+    const record = createFileRecord('n1', 'a.ts', fileGeneration('blob-1'), 'repository');
+    const changedInput = {
+      records: [record],
+      workingFiles: [],
+      stagedFiles: [],
+      generations: generationsOf([['a.ts', fileGeneration('blob-2')]]),
+    };
+    const changed = reconcileNotes(changedInput);
+    expect(changed.changed).toBe(true);
+
+    // When: the changed state is reconciled again and then the original content returns
+    const settled = reconcileNotes({ ...changedInput, records: changed.records });
+    const recovered = reconcileNotes({
+      ...changedInput,
+      records: settled.records,
+      generations: generationsOf([['a.ts', fileGeneration('blob-1')]]),
+    });
+
+    // Then: the repeated pass is idempotent and restoring the anchor makes the note live
+    expect(settled).toEqual({ records: changed.records, changed: false });
+    expect(recovered).toEqual({ records: [record], changed: true });
   });
 
   it('keeps a file note across stage-all when the worktree blob is unchanged', () => {

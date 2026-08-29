@@ -1,9 +1,9 @@
 import type { NoteBucket, NoteStaleness } from './types';
 
 /**
- * Server-internal representation of a note's target: identifies the file and
- * hunk by the diff's own ids rather than by path, so store and reconcile can
- * validate and re-anchor a note without resolving a path on every operation.
+ * Server-internal representation of a note's target. Line notes keep the
+ * diff's file and hunk ids for re-anchoring; file notes keep the stable
+ * `file-${path}` identity and whether diff presence is part of their anchor.
  * Never leaves the server; HTTP responses use the path-based public `Note`.
  */
 export type AnchoredLineNoteTarget = {
@@ -26,6 +26,8 @@ export type AnchoredFileNoteTarget = {
   kind: 'file';
   /** The file the note belongs to. No bucket: a file note is pane-agnostic and shown in both panes. */
   fileId: string;
+  /** Whether reconcile requires the file to remain in the diff. */
+  scope: 'diff' | 'repository';
 };
 
 export type AnchoredNoteTarget = AnchoredLineNoteTarget | AnchoredFileNoteTarget;
@@ -45,10 +47,11 @@ export type AnchoredNote = {
   body: string;
   createdAt: number;
   /**
-   * Whether the note still matches the current diff, as of the last reconcile
-   * pass. A cached output, never an input: reconcile always recomputes it from
-   * the creation-time anchor held alongside this note, so it can go back to
-   * live when the file returns to the state the note was written against.
+   * Whether the note still matches its current repository state, as of the
+   * last reconcile pass. A cached output, never an input: reconcile always
+   * recomputes it from the creation-time anchor held alongside this note, so
+   * it can go back to live when the file returns to the state the note was
+   * written against.
    */
   staleness: NoteStaleness;
 };

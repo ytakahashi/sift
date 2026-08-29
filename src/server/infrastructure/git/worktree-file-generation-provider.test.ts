@@ -100,7 +100,7 @@ describe('WorktreeFileGenerationProvider', () => {
     expect(hashObjects).not.toHaveBeenCalled();
   });
 
-  it('marks non-file, non-symlink worktree entries as unavailable', async () => {
+  it('marks non-file, non-symlink worktree entries as ineligible', async () => {
     // Given: the path is a directory (e.g. a gitlink race after submodule
     // replacement)
     lstat.mockResolvedValue(directoryStats());
@@ -108,9 +108,9 @@ describe('WorktreeFileGenerationProvider', () => {
     // When: generations are fetched
     const generations = await provider.getWorktreeGenerations(['vendor/lib']);
 
-    // Then: the entry is indeterminate, not deleted
+    // Then: the entry is a confirmed invalid note target, not indeterminate
     expect(generations.get('vendor/lib')).toEqual({
-      kind: 'unavailable',
+      kind: 'ineligible',
       reason: 'not a regular file or symlink',
     });
   });

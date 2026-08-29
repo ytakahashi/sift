@@ -162,8 +162,9 @@ function findEligibleFileByPath(context: RepoNotesContext, path: string): DiffFi
 
 /**
  * Looks up the creation-time anchor generation. Creation never stores an
- * indeterminate anchor: an unavailable (or missing) generation aborts with
- * 503 so the client can retry with the same content.
+ * indeterminate or ineligible anchor: unavailable state aborts with 503 so
+ * the client can retry, while a confirmed invalid entry is rejected as a
+ * target error.
  */
 function requireConfirmedGeneration(
   context: RepoNotesContext,
@@ -173,6 +174,12 @@ function requireConfirmedGeneration(
   if (generation === undefined || generation.kind === 'unavailable') {
     throw new NoteGenerationUnavailableError(
       `Could not determine the current state of "${path}". Retry with the same content.`,
+    );
+  }
+  if (generation.kind === 'ineligible') {
+    throw new NoteTargetResolutionError(
+      `"${path}" is not a regular file or symlink; notes cannot be attached to it.`,
+      'ineligible',
     );
   }
   return generation;
@@ -197,7 +204,7 @@ function resolveCreateTarget(
       );
     }
     return {
-      target: { kind: 'file', fileId: file.id },
+      target: { kind: 'file', fileId: file.id, scope: 'diff' },
       generation: requireConfirmedGeneration(context, file.path),
     };
   }

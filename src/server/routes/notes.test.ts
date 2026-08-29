@@ -53,7 +53,7 @@ function createStoredNote(
   return {
     id,
     path,
-    target: { kind: 'file', fileId: `file-${path}` },
+    target: { kind: 'file', fileId: `file-${path}`, scope: 'diff' },
     body: `note-${id}`,
     createdAt: 100,
     staleness,
@@ -556,7 +556,11 @@ describe('notesRoutes', () => {
       expect(response.status).toBe(201);
       expect(notesStore.add).toHaveBeenCalledWith(
         'my-repo',
-        { path: 'a.ts', target: { kind: 'file', fileId: 'file-a.ts' }, body: 'about this file' },
+        {
+          path: 'a.ts',
+          target: { kind: 'file', fileId: 'file-a.ts', scope: 'diff' },
+          body: 'about this file',
+        },
         { generation: FILE_GENERATION, lineContents: undefined },
       );
     });
@@ -570,6 +574,26 @@ describe('notesRoutes', () => {
 
       // Then: the request is rejected
       expect(response.status).toBe(422);
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 without saving when the current entry is ineligible', async () => {
+      // Given: the diff target was replaced by a confirmed non-file worktree entry
+      generations = new Map([
+        ['a.ts', { kind: 'ineligible', reason: 'not a regular file or symlink' }],
+      ]);
+
+      // When: a file note is created for that target
+      const response = await postNote({
+        target: { kind: 'file', path: 'a.ts' },
+        body: 'x',
+      });
+
+      // Then: the invalid target is rejected rather than stored as an anchor
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_TARGET_INELIGIBLE',
+      });
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 

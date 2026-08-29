@@ -7,9 +7,9 @@
 export type NoteBucket = 'working' | 'staged';
 
 /**
- * Why a note no longer matches the current diff. Each value corresponds to one
- * of reconcile's checks, so the UI and agents can explain what happened rather
- * than only that something did.
+ * Why a note no longer matches its current repository state. Each value
+ * corresponds to one of reconcile's checks, so the UI and agents can explain
+ * what happened rather than only that something did.
  *
  * Defined as a runtime array (rather than a plain union type) so callers
  * outside this module can validate a reason against the exact known set
@@ -27,7 +27,8 @@ export const NOTE_STALE_REASONS = [
 export type NoteStaleReason = (typeof NOTE_STALE_REASONS)[number];
 
 /**
- * Whether a note still matches the current diff.
+ * Whether a note still matches its current repository state and applicable
+ * diff anchor.
  *
  * Recomputed on every reconcile pass from the note's creation-time anchor,
  * which is never rewritten. Staleness therefore does not accumulate: a file

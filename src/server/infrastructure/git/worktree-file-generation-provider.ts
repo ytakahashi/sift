@@ -133,13 +133,13 @@ export class WorktreeFileGenerationProvider implements FileGenerationProvider {
       return { kind: 'regular-file', mode };
     }
 
-    // Directories, gitlinks (submodule races), FIFOs, sockets, ...: not a
-    // note-eligible worktree object. The pane diff will surface the real
-    // state (e.g. a submodule entry) and the presence check marks any note on
-    // this path stale.
+    // Directories, gitlinks (submodule races), FIFOs, sockets, ... are
+    // confirmed non-noteable entries, not transient read failures. Reporting
+    // them explicitly lets reconcile invalidate notes that do not require a
+    // corresponding pane entry.
     return {
       kind: 'resolved',
-      generation: { kind: 'unavailable', reason: 'not a regular file or symlink' },
+      generation: { kind: 'ineligible', reason: 'not a regular file or symlink' },
     };
   }
 }
