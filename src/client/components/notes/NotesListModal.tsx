@@ -8,6 +8,7 @@ import {
 import { isLiveNote } from '../../../domain/notes/note-staleness';
 import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
 import { DeleteStaleNotesConfirmModal } from './DeleteStaleNotesConfirmModal';
+import { FileNoteCreateForm } from './FileNoteCreateForm';
 import { NoteActionButton } from './NoteActionButton';
 import { useCopyFeedback } from './useCopyFeedback';
 
@@ -19,6 +20,9 @@ interface NotesListModalProps {
   onDeleteStaleNotes: () => void;
   /** Jumps to the note's file/pane in the main diff pane. */
   onSelectLocation: (note: Note) => void;
+  /** Whether the note currently has a destination in the main diff pane. */
+  canSelectLocation: (note: Note) => boolean;
+  onAddNote: (path: string, body: string) => Promise<void>;
   /** Disables both deletions while another notes mutation is in flight. */
   mutationDisabled?: boolean;
 }
@@ -29,6 +33,8 @@ export function NotesListModal({
   onDeleteNote,
   onDeleteStaleNotes,
   onSelectLocation,
+  canSelectLocation,
+  onAddNote,
   mutationDisabled = false,
 }: NotesListModalProps): ReactElement {
   const { copied, copy } = useCopyFeedback();
@@ -51,23 +57,27 @@ export function NotesListModal({
 
   const renderNote = (note: Note): ReactElement => {
     const stale = note.staleness.kind === 'stale';
+    const locationStyle = {
+      background: 'transparent',
+      border: 'none',
+      color: stale ? '#8b949e' : '#c9d1d9',
+      fontSize: '0.8rem',
+      padding: 0,
+      textAlign: 'left' as const,
+    };
     return (
       <div key={note.id} style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
-        <button
-          onClick={() => onSelectLocation(note)}
-          type="button"
-          style={{
-            background: 'transparent',
-            border: 'none',
-            padding: 0,
-            textAlign: 'left',
-            cursor: 'pointer',
-            fontSize: '0.8rem',
-            color: stale ? '#8b949e' : '#c9d1d9',
-          }}
-        >
-          {formatNoteLocation(note)}
-        </button>
+        {canSelectLocation(note) ? (
+          <button
+            onClick={() => onSelectLocation(note)}
+            type="button"
+            style={{ ...locationStyle, cursor: 'pointer' }}
+          >
+            {formatNoteLocation(note)}
+          </button>
+        ) : (
+          <div style={locationStyle}>{formatNoteLocation(note)}</div>
+        )}
         <div
           style={{
             backgroundColor: '#0d1117',
@@ -166,6 +176,12 @@ export function NotesListModal({
             gap: '1rem',
           }}
         >
+          <FileNoteCreateForm disabled={mutationDisabled} onSave={onAddNote} />
+          {notes.length === 0 && (
+            <div style={{ color: '#8b949e', fontSize: '0.85rem', textAlign: 'center' }}>
+              No notes yet.
+            </div>
+          )}
           {liveNotes.map(renderNote)}
           {staleNotes.length > 0 && (
             <>
@@ -205,6 +221,7 @@ export function NotesListModal({
             <CopyFeedbackTooltip visible={copied} align="end" size="comfortable" />
             <button
               className="button button-primary"
+              disabled={notes.length === 0}
               onClick={() => copy(formatNotesForClipboard(notes))}
               type="button"
             >

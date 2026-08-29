@@ -18,7 +18,7 @@ export type NoteBucket = 'working' | 'staged';
 export const NOTE_STALE_REASONS = [
   /** The note's file is no longer in either pane (committed, discarded, deleted, ...). */
   'file-out-of-diff',
-  /** The file is still in the diff, but its worktree content changed after creation. */
+  /** The file's worktree content or entry type changed after creation. */
   'content-changed',
   /** The file is unchanged, but the anchored line range no longer resolves (e.g. partial staging). */
   'range-unresolved',
@@ -70,9 +70,11 @@ export type FileNote = {
 export type Note = LineNote | FileNote;
 
 /**
- * Creation request for a note, addressed by path and inclusive line range.
- * Distinct from the stored Note: fileId/hunkId resolution and validation
- * happen on the server so UI- and agent-created notes share one code path.
+ * Creation request for a note, addressed by path and an optional inclusive
+ * line range. File targets may be tracked files outside the current diff;
+ * line targets require a current diff hunk. Distinct from the stored Note:
+ * fileId/hunkId resolution and validation happen on the server so UI- and
+ * agent-created notes share one code path.
  */
 export type NoteCreateTarget =
   | {

@@ -80,11 +80,11 @@ function describeKnownErrorCode(code: ErrorResponseCode, message: string): strin
       return `${message} Specify "bucket" as "working" or "staged" and retry.`;
     case 'NOTE_TARGET_NOT_FOUND':
       return (
-        `${message} The target is not part of the current diff, or does not fit within a single ` +
-        'diff hunk. Retry with kind: "file" for a whole-file comment instead.'
+        `${message} Check the path. File notes require a tracked or diff-visible file; line ` +
+        'notes must fit within one current diff hunk.'
       );
     case 'NOTE_TARGET_INELIGIBLE':
-      return `${message} This file (e.g. a submodule) cannot have notes.`;
+      return `${message} Notes require a regular file or symlink; submodules and other special entries are ineligible.`;
     case 'NOTE_GENERATION_UNAVAILABLE':
       return `${message} The file state could not be checked; retry with the same content.`;
     case 'NOTE_REQUEST_INVALID':

@@ -18,9 +18,9 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **3-Pane Interface**: Easily navigate between your Working Directory changes and Staged Changes,
   while viewing the diff in the main viewer.
 - **Granular Git Actions**: Stage and unstage changes directly from the UI.
-- **Ephemeral Notes**: Add in-memory notes to specific lines, line ranges, or entire files. This is
-  perfect for jotting down self-reminders and double-checking your work before it gets etched into
-  your Git history.
+- **Ephemeral Notes**: Add in-memory notes to specific diff lines and ranges, or to entire files —
+  including tracked files outside the current diff. This is perfect for jotting down self-reminders
+  and double-checking your work before it gets etched into your Git history.
 - **Notes MCP**: Let MCP-compatible AI agents read the Notes that still apply, and add, revise, or
   withdraw review findings directly within your local environment.
 - **Runs Entirely Locally**: Data never leaves your computer, and directory traversal is strictly
@@ -137,8 +137,9 @@ Notes and operational details:
 - Both processes use `PORT` (default: `49321`). If you override it, provide the same value to the
   HTTP server and the MCP process.
 - Notes are stored in the HTTP server's memory and cleared when the server exits.
-- `list_notes` returns only the notes that still match the current diff, and reports how many stale
-  ones were left out. Pass `includeStale: true` to see those too.
+- `list_notes` returns only notes whose creation-time anchors still apply to the current repository
+  state, and reports how many stale ones were left out. Live file notes may target tracked files
+  outside the current diff. Pass `includeStale: true` to see stale notes too.
 - `update_note` and `delete_note` take a note id from `list_notes`. Ids live only as long as the
   server process, so an id kept from an earlier session reports `NOTE_NOT_FOUND`.
 

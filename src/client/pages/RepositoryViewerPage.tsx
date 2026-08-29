@@ -279,11 +279,9 @@ function RepositoryWorkspace({
         errorMessage={repositoryError || diffError || actionError || notesError}
         actions={
           <>
-            {notesPanel.canOpen && (
-              <button className="button" onClick={notesPanel.toggle} type="button">
-                View Notes ({notes.length})
-              </button>
-            )}
+            <button className="button" onClick={notesPanel.toggle} type="button">
+              View Notes ({notes.length})
+            </button>
             <button className="button" onClick={refreshAll} type="button">
               Refresh
             </button>
@@ -308,6 +306,10 @@ function RepositoryWorkspace({
             onClose={notesPanel.close}
             onDeleteNote={deleteNote}
             onDeleteStaleNotes={() => void deleteStaleNotes()}
+            canSelectLocation={(note) =>
+              findDiffFileForNote(workingFiles, stagedFiles, note) !== null
+            }
+            onAddNote={(path, body) => addNote({ kind: 'file', path }, body)}
             onSelectLocation={handleSelectNoteLocation}
             mutationDisabled={notesMutating}
           />

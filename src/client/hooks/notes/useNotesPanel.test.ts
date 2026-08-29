@@ -18,7 +18,7 @@ function createNote(id: string, path: string): Note {
 }
 
 describe('useNotesPanel', () => {
-  it('does not open when there are no notes', () => {
+  it('opens and closes when there are no notes', () => {
     // Given: the hook is rendered with zero notes
     const { result } = renderHook(() =>
       useNotesPanel({
@@ -26,13 +26,20 @@ describe('useNotesPanel', () => {
         selectedFilePath: null,
       }),
     );
-    // When: toggle is invoked on the panel
+    // When: toggle is invoked on the empty panel
     act(() => {
       result.current.toggle();
     });
 
-    // Then: the panel remains closed and canOpen stays false
-    expect(result.current.canOpen).toBe(false);
+    // Then: the creation surface becomes available
+    expect(result.current.isOpen).toBe(true);
+
+    // When: toggle is invoked again
+    act(() => {
+      result.current.toggle();
+    });
+
+    // Then: the panel closes normally
     expect(result.current.isOpen).toBe(false);
   });
 
@@ -52,7 +59,6 @@ describe('useNotesPanel', () => {
     });
 
     // Then: the panel becomes open
-    expect(result.current.canOpen).toBe(true);
     expect(result.current.isOpen).toBe(true);
 
     // When: toggle is invoked again
@@ -64,7 +70,7 @@ describe('useNotesPanel', () => {
     expect(result.current.isOpen).toBe(false);
   });
 
-  it('closes automatically when notes become empty', () => {
+  it('stays open when the last note is removed', () => {
     // Given: the panel is opened while notes are present
     const notes = [createNote('n1', 'a.ts')];
     const { result, rerender } = renderHook(
@@ -76,15 +82,15 @@ describe('useNotesPanel', () => {
       { initialProps: { currentNotes: notes } },
     );
     act(() => {
-      result.current.open();
+      result.current.toggle();
     });
     expect(result.current.isOpen).toBe(true);
 
     // When: notes become an empty array due to external update
     rerender({ currentNotes: [] });
 
-    // Then: the panel closes automatically
-    expect(result.current.isOpen).toBe(false);
+    // Then: the empty state and creation form can remain visible
+    expect(result.current.isOpen).toBe(true);
   });
 
   it('returns notes for the selected path only', () => {

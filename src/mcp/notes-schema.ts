@@ -7,8 +7,9 @@ export const listNotesInputSchema = z
       .boolean()
       .optional()
       .describe(
-        'Include notes that no longer match the current diff. Defaults to false, ' +
-          'so only notes that still apply are returned.',
+        'Include notes whose creation-time anchors no longer apply to the current repository ' +
+          'state. Defaults to false. A file note may be live while its tracked file is outside ' +
+          'the current diff.',
       ),
   })
   .strict();

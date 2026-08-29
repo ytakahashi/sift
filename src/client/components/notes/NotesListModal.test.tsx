@@ -54,6 +54,8 @@ describe('NotesListModal', () => {
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
         onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -82,6 +84,8 @@ describe('NotesListModal', () => {
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
         onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -108,6 +112,8 @@ describe('NotesListModal', () => {
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
         onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -129,6 +135,8 @@ describe('NotesListModal', () => {
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
         onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -160,6 +168,8 @@ describe('NotesListModal', () => {
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
         onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
         onSelectLocation={vi.fn()}
       />,
     );
@@ -191,6 +201,8 @@ describe('NotesListModal', () => {
           onClose={vi.fn()}
           onDeleteNote={vi.fn()}
           onDeleteStaleNotes={vi.fn()}
+          canSelectLocation={() => true}
+          onAddNote={vi.fn(async () => {})}
           onSelectLocation={vi.fn()}
           {...overrides}
         />,
@@ -215,6 +227,8 @@ describe('NotesListModal', () => {
           onClose={vi.fn()}
           onDeleteNote={vi.fn()}
           onDeleteStaleNotes={vi.fn()}
+          canSelectLocation={() => true}
+          onAddNote={vi.fn(async () => {})}
           onSelectLocation={vi.fn()}
         />,
       );
@@ -287,6 +301,8 @@ describe('NotesListModal', () => {
           onClose={vi.fn()}
           onDeleteNote={vi.fn()}
           onDeleteStaleNotes={vi.fn()}
+          canSelectLocation={() => true}
+          onAddNote={vi.fn(async () => {})}
           onSelectLocation={vi.fn()}
         />,
       );
@@ -325,6 +341,8 @@ describe('NotesListModal', () => {
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
         onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
         onSelectLocation={onSelectLocation}
       />,
     );
@@ -334,5 +352,46 @@ describe('NotesListModal', () => {
 
     // Then: onSelectLocation is called with the note
     expect(onSelectLocation).toHaveBeenCalledWith(note);
+  });
+
+  it('renders a location without a button when the current diff has no destination', () => {
+    // Given: a file note targets a tracked file outside the current diff
+    const note = createFileNote({ path: 'src/unchanged.ts' });
+    render(
+      <NotesListModal
+        notes={[note]}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => false}
+        onAddNote={vi.fn(async () => {})}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // When / Then: the path remains visible but is not presented as an action
+    expect(screen.getByText('src/unchanged.ts')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'src/unchanged.ts' })).toBeNull();
+  });
+
+  it('shows the creation form and an empty state when there are no notes', () => {
+    // Given / When: the first note has not been created yet
+    render(
+      <NotesListModal
+        notes={[]}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => false}
+        onAddNote={vi.fn(async () => {})}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // Then: creation is available alongside an explicit empty list
+    expect(screen.getByRole('form', { name: 'Add file note' })).toBeDefined();
+    expect(screen.getByText('No notes yet.')).toBeDefined();
+    expect(screen.getByText('Your Notes (0)')).toBeDefined();
+    expect(screen.getByRole('button', { name: 'Copy' })).toHaveProperty('disabled', true);
   });
 });

@@ -24,8 +24,8 @@ export function formatNoteLocation(note: Note): string {
 
 /**
  * Copied text is typically pasted into an agent prompt, where a stale note
- * would read as a finding about the current diff. Stale notes therefore carry
- * their reason instead of being copied as if they still applied.
+ * would read as a finding that still applies. Stale notes therefore carry
+ * their reason instead of being copied as if they still matched their target.
  */
 function formatStaleSuffix(note: Note): string {
   return note.staleness.kind === 'live'

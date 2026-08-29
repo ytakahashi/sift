@@ -129,12 +129,13 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
     'list_notes',
     {
       description:
-        'List review comments (Notes) for the current diff. By default only notes that still ' +
-        'match the current diff are returned; notes whose code has since changed are marked ' +
-        'stale and left out, with "staleCount" reporting how many. Call this right after ' +
-        'editing a file to see which notes went stale, which usually means they are addressed. ' +
-        'Pass includeStale: true to see them with the reason they no longer apply. The returned ' +
-        'ids are what update_note and delete_note take.',
+        'List review comments (Notes) for the repository. By default only notes whose ' +
+        'creation-time anchors still apply to the current repository state are returned. Live ' +
+        'file notes may target tracked files outside the current diff. Notes whose targets have ' +
+        'since changed are marked stale and left out, with "staleCount" reporting how many. ' +
+        'Call this right after editing a file to see which notes went stale, which usually means ' +
+        'they are addressed. Pass includeStale: true to see them with the reason they no longer ' +
+        'apply. The returned ids are what update_note and delete_note take.',
       inputSchema: listNotesInputSchema,
       outputSchema: listNotesOutputSchema,
     },
@@ -168,9 +169,10 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
     'add_note',
     {
       description:
-        "Add a review comment to a file, or to a specific line range, in the diff. kind: 'file' " +
-        'comments on the whole file. If the same path/range exists in both the working and staged ' +
-        'panes, the call fails and asks for "bucket" to be specified.',
+        "Add a review comment to a whole file or a specific diff line range. kind: 'file' accepts " +
+        'a tracked file even when it is outside the current diff, or a diff-visible file. kind: ' +
+        "'line' must fit within one current diff hunk. If the same line range exists in both the " +
+        'working and staged panes, the call fails and asks for "bucket" to be specified.',
       inputSchema: addNoteInputSchema,
       outputSchema: addNoteOutputSchema,
       annotations: { idempotentHint: false },
