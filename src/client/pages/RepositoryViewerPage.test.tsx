@@ -782,7 +782,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     }
   });
 
-  it('renders "View Notes" button conditionally based on notes length', () => {
+  it('renders the Notes button when there are no notes', () => {
     // Given: an empty notes list
     vi.mocked(useNotes).mockReturnValue({
       notes: [],
@@ -797,27 +797,18 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     });
 
     // When: the app is rendered
-    const { rerender } = render(<Page />);
+    render(<Page />);
 
-    // Then: button is not in document
-    expect(screen.queryByRole('button', { name: /View Notes/i })).toBeNull();
+    // Then: the empty modal remains reachable for creating the first note
+    expect(screen.getByRole('button', { name: 'View Notes (0)' })).toBeDefined();
+  });
 
-    // Given: one note is available
+  it('creates the first file note from the empty Notes modal', async () => {
+    // Given: no notes exist yet
+    const addNote = vi.fn(async () => {});
     vi.mocked(useNotes).mockReturnValue({
-      notes: [
-        {
-          id: 'n1',
-          kind: 'line',
-          path: 'f1',
-          startLine: 1,
-          endLine: 1,
-          bucket: 'working',
-          body: 'hello',
-          createdAt: 100,
-          staleness: { kind: 'live' },
-        },
-      ],
-      addNote: vi.fn(),
+      notes: [],
+      addNote,
       updateNote: vi.fn(),
       deleteNote: vi.fn(),
       clearNotes,
@@ -826,12 +817,20 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       mutating: false,
       error: null,
     });
+    const user = userEvent.setup();
+    render(<Page />);
 
-    // When: the app is re-rendered
-    rerender(<Page />);
+    // When: a path and comment are submitted from the modal
+    await user.click(screen.getByRole('button', { name: 'View Notes (0)' }));
+    await user.type(screen.getByRole('textbox', { name: 'File path' }), 'src/unchanged.ts');
+    await user.type(screen.getByRole('textbox', { name: 'Note body' }), 'Update this caller.');
+    await user.click(screen.getByRole('button', { name: 'Add note' }));
 
-    // Then: button should be present
-    expect(screen.getByRole('button', { name: 'View Notes (1)' })).toBeDefined();
+    // Then: the existing gateway-facing mutation receives a file target
+    expect(addNote).toHaveBeenCalledWith(
+      { kind: 'file', path: 'src/unchanged.ts' },
+      'Update this caller.',
+    );
   });
 
   it('toggles the NotesListModal on button click', async () => {
@@ -928,7 +927,40 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     expect(within(screen.getByTestId('diff-viewer')).getByText('f1.ts')).toBeDefined();
   });
 
-  it('closes the modal automatically when all notes are deleted', async () => {
+  it('does not render a location button for a note outside the current diff', async () => {
+    // Given: the note targets a tracked file that is absent from both panes
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [
+        {
+          id: 'outside',
+          kind: 'file',
+          path: 'src/unchanged.ts',
+          body: 'Update this caller.',
+          createdAt: 100,
+          staleness: { kind: 'live' },
+        },
+      ],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+      deleteStaleNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
+    });
+    const user = userEvent.setup();
+    render(<Page />);
+
+    // When: the Notes modal is opened
+    await user.click(screen.getByRole('button', { name: 'View Notes (1)' }));
+
+    // Then: the location is readable but cannot trigger a no-op navigation
+    expect(screen.getByText('src/unchanged.ts')).toBeDefined();
+    expect(screen.queryByRole('button', { name: 'src/unchanged.ts' })).toBeNull();
+  });
+
+  it('keeps the modal open when all notes are deleted', async () => {
     // Given: one note is available
     vi.mocked(useNotes).mockReturnValue({
       notes: [
@@ -977,9 +1009,44 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     });
     rerender(<Page />);
 
-    // Then: modal is automatically hidden
-    expect(screen.queryByText('Your Notes (0)')).toBeNull();
+    // Then: the empty state and creation form remain available
+    expect(screen.getByText('Your Notes (0)')).toBeDefined();
+    expect(screen.getByText('No notes yet.')).toBeDefined();
+    expect(screen.getByRole('form', { name: 'Add file note' })).toBeDefined();
     expect(screen.queryByText('Your Notes (1)')).toBeNull();
+  });
+
+  it('resets the Notes modal and its draft when the repository changes', async () => {
+    // Given: an empty Notes modal with an unfinished draft in repository A
+    vi.mocked(useNotes).mockReturnValue({
+      notes: [],
+      addNote: vi.fn(),
+      updateNote: vi.fn(),
+      deleteNote: vi.fn(),
+      clearNotes,
+      deleteStaleNotes,
+      refetchNotes: vi.fn(async () => {}),
+      mutating: false,
+      error: null,
+    });
+    const user = userEvent.setup();
+    const { rerender } = render(<Page repoId="repo-a" />);
+    await user.click(screen.getByRole('button', { name: 'View Notes (0)' }));
+    await user.type(screen.getByRole('textbox', { name: 'File path' }), 'src/repo-a.ts');
+    await user.type(screen.getByRole('textbox', { name: 'Note body' }), 'Repository A draft');
+
+    // When: the page changes to repository B
+    rerender(<Page repoId="repo-b" />);
+
+    // Then: the keyed repository workspace closes the old modal
+    expect(screen.queryByText('Your Notes (0)')).toBeNull();
+
+    // When: the modal is opened for repository B
+    await user.click(screen.getByRole('button', { name: 'View Notes (0)' }));
+
+    // Then: no input from repository A is carried across the boundary
+    expect(screen.getByRole('textbox', { name: 'File path' })).toHaveProperty('value', '');
+    expect(screen.getByRole('textbox', { name: 'Note body' })).toHaveProperty('value', '');
   });
 
   it('copies notes to clipboard and shows tooltip', async () => {

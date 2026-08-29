@@ -38,6 +38,16 @@ describe('listNotesInputSchema', () => {
     // Then
     expect(result.success).toBe(false);
   });
+
+  it('describes stale notes independently of diff presence', () => {
+    // Given / When
+    const description = listNotesInputSchema.shape.includeStale.description;
+
+    // Then: a live tracked-file note outside the diff is not mislabeled stale
+    expect(description).toContain('creation-time anchors');
+    expect(description).toContain('may be live');
+    expect(description).toContain('outside the current diff');
+  });
 });
 
 describe('noteSchema', () => {

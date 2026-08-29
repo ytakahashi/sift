@@ -585,6 +585,39 @@ describe('registerNotesTools', () => {
   });
 
   describe('tool registration shape', () => {
+    it('describes list_notes as repository-state based rather than diff-only', () => {
+      // Given
+      const options = createOptions();
+      const registerTool = vi.fn();
+      const server = { registerTool } as unknown as McpServer;
+
+      // When
+      registerNotesTools(server, options);
+
+      // Then
+      const listNotesCall = registerTool.mock.calls.find(([name]) => name === 'list_notes');
+      const config = listNotesCall?.[1] as { description?: string };
+      expect(config.description).toContain('current repository state');
+      expect(config.description).toContain('outside the current diff');
+    });
+
+    it('describes the distinct file and line target scopes for add_note', () => {
+      // Given
+      const options = createOptions();
+      const registerTool = vi.fn();
+      const server = { registerTool } as unknown as McpServer;
+
+      // When
+      registerNotesTools(server, options);
+
+      // Then
+      const addNoteCall = registerTool.mock.calls.find(([name]) => name === 'add_note');
+      const config = addNoteCall?.[1] as { description?: string };
+      expect(config.description).toContain('tracked file');
+      expect(config.description).toContain('outside the current diff');
+      expect(config.description).toContain('current diff hunk');
+    });
+
     it('declares idempotentHint: false for add_note', () => {
       // Given
       const options = createOptions();

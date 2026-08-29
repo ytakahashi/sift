@@ -139,7 +139,7 @@ describe('describeKnownError', () => {
     expect(guidance).toContain('bucket');
   });
 
-  it('mentions kind: "file" for NOTE_TARGET_NOT_FOUND', () => {
+  it('gives neutral file and line recovery guidance for NOTE_TARGET_NOT_FOUND', () => {
     // Given / When
     const guidance = describeKnownError(
       'NOTE_TARGET_NOT_FOUND' satisfies ErrorResponseCode,
@@ -148,7 +148,21 @@ describe('describeKnownError', () => {
     );
 
     // Then
-    expect(guidance).toContain('kind: "file"');
+    expect(guidance).toContain('tracked or diff-visible file');
+    expect(guidance).toContain('current diff hunk');
+  });
+
+  it('does not limit NOTE_TARGET_INELIGIBLE guidance to submodules', () => {
+    // Given / When
+    const guidance = describeKnownError(
+      'NOTE_TARGET_INELIGIBLE' satisfies ErrorResponseCode,
+      'x',
+      422,
+    );
+
+    // Then: the same code also covers directories and other special entries
+    expect(guidance).toContain('regular file or symlink');
+    expect(guidance).toContain('special entries');
   });
 
   it('points at list_notes for NOTE_NOT_FOUND', () => {
