@@ -1,5 +1,6 @@
 import { Hono, type Context } from 'hono';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
+import { createDiffFileId } from '../../domain/diff/file-id';
 import type { ConfirmedFileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNoteTarget } from '../../domain/notes/anchored-note';
@@ -16,6 +17,11 @@ import {
   NoteTargetResolutionError,
 } from '../services/notes-store';
 import type { RepositoryResolver } from '../services/repository-resolver';
+import {
+  isSubmoduleIndexEntry,
+  type RepositoryIndexEntry,
+  type RepositoryIndexProvider,
+} from '../services/repository-index-provider';
 import { toNoteResponse } from './note-response';
 import { handleRouteError } from './route-error';
 
@@ -24,12 +30,18 @@ export interface CreateNotesRoutesOptions {
   notesStore: NotesStore;
   createDiffProvider: (repositoryPath: string) => DiffProvider;
   createFileGenerationProvider: (repositoryPath: string) => FileGenerationProvider;
+  createRepositoryIndexProvider: (repositoryPath: string) => RepositoryIndexProvider;
   notifyNotesChanged: (repoId: RepositoryId) => void;
 }
 
 /** Current repository state shared between reconcile and POST target resolution. */
 interface RepoNotesContext extends NotesCurrentState {
   repoId: RepositoryId;
+  /** Present only when a POST file target had no corresponding diff entry. */
+  repositoryTarget?: {
+    path: string;
+    indexEntry: RepositoryIndexEntry | null;
+  };
 }
 
 type NoteCreateRequest =
@@ -76,16 +88,32 @@ function readPositiveLineNumber(value: unknown, fieldName: 'startLine' | 'endLin
   return value;
 }
 
+function readRepositoryRelativeNotePath(value: unknown): string {
+  if (typeof value !== 'string' || value.trim() === '') {
+    throw new NoteRequestValidationError('Note target requires a non-empty string path.');
+  }
+
+  // Note paths are portable repository-relative identities. Reject both POSIX
+  // and Windows escape forms before they can reach Git or filesystem ports.
+  const isAbsolute =
+    value.startsWith('/') || value.startsWith('\\') || /^[A-Za-z]:[\\/]/.test(value);
+  const hasParentSegment = value.split(/[\\/]/).includes('..');
+  if (isAbsolute || hasParentSegment || value.includes('\0')) {
+    throw new NoteRequestValidationError(
+      'Note target path must be repository-relative and must not contain parent-directory segments.',
+    );
+  }
+
+  return value;
+}
+
 function readCreateTarget(body: Record<string, unknown>): NoteCreateRequest {
   const target = body.target;
   if (!isRecord(target)) {
     throw new NoteRequestValidationError('Note requires a target object.');
   }
 
-  const path = target.path;
-  if (typeof path !== 'string' || path.trim() === '') {
-    throw new NoteRequestValidationError('Note target requires a non-empty string path.');
-  }
+  const path = readRepositoryRelativeNotePath(target.path);
 
   if (target.kind === 'file') {
     if (target.bucket !== undefined) {
@@ -198,10 +226,40 @@ function resolveCreateTarget(
           'ineligible',
         );
       }
-      throw new NoteTargetResolutionError(
-        `"${request.path}" is not part of the current diff.`,
-        'not-found',
-      );
+
+      const repositoryTarget = context.repositoryTarget;
+      if (
+        repositoryTarget === undefined ||
+        repositoryTarget.path !== request.path ||
+        repositoryTarget.indexEntry === null
+      ) {
+        throw new NoteTargetResolutionError(
+          `"${request.path}" is neither tracked nor part of the current diff.`,
+          'not-found',
+        );
+      }
+      if (isSubmoduleIndexEntry(repositoryTarget.indexEntry)) {
+        throw new NoteTargetResolutionError(
+          `"${request.path}" is a submodule; notes cannot be attached to submodules.`,
+          'ineligible',
+        );
+      }
+
+      const generation = requireConfirmedGeneration(context, request.path);
+      if (generation.kind === 'deleted') {
+        throw new NoteTargetResolutionError(
+          `"${request.path}" is tracked but does not exist in the worktree.`,
+          'not-found',
+        );
+      }
+      return {
+        target: {
+          kind: 'file',
+          fileId: createDiffFileId(request.path),
+          scope: 'repository',
+        },
+        generation,
+      };
     }
     return {
       target: { kind: 'file', fileId: file.id, scope: 'diff' },
@@ -269,7 +327,10 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
    * diffs and the batch-fetched worktree generations of the note-eligible
    * paths. Loading only, so each caller decides how the store consumes it.
    */
-  const loadRepoNotesContext = async (c: Context<Env>): Promise<RepoNotesContext> => {
+  const loadRepoNotesContext = async (
+    c: Context<Env>,
+    createRequest?: NoteCreateRequest,
+  ): Promise<RepoNotesContext> => {
     const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
     const diffProvider = options.createDiffProvider(repository.path);
     const [workingFiles, stagedFiles] = await Promise.all([
@@ -277,10 +338,30 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       diffProvider.getFiles('staged'),
     ]);
 
+    const diffFiles = [...workingFiles, ...stagedFiles];
+    let repositoryTarget: RepoNotesContext['repositoryTarget'];
+    if (
+      createRequest?.kind === 'file' &&
+      !diffFiles.some((file) => file.path === createRequest.path)
+    ) {
+      const indexEntry = await options
+        .createRepositoryIndexProvider(repository.path)
+        .getIndexEntry(createRequest.path);
+      repositoryTarget = { path: createRequest.path, indexEntry };
+    }
+
+    // Stored note paths must participate in every reconciliation path. A
+    // missing generation leaves a live repository-scoped note live forever,
+    // including when DELETE staleness=stale asks the store to judge it.
+    const existingNotes = await options.notesStore.list(repository.id);
     const paths = [
-      ...new Set(
-        [...workingFiles, ...stagedFiles].filter(isNoteEligibleFile).map((file) => file.path),
-      ),
+      ...new Set([
+        ...diffFiles.filter(isNoteEligibleFile).map((file) => file.path),
+        ...existingNotes.map((note) => note.path),
+        ...(repositoryTarget?.indexEntry && !isSubmoduleIndexEntry(repositoryTarget.indexEntry)
+          ? [repositoryTarget.path]
+          : []),
+      ]),
     ];
     const generations = await options
       .createFileGenerationProvider(repository.path)
@@ -291,18 +372,22 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       workingFiles,
       stagedFiles,
       generations,
+      ...(repositoryTarget ? { repositoryTarget } : {}),
     };
   };
 
   /**
    * Shared preprocessing for every handler except the collection DELETE:
    * loads the current state and reconciles the store so every note in the
-   * response reports its staleness against the diff as it is right now. Stale
-   * notes are returned like any other; it is the caller that decides what to do
-   * with them.
+   * response reports its staleness against the repository state as it is right
+   * now. Stale notes are returned like any other; it is the caller that decides
+   * what to do with them.
    */
-  const reconcileRepo = async (c: Context<Env>): Promise<RepoNotesContext> => {
-    const context = await loadRepoNotesContext(c);
+  const reconcileRepo = async (
+    c: Context<Env>,
+    createRequest?: NoteCreateRequest,
+  ): Promise<RepoNotesContext> => {
+    const context = await loadRepoNotesContext(c, createRequest);
     const changed = await options.notesStore.reconcile(context.repoId, context);
     if (changed) {
       options.notifyNotesChanged(context.repoId);
@@ -322,10 +407,10 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
 
   notesRoutes.post('/repositories/:repoId/notes', async (c) => {
     try {
-      const context = await reconcileRepo(c);
       const body = await readJsonBody(c);
       const noteBody = readNoteBody(body);
       const request = readCreateTarget(body);
+      const context = await reconcileRepo(c, request);
 
       const resolved = resolveCreateTarget(context, request);
       const note = await options.notesStore.add(

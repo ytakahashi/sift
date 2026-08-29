@@ -4,6 +4,7 @@ import {
 } from '../../../domain/diff/file-content-limits';
 import { splitTextFileLines } from '../../../domain/diff/text-file-lines';
 import type { FileContentProvider, FileContentResult } from '../../services/file-content-provider';
+import { isSubmoduleIndexEntry } from '../../services/repository-index-provider';
 import { GitClient } from '../git/git-client';
 
 type FileContentGit = Pick<GitClient, 'getIndexEntry' | 'getBlobSize' | 'getBlobContent'>;
@@ -25,8 +26,7 @@ export class RepositoryFileContentProvider implements FileContentProvider {
       return { kind: 'not-found' };
     }
 
-    // Mode 160000 points at a commit object for a submodule, not file contents.
-    if (entry.mode === '160000') {
+    if (isSubmoduleIndexEntry(entry)) {
       return { kind: 'unsupported' };
     }
 

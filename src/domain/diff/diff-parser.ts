@@ -1,4 +1,5 @@
 import { DiffFile, DiffHunk, DiffLineType, FileBucket } from './types';
+import { createDiffFileId } from './file-id';
 
 export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
   const files: DiffFile[] = [];
@@ -27,7 +28,7 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
       const bPath = match ? match[2] : '';
 
       currentFile = {
-        id: `file-${bPath}`,
+        id: createDiffFileId(bPath),
         bucket,
         path: bPath,
         oldPath: aPath !== bPath ? aPath : undefined,

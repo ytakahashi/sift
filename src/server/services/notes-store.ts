@@ -12,8 +12,9 @@ export class NoteNotFoundError extends Error {
 }
 
 /**
- * The creation target could not be resolved against the current diff:
- * file or line range not present, ambiguous across panes, or a submodule.
+ * The creation target could not be resolved against the current repository
+ * state: file or line range not present, ambiguous across panes, or an
+ * ineligible entry such as a submodule.
  * The kind provides a stable classification while the message guides human
  * recovery (e.g. suggesting a file note or an explicit bucket).
  */
@@ -82,9 +83,10 @@ export interface DeleteStaleNotesResult {
 
 export interface NotesStore {
   /**
-   * Revalidates stored notes against the current diff and worktree
+   * Revalidates stored notes against current pane diffs and worktree
    * generations: marks changed files and missing required diff anchors as
-   * stale, and re-anchors line notes whose content moved between panes
+   * stale, keeps repository-scoped file notes independent of diff presence,
+   * and re-anchors line notes whose content moved between panes
    * (delegated to domain reconcileNotes). Notes are never removed here, so the
    * stored count only changes through explicit deletion. Returns whether any
    * staleness or anchor changed, so the caller can decide whether to notify

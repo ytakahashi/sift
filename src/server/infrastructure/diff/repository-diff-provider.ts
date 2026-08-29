@@ -1,6 +1,7 @@
 import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import type { DiffProvider } from '../../../domain/diff/diff-provider';
+import { createDiffFileId } from '../../../domain/diff/file-id';
 import { parseDiff } from '../../../domain/diff/diff-parser';
 import { MAX_TEXT_DIFF_BYTES } from '../../../domain/diff/file-content-limits';
 import { splitTextFileLines } from '../../../domain/diff/text-file-lines';
@@ -128,7 +129,7 @@ export class RepositoryDiffProvider implements DiffProvider {
     }
 
     return {
-      id: `file-${file}`,
+      id: createDiffFileId(file),
       bucket: 'working',
       path: file,
       status: 'untracked',
@@ -140,7 +141,7 @@ export class RepositoryDiffProvider implements DiffProvider {
 
   private createUntrackedBinaryFile(file: string): DiffFile {
     return {
-      id: `file-${file}`,
+      id: createDiffFileId(file),
       bucket: 'working',
       path: file,
       status: 'untracked',
