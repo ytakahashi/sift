@@ -49,11 +49,12 @@ function createStoredNote(
   id: string,
   path = 'a.ts',
   staleness: NoteStaleness = LIVE,
+  scope: 'diff' | 'repository' = 'diff',
 ): AnchoredNote {
   return {
     id,
     path,
-    target: { kind: 'file', fileId: `file-${path}`, scope: 'diff' },
+    target: { kind: 'file', fileId: `file-${path}`, scope },
     body: `note-${id}`,
     createdAt: 100,
     staleness,
@@ -88,6 +89,7 @@ describe('notesRoutes', () => {
     deleteStale: Mock;
   };
   let getWorktreeGenerations: Mock;
+  let getIndexEntry: Mock;
   let getFiles: Mock;
   let notifyNotesChanged: Mock;
   let app: Hono<Env>;
@@ -107,6 +109,7 @@ describe('notesRoutes', () => {
       deleteStale: vi.fn().mockResolvedValue({ deletedCount: 0, changed: false }),
     };
     getWorktreeGenerations = vi.fn(async () => generations);
+    getIndexEntry = vi.fn().mockResolvedValue(null);
     getFiles = vi.fn(async (bucket: string) => (bucket === 'working' ? workingFiles : stagedFiles));
     notifyNotesChanged = vi.fn();
 
@@ -126,6 +129,7 @@ describe('notesRoutes', () => {
         notesStore,
         createDiffProvider: () => ({ getFiles }),
         createFileGenerationProvider: () => ({ getWorktreeGenerations }),
+        createRepositoryIndexProvider: () => ({ getIndexEntry }),
         notifyNotesChanged,
       }),
     );
@@ -163,6 +167,28 @@ describe('notesRoutes', () => {
         stagedFiles,
         generations,
       });
+    });
+
+    it('includes stored note paths that are absent from both pane diffs', async () => {
+      // Given: a repository-scoped note targets an unchanged tracked file
+      workingFiles = [];
+      stagedFiles = [];
+      notesStore.list.mockResolvedValue([
+        createStoredNote('outside', 'src/unchanged.ts', LIVE, 'repository'),
+      ]);
+      generations = new Map([['src/unchanged.ts', FILE_GENERATION]]);
+
+      // When: notes are listed and reconciled
+      const response = await app.request('/api/repositories/my-repo/notes');
+
+      // Then: its path participates in the one generation batch
+      expect(response.status).toBe(200);
+      expect(getWorktreeGenerations).toHaveBeenCalledTimes(1);
+      expect(getWorktreeGenerations).toHaveBeenCalledWith(['src/unchanged.ts']);
+      expect(notesStore.reconcile).toHaveBeenCalledWith(
+        'my-repo',
+        expect.objectContaining({ generations }),
+      );
     });
 
     it('notifies subscribers when reconcile changed staleness or re-anchored notes', async () => {
@@ -294,6 +320,7 @@ describe('notesRoutes', () => {
         { generation: FILE_GENERATION, lineContents: ['alpha'] },
       );
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
+      expect(getIndexEntry).not.toHaveBeenCalled();
     });
 
     it('resolves a multi-line range in one hunk and stores all line contents', async () => {
@@ -563,9 +590,72 @@ describe('notesRoutes', () => {
         },
         { generation: FILE_GENERATION, lineContents: undefined },
       );
+      expect(getIndexEntry).not.toHaveBeenCalled();
     });
 
-    it('returns 422 when the file is not part of the diff', async () => {
+    it('creates a repository-scoped note for a tracked file outside the diff', async () => {
+      // Given: the file is absent from both panes but has a stage-zero index entry
+      workingFiles = [];
+      stagedFiles = [];
+      notesStore.list.mockResolvedValue([]);
+      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      generations = new Map([['src/unchanged.ts', FILE_GENERATION]]);
+
+      // When: a file note targets the unchanged tracked file
+      const response = await postNote({
+        target: { kind: 'file', path: 'src/unchanged.ts' },
+        body: 'update this caller too',
+      });
+
+      // Then: the target is anchored without requiring diff presence
+      expect(response.status).toBe(201);
+      expect(getIndexEntry).toHaveBeenCalledTimes(1);
+      expect(getIndexEntry).toHaveBeenCalledWith('src/unchanged.ts');
+      expect(notesStore.add).toHaveBeenCalledWith(
+        'my-repo',
+        {
+          path: 'src/unchanged.ts',
+          target: {
+            kind: 'file',
+            fileId: 'file-src/unchanged.ts',
+            scope: 'repository',
+          },
+          body: 'update this caller too',
+        },
+        { generation: FILE_GENERATION, lineContents: undefined },
+      );
+    });
+
+    it('collects diff, stored-note, and creation paths in one deduplicated batch', async () => {
+      // Given: the existing note repeats the diff path and adds one outside path
+      notesStore.list.mockResolvedValue([
+        createStoredNote('diff-note', 'a.ts'),
+        createStoredNote('outside-note', 'src/existing.ts', LIVE, 'repository'),
+      ]);
+      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      generations = new Map([
+        ['a.ts', FILE_GENERATION],
+        ['src/existing.ts', FILE_GENERATION],
+        ['src/new-target.ts', FILE_GENERATION],
+      ]);
+
+      // When: another outside-diff file note is created
+      const response = await postNote({
+        target: { kind: 'file', path: 'src/new-target.ts' },
+        body: 'new target',
+      });
+
+      // Then: all necessary paths use one provider call in stable order
+      expect(response.status).toBe(201);
+      expect(getWorktreeGenerations).toHaveBeenCalledTimes(1);
+      expect(getWorktreeGenerations).toHaveBeenCalledWith([
+        'a.ts',
+        'src/existing.ts',
+        'src/new-target.ts',
+      ]);
+    });
+
+    it('returns 422 when the file is neither tracked nor part of the diff', async () => {
       // When: a file note targets an unknown path
       const response = await postNote({
         target: { kind: 'file', path: 'unknown.ts' },
@@ -574,6 +664,119 @@ describe('notesRoutes', () => {
 
       // Then: the request is rejected
       expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_TARGET_NOT_FOUND' });
+      expect(getIndexEntry).toHaveBeenCalledWith('unknown.ts');
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 for an outside-diff submodule without fetching its generation', async () => {
+      // Given: the index entry is a gitlink
+      workingFiles = [];
+      stagedFiles = [];
+      notesStore.list.mockResolvedValue([]);
+      getIndexEntry.mockResolvedValue({ mode: '160000', blobId: 'commit-id' });
+
+      // When: a file note targets it
+      const response = await postNote({
+        target: { kind: 'file', path: 'vendor/lib' },
+        body: 'x',
+      });
+
+      // Then: it is classified as ineligible, not missing
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_TARGET_INELIGIBLE',
+      });
+      expect(getWorktreeGenerations).toHaveBeenCalledWith([]);
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
+    it('does not consult the index for a submodule already visible in the diff', async () => {
+      // Given: the diff identifies the path as a submodule
+      workingFiles = [createFile({ path: 'vendor/lib', kind: 'submodule' })];
+
+      // When: a file note targets it
+      const response = await postNote({
+        target: { kind: 'file', path: 'vendor/lib' },
+        body: 'x',
+      });
+
+      // Then: diff-backed eligibility rejects it without another Git subprocess
+      expect(response.status).toBe(422);
+      expect(getIndexEntry).not.toHaveBeenCalled();
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_TARGET_INELIGIBLE',
+      });
+    });
+
+    it('returns 422 when a tracked outside-diff file is absent from the worktree', async () => {
+      // Given: the path remains in the index but has no worktree entry
+      workingFiles = [];
+      stagedFiles = [];
+      notesStore.list.mockResolvedValue([]);
+      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      generations = new Map([['src/deleted.ts', { kind: 'deleted' }]]);
+
+      // When
+      const response = await postNote({
+        target: { kind: 'file', path: 'src/deleted.ts' },
+        body: 'x',
+      });
+
+      // Then
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_TARGET_NOT_FOUND' });
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
+    it.each([
+      [
+        'unavailable',
+        'src/unavailable.ts',
+        new Map<string, FileGeneration>([
+          ['src/unavailable.ts', { kind: 'unavailable', reason: 'read error' }],
+        ]),
+      ],
+      [
+        'missing from the generation map',
+        'src/missing-generation.ts',
+        new Map<string, FileGeneration>(),
+      ],
+    ] as Array<[string, string, Map<string, FileGeneration>]>)(
+      'returns 503 when an outside-diff generation is %s',
+      async (_label, path, current) => {
+        // Given: the target is tracked, but its generation is not confirmed
+        workingFiles = [];
+        stagedFiles = [];
+        notesStore.list.mockResolvedValue([]);
+        getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+        generations = current;
+
+        // When: a file note is created
+        const response = await postNote({
+          target: { kind: 'file', path },
+          body: 'x',
+        });
+
+        // Then: the indeterminate state is retryable and nothing is saved
+        expect(response.status).toBe(503);
+        expect(notesStore.add).not.toHaveBeenCalled();
+      },
+    );
+
+    it('returns 500 without reconciling or saving when index lookup fails', async () => {
+      // Given: Git cannot inspect the outside-diff target
+      getIndexEntry.mockRejectedValue(new Error('git ls-files failed'));
+
+      // When
+      const response = await postNote({
+        target: { kind: 'file', path: 'src/unknown.ts' },
+        body: 'x',
+      });
+
+      // Then: the operational error is not translated into target absence
+      expect(response.status).toBe(500);
+      expect(notesStore.reconcile).not.toHaveBeenCalled();
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
@@ -590,6 +793,30 @@ describe('notesRoutes', () => {
       });
 
       // Then: the invalid target is rejected rather than stored as an anchor
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_TARGET_INELIGIBLE',
+      });
+      expect(notesStore.add).not.toHaveBeenCalled();
+    });
+
+    it('returns 422 when an outside-diff tracked path is not a file or symlink', async () => {
+      // Given: the index contains the path, but its current worktree entry is ineligible
+      workingFiles = [];
+      stagedFiles = [];
+      notesStore.list.mockResolvedValue([]);
+      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      generations = new Map([
+        ['src/directory', { kind: 'ineligible', reason: 'not a regular file or symlink' }],
+      ]);
+
+      // When
+      const response = await postNote({
+        target: { kind: 'file', path: 'src/directory' },
+        body: 'x',
+      });
+
+      // Then
       expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({
         code: 'NOTE_TARGET_INELIGIBLE',
@@ -633,6 +860,25 @@ describe('notesRoutes', () => {
         { target: { kind: 'file', path: 'a.ts', bucket: 'working' }, body: 'b' },
       ],
       ['unknown target kind', { target: { kind: 'hunk', path: 'a.ts' }, body: 'b' }],
+      ['an absolute POSIX path', { target: { kind: 'file', path: '/outside.ts' }, body: 'b' }],
+      [
+        'an absolute Windows path',
+        {
+          target: { kind: 'line', path: 'C:\\outside.ts', startLine: 1, endLine: 1 },
+          body: 'b',
+        },
+      ],
+      [
+        'a POSIX parent-directory segment',
+        { target: { kind: 'file', path: 'src/../../outside.ts' }, body: 'b' },
+      ],
+      [
+        'a Windows parent-directory segment',
+        {
+          target: { kind: 'line', path: 'src\\..\\outside.ts', startLine: 1, endLine: 1 },
+          body: 'b',
+        },
+      ],
       ['missing startLine', { target: { kind: 'line', path: 'a.ts', endLine: 5 }, body: 'b' }],
       ['missing endLine', { target: { kind: 'line', path: 'a.ts', startLine: 5 }, body: 'b' }],
       ['legacy line field', { target: { kind: 'line', path: 'a.ts', line: 5 }, body: 'b' }],
@@ -678,6 +924,12 @@ describe('notesRoutes', () => {
       expect(response.status).toBe(400);
       await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_REQUEST_INVALID' });
       expect(notesStore.add).not.toHaveBeenCalled();
+      expect(getFiles).not.toHaveBeenCalled();
+      expect(notesStore.list).not.toHaveBeenCalled();
+      expect(getWorktreeGenerations).not.toHaveBeenCalled();
+      expect(getIndexEntry).not.toHaveBeenCalled();
+      expect(notesStore.reconcile).not.toHaveBeenCalled();
+      expect(notifyNotesChanged).not.toHaveBeenCalled();
     });
   });
 
@@ -751,12 +1003,21 @@ describe('notesRoutes', () => {
     });
 
     it('hands the current repository state to the store for staleness=stale', async () => {
-      // Given: the panes contain a text file and a submodule
+      // Given: the panes contain a text file and a submodule, while a stored
+      // repository-scoped note targets a path absent from both panes
       workingFiles = [
         createFile({ path: 'a.ts', lines: [{ line: 5, content: 'alpha' }] }),
         createFile({ path: 'vendor/lib', kind: 'submodule' }),
       ];
       stagedFiles = [createFile({ path: 'a.ts', lines: [{ line: 1, content: 'beta' }] })];
+      notesStore.list.mockResolvedValue([
+        createStoredNote('n1'),
+        createStoredNote('outside', 'src/unchanged.ts', LIVE, 'repository'),
+      ]);
+      generations = new Map([
+        ['a.ts', FILE_GENERATION],
+        ['src/unchanged.ts', FILE_GENERATION],
+      ]);
 
       // When: only the stale notes are deleted
       const response = await deleteNotes('?staleness=stale');
@@ -764,7 +1025,7 @@ describe('notesRoutes', () => {
       // Then: the store judges and deletes against one freshly loaded state,
       // so the route does not reconcile separately
       expect(response.status).toBe(200);
-      expect(getWorktreeGenerations).toHaveBeenCalledWith(['a.ts']);
+      expect(getWorktreeGenerations).toHaveBeenCalledWith(['a.ts', 'src/unchanged.ts']);
       expect(notesStore.deleteStale).toHaveBeenCalledWith('my-repo', {
         repoId: 'my-repo',
         workingFiles,

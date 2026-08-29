@@ -25,6 +25,7 @@ import {
 import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
 import { RepositoryFileContentProvider } from './infrastructure/diff/repository-file-content-provider';
 import { RepositoryHeadRefProvider } from './infrastructure/git/repository-head-ref-provider';
+import { GitRepositoryIndexProvider } from './infrastructure/git/repository-index-provider';
 import { WorktreeFileGenerationProvider } from './infrastructure/git/worktree-file-generation-provider';
 import { InMemoryNotesStore } from './infrastructure/notes/in-memory-notes-store';
 import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-service-impl';
@@ -95,10 +96,11 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
     createNotesRoutes({
       repositoryResolver: resolver,
       notesStore,
-      // Reconcile deletes notes for files absent from the diff, so a transient
-      // Git/filesystem failure must abort the request rather than look empty.
+      // A transient Git failure must abort reconciliation rather than make a
+      // required diff anchor appear absent and therefore stale.
       createDiffProvider: (path) => new RepositoryDiffProvider(path, { errorMode: 'throw' }),
       createFileGenerationProvider: (path) => new WorktreeFileGenerationProvider(path),
+      createRepositoryIndexProvider: (path) => new GitRepositoryIndexProvider(path),
       notifyNotesChanged: (repoId) => options.repoWatchManager.broadcastNotesChanged(repoId),
     }),
   );
