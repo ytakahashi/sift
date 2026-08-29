@@ -38,19 +38,22 @@ export interface ReconcileNotesResult {
 const LIVE: NoteStaleness = { kind: 'live' };
 
 /**
- * Recomputes, for every stored note, whether it still matches the current diff
- * and worktree state.
+ * Recomputes, for every stored note, whether it still matches the current
+ * repository state and any diff anchor its target requires.
  *
- * Per note, three checks run in order; the first one that fails decides the
- * stale reason:
- * 1. Presence  — a note-eligible pane file with the note's fileId must still
- *    exist in some pane. Covers commit/discard/deletion and the path being
- *    replaced by a submodule. Failure means 'file-out-of-diff'.
+ * Each target selects the applicable checks, which run in order and stop at
+ * the first failure:
+ * 1. Presence  — line notes and diff-scoped file notes require an eligible
+ *    pane file with the note's fileId. Repository-scoped file notes skip this
+ *    check because their file is intentionally outside the diff. Failure
+ *    means 'file-out-of-diff'.
  * 2. Generation — the file's current worktree generation must equal the
  *    creation-time one. `unavailable` (or a missing map entry) means
  *    indeterminate, never "changed", and equally never "recovered": every
  *    already-stale note holds its verdict, whatever its reason, instead of
  *    returning to live on a state nothing could read.
+ *    `ineligible` is a confirmed invalid target and therefore counts as a
+ *    change rather than an indeterminate state.
  *    Stage/unstage/commit do not touch the worktree, so they pass here.
  *    Failure means 'content-changed'.
  * 3. Re-anchor (line notes) — the target must re-resolve with path, line
@@ -84,28 +87,32 @@ function reconcileRecord(
   record: NoteReconcileRecord,
   input: ReconcileNotesInput,
 ): NoteReconcileRecord {
-  const paneFile = findEligiblePaneFile(record.note.target.fileId, input);
+  const target = record.note.target;
+  // The recorded repository-relative path is the canonical generation key for
+  // every scope. Diff-scoped creation only accepts a pane file with this exact
+  // path, while repository-scoped targets intentionally have no pane file.
+  const currentGeneration = input.generations.get(record.note.path);
+
+  if (target.kind === 'file') {
+    if (target.scope === 'diff' && !findEligiblePaneFile(target.fileId, input)) {
+      return withStaleness(record, { kind: 'stale', reason: 'file-out-of-diff' });
+    }
+
+    const generationVerdict = reconcileGeneration(record, currentGeneration);
+    if (generationVerdict) {
+      return generationVerdict;
+    }
+    return withStaleness(record, LIVE);
+  }
+
+  const paneFile = findEligiblePaneFile(target.fileId, input);
   if (!paneFile) {
     return withStaleness(record, { kind: 'stale', reason: 'file-out-of-diff' });
   }
 
-  const current = input.generations.get(paneFile.path);
-  if (isIndeterminate(current)) {
-    // An indeterminate current state can confirm a recovery no more than it can
-    // confirm a change, so an already-stale note holds its verdict whatever the
-    // reason: returning to live would claim the note matches content that could
-    // not be read. Only this check is suspended, not the pass: a live note goes
-    // on to the range check, which is decided from the diff that was read
-    // successfully and therefore stays in force.
-    if (record.note.staleness.kind === 'stale') {
-      return record;
-    }
-  } else if (hasGenerationChanged(record.generation, current)) {
-    return withStaleness(record, { kind: 'stale', reason: 'content-changed' });
-  }
-
-  if (record.note.target.kind === 'file') {
-    return withStaleness(record, LIVE);
+  const generationVerdict = reconcileGeneration(record, currentGeneration);
+  if (generationVerdict) {
+    return generationVerdict;
   }
 
   // A line record without its content baseline cannot be re-anchored safely;
@@ -118,19 +125,16 @@ function reconcileRecord(
     workingFiles: input.workingFiles,
     stagedFiles: input.stagedFiles,
     path: paneFile.path,
-    startLine: record.note.target.startNewLineNumber,
-    endLine: record.note.target.endNewLineNumber,
-    bucketConstraint: { kind: 'preferred', bucket: record.note.target.bucket },
+    startLine: target.startNewLineNumber,
+    endLine: target.endNewLineNumber,
+    bucketConstraint: { kind: 'preferred', bucket: target.bucket },
     requiredLineContents: record.lineContents,
   });
   if (resolution.kind !== 'resolved') {
     return withStaleness(record, { kind: 'stale', reason: 'range-unresolved' });
   }
 
-  if (
-    resolution.target.bucket === record.note.target.bucket &&
-    resolution.target.hunkId === record.note.target.hunkId
-  ) {
+  if (resolution.target.bucket === target.bucket && resolution.target.hunkId === target.hunkId) {
     return withStaleness(record, LIVE);
   }
 
@@ -139,13 +143,33 @@ function reconcileRecord(
     note: {
       ...record.note,
       target: {
-        ...record.note.target,
+        ...target,
         bucket: resolution.target.bucket,
         hunkId: resolution.target.hunkId,
       },
       staleness: LIVE,
     },
   };
+}
+
+/** Returns a final record when generation decides the verdict, or null to continue. */
+function reconcileGeneration(
+  record: NoteReconcileRecord,
+  current: FileGeneration | undefined,
+): NoteReconcileRecord | null {
+  if (isIndeterminate(current)) {
+    // An indeterminate current state can confirm a recovery no more than it can
+    // confirm a change, so an already-stale note holds its verdict whatever the
+    // reason. A live line note may still continue to the diff-backed range
+    // check, whose inputs were read successfully.
+    return record.note.staleness.kind === 'stale' ? record : null;
+  }
+
+  if (current.kind === 'ineligible' || hasGenerationChanged(record.generation, current)) {
+    return withStaleness(record, { kind: 'stale', reason: 'content-changed' });
+  }
+
+  return null;
 }
 
 /**

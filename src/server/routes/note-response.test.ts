@@ -43,7 +43,7 @@ describe('toNoteResponse', () => {
     const note: AnchoredNote = {
       id: 'n2',
       path: 'b.ts',
-      target: { kind: 'file', fileId: 'file-b.ts' },
+      target: { kind: 'file', fileId: 'file-b.ts', scope: 'repository' },
       body: 'about this file',
       createdAt: 200,
       staleness: { kind: 'live' },
@@ -52,7 +52,7 @@ describe('toNoteResponse', () => {
     // When: the note is converted
     const result = toNoteResponse(note);
 
-    // Then: no bucket or line fields are present
+    // Then: no bucket, line, or internal scope fields are present
     expect(result).toEqual({
       id: 'n2',
       kind: 'file',
@@ -69,7 +69,7 @@ describe('toNoteResponse', () => {
     const note: AnchoredNote = {
       id: 'n3',
       path: 'src/nested/a.ts',
-      target: { kind: 'file', fileId: 'file-src/nested/a.ts' },
+      target: { kind: 'file', fileId: 'file-src/nested/a.ts', scope: 'diff' },
       body: 'x',
       createdAt: 1,
       staleness: { kind: 'live' },

@@ -56,7 +56,7 @@ async function addFileNote(
 ): Promise<string> {
   const note = await store.add(
     repoId,
-    { path, target: { kind: 'file', fileId: `file-${path}` }, body: 'body' },
+    { path, target: { kind: 'file', fileId: `file-${path}`, scope: 'diff' }, body: 'body' },
     { generation },
   );
   return note.id;
@@ -135,7 +135,7 @@ describe('InMemoryNotesStore', () => {
     const existing: AnchoredNote = {
       id: 'caller-supplied-id',
       path: 'a.ts',
-      target: { kind: 'file', fileId: 'file-a.ts' },
+      target: { kind: 'file', fileId: 'file-a.ts', scope: 'diff' },
       body: 'body',
       createdAt: 1,
       staleness: { kind: 'stale', reason: 'content-changed' },

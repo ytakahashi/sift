@@ -24,14 +24,20 @@ describe('serializeFileGeneration', () => {
     expect(serializeFileGeneration(regular)).not.toBe(serializeFileGeneration(executable));
   });
 
-  it('excludes unavailable from confirmed generations at the type level', () => {
-    // Given: an unavailable generation (indeterminate, not a real generation)
+  it('excludes non-anchor states from confirmed generations at the type level', () => {
+    // Given: generations that are indeterminate or confirmed ineligible
     const unavailable: FileGeneration = { kind: 'unavailable', reason: 'read error' };
+    const ineligible: FileGeneration = { kind: 'ineligible', reason: 'directory' };
 
-    // Then: it is not assignable to ConfirmedFileGeneration, so it can never
+    // Then: neither is assignable to ConfirmedFileGeneration, so neither can
     // be stored as an anchor or compared for equality
     // @ts-expect-error unavailable must not be accepted as a confirmed generation
-    const rejected: ConfirmedFileGeneration = unavailable;
-    expect(rejected.kind).toBe('unavailable');
+    const rejectedUnavailable: ConfirmedFileGeneration = unavailable;
+    // @ts-expect-error ineligible must not be accepted as a confirmed generation
+    const rejectedIneligible: ConfirmedFileGeneration = ineligible;
+    expect([rejectedUnavailable.kind, rejectedIneligible.kind]).toEqual([
+      'unavailable',
+      'ineligible',
+    ]);
   });
 });
