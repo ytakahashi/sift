@@ -1,11 +1,7 @@
-import {
-  MAX_FULL_FILE_VIEW_LINES,
-  MAX_TEXT_DIFF_BYTES,
-} from '../../../domain/diff/file-content-limits';
-import { splitTextFileLines } from '../../../domain/diff/text-file-lines';
 import type { FileContentProvider, FileContentResult } from '../../services/file-content-provider';
 import { isSubmoduleIndexEntry } from '../../services/repository-index-provider';
 import { GitClient } from '../git/git-client';
+import { readBlobAsText } from './blob-text-reader';
 
 type FileContentGit = Pick<GitClient, 'getIndexEntry' | 'getBlobSize' | 'getBlobContent'>;
 
@@ -30,21 +26,7 @@ export class RepositoryFileContentProvider implements FileContentProvider {
       return { kind: 'unsupported' };
     }
 
-    const size = await this.git.getBlobSize(entry.blobId);
-    if (size > MAX_TEXT_DIFF_BYTES) {
-      return { kind: 'too-large' };
-    }
-
-    const content = await this.git.getBlobContent(entry.blobId);
-    if (content.includes(0)) {
-      return { kind: 'unsupported' };
-    }
-
-    const lines = splitTextFileLines(content.toString('utf8'));
-    if (lines.length > MAX_FULL_FILE_VIEW_LINES) {
-      return { kind: 'too-large' };
-    }
-
-    return { kind: 'file', blobId: entry.blobId, lines };
+    const result = await readBlobAsText(this.git, entry.blobId);
+    return result.kind === 'file' ? { ...result, blobId: entry.blobId } : result;
   }
 }

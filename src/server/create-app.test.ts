@@ -24,4 +24,24 @@ describe('createApp', () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ version: APP_INFO.version });
   });
+
+  it('mounts the blob content route', async () => {
+    // Given
+    const app = createApp({
+      repoWatchManager: {
+        broadcastNotesChanged: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+        subscribe: vi.fn().mockResolvedValue(undefined),
+      },
+    });
+
+    // When: validation happens before repository resolution or Git access
+    const response = await app.request('/api/repositories/repo/blob-content', {
+      headers: { host: 'localhost' },
+    });
+
+    // Then
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ error: 'A valid blob ID is required.' });
+  });
 });

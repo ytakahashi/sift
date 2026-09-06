@@ -10,6 +10,7 @@ import { createNotesRoutes } from './routes/notes';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
 import { createFileContentRoutes } from './routes/file-content';
+import { createBlobContentRoutes } from './routes/blob-content';
 import type { NotesStore } from './services/notes-store';
 import type { RepositoryConfigUpdater } from './services/repository-config';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
@@ -24,6 +25,7 @@ import {
 } from './infrastructure/repository-validator';
 import { RepositoryDiffProvider } from './infrastructure/diff/repository-diff-provider';
 import { RepositoryFileContentProvider } from './infrastructure/diff/repository-file-content-provider';
+import { RepositoryBlobContentProvider } from './infrastructure/diff/repository-blob-content-provider';
 import { RepositoryHeadRefProvider } from './infrastructure/git/repository-head-ref-provider';
 import { GitRepositoryIndexProvider } from './infrastructure/git/repository-index-provider';
 import { WorktreeFileGenerationProvider } from './infrastructure/git/worktree-file-generation-provider';
@@ -75,6 +77,13 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
     createFileContentRoutes({
       repositoryResolver: resolver,
       createFileContentProvider: (path) => new RepositoryFileContentProvider(path),
+    }),
+  );
+  app.route(
+    '/api',
+    createBlobContentRoutes({
+      repositoryResolver: resolver,
+      createBlobContentProvider: (path) => new RepositoryBlobContentProvider(path),
     }),
   );
   app.route(
