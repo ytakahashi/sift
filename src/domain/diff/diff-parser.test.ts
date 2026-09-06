@@ -38,6 +38,7 @@ describe('parseDiff', () => {
     expect(file.bucket).toBe('working');
     expect(file.status).toBe('modified');
     expect(file.kind).toBe('text');
+    expect(file.oldBlobId).toBe('abc1234');
     expect(file.newBlobId).toBe('def5678');
     expect(file.hunks).toHaveLength(1);
 
@@ -76,6 +77,39 @@ describe('parseDiff', () => {
       newLineNumber: 3,
       content: 'line3',
     });
+  });
+
+  it('parses old and new blob ids from an index header without a mode', () => {
+    // Given
+    const raw = [
+      'diff --git a/file.ts b/file.ts',
+      'index abc1234..def5678',
+      '--- a/file.ts',
+      '+++ b/file.ts',
+    ].join('\n');
+
+    // When
+    const files = parseDiff(raw, 'staged');
+
+    // Then
+    expect(files[0]).toMatchObject({ oldBlobId: 'abc1234', newBlobId: 'def5678' });
+  });
+
+  it('leaves blob ids absent when the index header is malformed', () => {
+    // Given
+    const raw = [
+      'diff --git a/file.ts b/file.ts',
+      'index not-a-blob..def5678 100644',
+      '--- a/file.ts',
+      '+++ b/file.ts',
+    ].join('\n');
+
+    // When
+    const files = parseDiff(raw, 'staged');
+
+    // Then
+    expect(files[0].oldBlobId).toBeUndefined();
+    expect(files[0].newBlobId).toBeUndefined();
   });
 
   it('parses multiple files', () => {

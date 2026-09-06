@@ -119,6 +119,87 @@ describe('GitClient.hashObjects', () => {
   });
 });
 
+describe('GitClient.getObjectType', () => {
+  beforeEach(() => {
+    vi.mocked(spawn).mockReset();
+  });
+
+  it.each(['blob', 'tree', 'commit', 'tag'] as const)(
+    'returns the %s object type',
+    async (type) => {
+      // Given
+      const child = stubSpawnedChild();
+      const client = new GitClient('/repo/root');
+
+      // When
+      const promise = client.getObjectType('abc123');
+      child.stdout.emit('data', Buffer.from(`${type}\n`));
+      child.emit('close', 0);
+
+      // Then
+      await expect(promise).resolves.toBe(type);
+      expect(spawn).toHaveBeenCalledWith('git', ['cat-file', '--batch-check=%(objecttype)'], {
+        cwd: '/repo/root',
+      });
+      expect(child.stdin.written).toBe('abc123\n');
+      expect(child.stdin.ended).toBe(true);
+    },
+  );
+
+  it('returns null for the structured missing response', async () => {
+    // Given
+    const child = stubSpawnedChild();
+    const client = new GitClient('/repo/root');
+
+    // When
+    const promise = client.getObjectType('deadbeef');
+    child.stdout.emit('data', Buffer.from('deadbeef missing\n'));
+    child.emit('close', 0);
+
+    // Then
+    await expect(promise).resolves.toBeNull();
+  });
+
+  it('rejects unexpected successful output instead of treating it as missing', async () => {
+    // Given
+    const child = stubSpawnedChild();
+    const client = new GitClient('/repo/root');
+
+    // When
+    const promise = client.getObjectType('abc123');
+    child.stdout.emit('data', Buffer.from('unexpected\n'));
+    child.emit('close', 0);
+
+    // Then
+    await expect(promise).rejects.toThrow('invalid object type');
+  });
+
+  it('propagates Git process failures', async () => {
+    // Given
+    const child = stubSpawnedChild();
+    const client = new GitClient('/repo/root');
+
+    // When
+    const promise = client.getObjectType('abc123');
+    child.stderr.emit('data', Buffer.from('fatal: not a git repository\n'));
+    child.emit('close', 128);
+
+    // Then
+    await expect(promise).rejects.toThrow('fatal: not a git repository');
+  });
+
+  it('rejects input that could add another batch request', async () => {
+    // Given
+    const client = new GitClient('/repo/root');
+
+    // When / Then
+    await expect(client.getObjectType('abc123\ndef456')).rejects.toThrow(
+      'only hexadecimal characters',
+    );
+    expect(spawn).not.toHaveBeenCalled();
+  });
+});
+
 describe('GitClient index content commands', () => {
   it('requests a literal pathspec and selects only its stage-zero entry', async () => {
     // Given: the path contains characters Git would otherwise treat as pathspec syntax

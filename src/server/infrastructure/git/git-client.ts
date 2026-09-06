@@ -3,6 +3,8 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+export type GitObjectType = 'blob' | 'tree' | 'commit' | 'tag';
+
 export class GitClient {
   constructor(readonly repoRoot: string) {}
 
@@ -111,6 +113,29 @@ export class GitClient {
     return this.execGit(['cat-file', '-p', blobId], { encoding: 'buffer' });
   }
 
+  async getObjectType(objectId: string): Promise<GitObjectType | null> {
+    // The batch protocol is line-oriented, so object IDs must never inject an
+    // additional request even when this method is called outside the HTTP route.
+    if (!/^[0-9a-f]+$/i.test(objectId)) {
+      throw new Error('Git object id must contain only hexadecimal characters.');
+    }
+
+    const output = await this.execGitWithInput(
+      ['cat-file', '--batch-check=%(objecttype)'],
+      `${objectId}\n`,
+    );
+    const result = output.trim();
+
+    if (result === `${objectId} missing`) {
+      return null;
+    }
+    if (result === 'blob' || result === 'tree' || result === 'commit' || result === 'tag') {
+      return result;
+    }
+
+    throw new Error(`git cat-file returned an invalid object type: ${result}`);
+  }
+
   async cleanPath(path: string): Promise<void> {
     await this.runGitCommand(['clean', '-f', '--', path]);
   }
@@ -134,8 +159,20 @@ export class GitClient {
       return [];
     }
 
-    return await new Promise<string[]>((resolvePromise, rejectPromise) => {
-      const child = spawn('git', ['hash-object', '--stdin-paths'], { cwd: this.repoRoot });
+    const stdout = await this.execGitWithInput(
+      ['hash-object', '--stdin-paths'],
+      `${paths.join('\n')}\n`,
+    );
+    const blobIds = stdout.split('\n').filter(Boolean);
+    if (blobIds.length !== paths.length) {
+      throw new Error(`git hash-object returned ${blobIds.length} ids for ${paths.length} paths`);
+    }
+    return blobIds;
+  }
+
+  private async execGitWithInput(args: string[], input: string): Promise<string> {
+    return await new Promise<string>((resolvePromise, rejectPromise) => {
+      const child = spawn('git', args, { cwd: this.repoRoot });
       let stdout = '';
       let stderr = '';
 
@@ -146,28 +183,17 @@ export class GitClient {
         stderr += chunk.toString('utf8');
       });
       child.on('error', (error: Error) => {
-        rejectPromise(
-          new Error(`Git command failed: git hash-object --stdin-paths\n${error.message}`),
-        );
+        rejectPromise(new Error(`Git command failed: git ${args.join(' ')}\n${error.message}`));
       });
       child.on('close', (code: number | null) => {
         if (code !== 0) {
-          rejectPromise(
-            new Error(`Git command failed: git hash-object --stdin-paths\n${stderr.trim()}`),
-          );
+          rejectPromise(new Error(`Git command failed: git ${args.join(' ')}\n${stderr.trim()}`));
           return;
         }
-        const blobIds = stdout.split('\n').filter(Boolean);
-        if (blobIds.length !== paths.length) {
-          rejectPromise(
-            new Error(`git hash-object returned ${blobIds.length} ids for ${paths.length} paths`),
-          );
-          return;
-        }
-        resolvePromise(blobIds);
+        resolvePromise(stdout);
       });
 
-      child.stdin.write(`${paths.join('\n')}\n`);
+      child.stdin.write(input);
       child.stdin.end();
     });
   }

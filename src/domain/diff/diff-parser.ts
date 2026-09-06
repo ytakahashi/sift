@@ -75,9 +75,10 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
     }
 
     if (line.startsWith('index ')) {
-      const match = line.match(/^index [0-9a-f]+\.\.([0-9a-f]+)(?: \d{6})?$/);
+      const match = line.match(/^index ([0-9a-f]+)\.\.([0-9a-f]+)(?: \d{6})?$/);
       if (match) {
-        currentFile.newBlobId = match[1];
+        currentFile.oldBlobId = match[1];
+        currentFile.newBlobId = match[2];
       }
       continue;
     }
