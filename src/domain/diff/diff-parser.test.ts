@@ -169,9 +169,12 @@ describe('parseDiff', () => {
 
   it('detects new file mode', () => {
     // Given: a raw diff string for a new file addition
+    const nullBlobId = '0'.repeat(40);
+    const newBlobId = 'a'.repeat(40);
     const raw = [
       'diff --git a/new.ts b/new.ts',
       'new file mode 100644',
+      `index ${nullBlobId}..${newBlobId}`,
       '--- /dev/null',
       '+++ b/new.ts',
       '@@ -0,0 +1,2 @@',
@@ -182,8 +185,10 @@ describe('parseDiff', () => {
     // When: parsing the diff
     const files = parseDiff(raw, 'staged');
 
-    // Then: it identifies the file status as 'added'
+    // Then: it identifies the file status and retains Git's zero object ID sentinel
     expect(files[0].status).toBe('added');
+    expect(files[0].oldBlobId).toBe(nullBlobId);
+    expect(files[0].newBlobId).toBe(newBlobId);
   });
 
   it('detects deleted file mode', () => {

@@ -1,5 +1,5 @@
 import type { ReactElement } from 'react';
-import { cleanup, render, screen, within, fireEvent, act } from '@testing-library/react';
+import { cleanup, render, screen, within, fireEvent, act, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../domain/diff/types';
@@ -25,13 +25,21 @@ vi.mock('../hooks/workspace-actions/useWorkspaceActions', () => ({
 
 vi.mock('../components/diff/UnifiedDiffViewer', () => ({
   UnifiedDiffViewer: ({
+    blobContentReader,
+    diffToolbarTarget,
     file,
     isFileNoteEditorOpen,
   }: {
+    blobContentReader?: AppDependencies['blobContentReader'];
+    diffToolbarTarget?: Element | null;
     file: DiffFile;
     isFileNoteEditorOpen?: boolean;
   }) => (
-    <div data-testid="diff-viewer">
+    <div
+      data-has-blob-content-reader={blobContentReader !== undefined}
+      data-has-diff-toolbar-target={diffToolbarTarget !== null && diffToolbarTarget !== undefined}
+      data-testid="diff-viewer"
+    >
       {file.displayPath}
       {isFileNoteEditorOpen && <span>file note editor open</span>}
     </div>
@@ -251,6 +259,21 @@ describe('RepositoryViewerPage interactions', () => {
       'my-app',
       expect.any(Function),
     );
+  });
+
+  it('passes Markdown preview dependencies and the diff toolbar target to the viewer', async () => {
+    // Given
+    const user = userEvent.setup();
+    render(<Page />);
+
+    // When
+    await user.click(screen.getByRole('option', { name: 'b.tsM' }));
+
+    // Then
+    await waitFor(() => {
+      expect(screen.getByTestId('diff-viewer').dataset.hasDiffToolbarTarget).toBe('true');
+    });
+    expect(screen.getByTestId('diff-viewer').dataset.hasBlobContentReader).toBe('true');
   });
 
   it('stages on double click from the working list', async () => {

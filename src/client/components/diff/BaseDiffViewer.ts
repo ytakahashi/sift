@@ -1,13 +1,14 @@
 import type { DiffFile } from '../../../domain/diff/types';
 import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
-import type { FileContentReader } from '../../application/ports';
+import type { BlobContentReader, FileContentReader } from '../../application/ports';
 
 export interface BaseDiffViewerProps {
   file: DiffFile;
   repoId: RepositoryId;
+  blobContentReader: BlobContentReader;
   fileContentReader: FileContentReader;
-  fullViewToolbarTarget?: Element | null;
+  diffToolbarTarget?: Element | null;
   paneMode: 'working' | 'staged';
   onStageHunk?: (hunkId: string) => void;
   onUnstageHunk?: (hunkId: string) => void;

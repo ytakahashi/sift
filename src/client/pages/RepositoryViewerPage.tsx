@@ -143,7 +143,7 @@ function RepositoryWorkspace({
   onRepositoryResolved,
 }: RepositoryWorkspaceProps): ReactElement {
   const [isFileListOpen, setIsFileListOpen] = useState(true);
-  const [fullViewToolbarTarget, setFullViewToolbarTarget] = useState<HTMLSpanElement | null>(null);
+  const [diffToolbarTarget, setDiffToolbarTarget] = useState<HTMLSpanElement | null>(null);
   // Read `--repository-sidebar-width` once at mount. The CSS variable is a fixed
   // value today, so this skips re-reading `getComputedStyle` on every render.
   // Revisit if the variable becomes responsive (e.g., changes via media query).
@@ -406,8 +406,8 @@ function RepositoryWorkspace({
                 <FileListToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
               </button>
               <span
-                data-full-view-toolbar-target="true"
-                ref={setFullViewToolbarTarget}
+                data-diff-toolbar-target="true"
+                ref={setDiffToolbarTarget}
                 style={{ display: 'inline-flex', flex: '0 0 auto' }}
               />
               {selectedFile ? (
@@ -457,10 +457,11 @@ function RepositoryWorkspace({
             ) : (
               <UnifiedDiffViewer
                 key={`${paneMode}:${selectedFile.id}`}
+                blobContentReader={dependencies.blobContentReader}
+                diffToolbarTarget={diffToolbarTarget}
                 file={selectedFile}
                 repoId={repoId}
                 fileContentReader={dependencies.fileContentReader}
-                fullViewToolbarTarget={fullViewToolbarTarget}
                 paneMode={paneMode}
                 onStageHunk={(id) => stageHunk(selectedFile.path, id)}
                 onUnstageHunk={(id) => unstageHunk(selectedFile.path, id)}

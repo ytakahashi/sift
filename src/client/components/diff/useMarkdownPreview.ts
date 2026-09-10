@@ -22,7 +22,8 @@ type StoredMarkdownPreviewState = MarkdownPreviewState & {
 
 const CONTENT_CHANGED_ERROR =
   'The file changed before it could be previewed. Refresh the diff and try again.';
-const MISSING_BLOB_IDS_ERROR = 'Markdown preview requires both the old and new blob IDs.';
+const MISSING_BLOB_ID_ERROR =
+  'Markdown preview requires a new blob ID and an old blob ID for modified files.';
 
 export function useMarkdownPreview(
   file: DiffFile,
@@ -51,14 +52,17 @@ export function useMarkdownPreview(
     const requestedRepoId = repoId;
     const oldBlobId = requestedFile.oldBlobId;
     const newBlobId = requestedFile.newBlobId;
+    // Git represents the absent old side of an added file with a zero object ID.
+    // File status, rather than that transport sentinel, defines the empty document.
+    const oldSideBlobId = requestedFile.status === 'added' ? null : oldBlobId;
     const requestId = ++latestRequestId.current;
 
-    if (oldBlobId === undefined || newBlobId === undefined) {
+    if (newBlobId === undefined || oldSideBlobId === undefined) {
       setState({
         mode: 'error',
         file: requestedFile,
         repoId: requestedRepoId,
-        error: MISSING_BLOB_IDS_ERROR,
+        error: MISSING_BLOB_ID_ERROR,
       });
       return;
     }
@@ -67,8 +71,8 @@ export function useMarkdownPreview(
 
     void (async (): Promise<void> => {
       try {
-        const [oldContent, initialNewContent] = await Promise.all([
-          blobContentReader.fetchBlobContent(requestedRepoId, oldBlobId),
+        const [oldLines, initialNewContent] = await Promise.all([
+          fetchOldLines(requestedRepoId, oldSideBlobId, blobContentReader),
           fileContentReader.fetchFileContent(requestedRepoId, requestedFile.path),
         ]);
         if (latestRequestId.current !== requestId) {
@@ -76,8 +80,8 @@ export function useMarkdownPreview(
         }
 
         let newContent: FileContent = initialNewContent;
-        // The old side is addressed by an immutable blob ID. Only the index-backed
-        // new side can race with the diff response, so retry that request alone.
+        // The old side is an immutable blob or an empty document. Only the
+        // index-backed new side can race, so retry that request alone.
         if (!isCurrentNewContent(requestedFile, newBlobId, newContent)) {
           newContent = await fileContentReader.fetchFileContent(
             requestedRepoId,
@@ -102,7 +106,7 @@ export function useMarkdownPreview(
           mode: 'ready',
           file: requestedFile,
           repoId: requestedRepoId,
-          oldLines: oldContent.lines,
+          oldLines,
           newLines: newContent.lines,
         });
       } catch (error: unknown) {
@@ -142,6 +146,18 @@ export function useMarkdownPreview(
       throw new Error(`Unhandled Markdown preview state: ${String(unhandledState)}`);
     }
   }
+}
+
+async function fetchOldLines(
+  repoId: RepositoryId,
+  blobId: string | null,
+  blobContentReader: BlobContentReader,
+): Promise<string[]> {
+  if (blobId === null) {
+    return [];
+  }
+  const content = await blobContentReader.fetchBlobContent(repoId, blobId);
+  return content.lines;
 }
 
 function isCurrentNewContent(
