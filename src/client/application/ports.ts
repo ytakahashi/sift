@@ -36,6 +36,16 @@ export class FileContentFetchError extends Error {
   }
 }
 
+export class BlobContentFetchError extends Error {
+  constructor(
+    message: string,
+    public readonly statusCode: number,
+  ) {
+    super(message);
+    this.name = 'BlobContentFetchError';
+  }
+}
+
 export class WorkspaceActionError extends Error {
   constructor(
     message: string,
@@ -75,6 +85,14 @@ export interface FileContent {
 
 export interface FileContentReader {
   fetchFileContent(repoId: RepositoryId, path: string): Promise<FileContent>;
+}
+
+export interface BlobContent {
+  lines: string[];
+}
+
+export interface BlobContentReader {
+  fetchBlobContent(repoId: RepositoryId, blobId: string): Promise<BlobContent>;
 }
 
 export interface RepositoryReader {

@@ -1,4 +1,5 @@
 import type {
+  BlobContentReader,
   DiffReader,
   FileContentReader,
   NotesGateway,
@@ -9,6 +10,7 @@ import type {
 } from '../application/ports';
 
 export interface AppDependencies {
+  blobContentReader: BlobContentReader;
   diffReader: DiffReader;
   fileContentReader: FileContentReader;
   repositoryReader: RepositoryReader;

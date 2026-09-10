@@ -5,6 +5,9 @@ import type { AppDependencies } from '../composition/dependencies';
 import { RepositorySelectionPage } from './RepositorySelectionPage';
 
 const testDependencies: AppDependencies = {
+  blobContentReader: {
+    fetchBlobContent: vi.fn(),
+  },
   diffReader: {
     fetchDiff: vi.fn(async () => ({
       metadata: {

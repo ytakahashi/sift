@@ -40,6 +40,9 @@ vi.mock('./components/diff/UnifiedDiffViewer', () => ({
 }));
 
 const testDependencies: AppDependencies = {
+  blobContentReader: {
+    fetchBlobContent: vi.fn(),
+  },
   diffReader: {
     fetchDiff: vi.fn(async () => ({
       metadata: {
