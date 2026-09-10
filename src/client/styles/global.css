@@ -1023,6 +1023,127 @@ button.app-brand-home {
   user-select: none;
 }
 
+.markdown-view-toggle {
+  display: inline-flex;
+  flex: 0 0 auto;
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.markdown-view-toggle-button {
+  border: 0;
+  border-radius: 0;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.75rem;
+}
+
+.markdown-view-toggle-button + .markdown-view-toggle-button {
+  border-left: 1px solid var(--border-color);
+}
+
+.markdown-view-toggle-button[aria-pressed='true'] {
+  background-color: rgba(56, 139, 253, 0.2);
+  color: #fff;
+}
+
+.markdown-preview-status,
+.markdown-preview-error {
+  padding: 0.75rem 1rem;
+}
+
+.markdown-preview-error {
+  color: var(--danger-color);
+}
+
+.markdown-preview-viewer {
+  padding: 1rem;
+  font-family: var(--font-family);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.markdown-preview-block {
+  padding: 0.25rem 0.75rem;
+  border-left: 3px solid transparent;
+}
+
+.markdown-preview-block-removed {
+  background-color: rgba(248, 81, 73, 0.15);
+  border-left-color: var(--diff-delete-color);
+}
+
+.markdown-preview-block-new.markdown-preview-block-changed {
+  background-color: rgba(63, 185, 80, 0.15);
+  border-left-color: var(--diff-add-color);
+}
+
+.markdown-preview-block + .markdown-preview-block {
+  margin-top: 0.5rem;
+}
+
+.markdown-preview-block h1,
+.markdown-preview-block h2,
+.markdown-preview-block h3,
+.markdown-preview-block h4,
+.markdown-preview-block h5,
+.markdown-preview-block h6 {
+  margin: 0;
+  line-height: 1.25;
+}
+
+.markdown-preview-block ul,
+.markdown-preview-block ol {
+  padding-left: 1.5rem;
+}
+
+.markdown-preview-block blockquote {
+  padding-left: 0.75rem;
+  color: #8b949e;
+  border-left: 3px solid var(--border-color);
+}
+
+.markdown-preview-block pre {
+  overflow-x: auto;
+  padding: 0.75rem;
+  background-color: var(--header-bg);
+  border-radius: 6px;
+}
+
+.markdown-preview-block code {
+  padding: 0.1rem 0.3rem;
+  font-family:
+    ui-monospace, SFMono-Regular, 'SF Mono', Menlo, Consolas, 'Liberation Mono', monospace;
+  font-size: 0.85em;
+  background-color: rgba(110, 118, 129, 0.25);
+  border-radius: 4px;
+}
+
+.markdown-preview-block pre code {
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+}
+
+.markdown-preview-link-placeholder {
+  color: #58a6ff;
+  text-decoration: underline dotted;
+}
+
+.markdown-preview-block hr {
+  border: 0;
+  border-top: 1px solid var(--border-color);
+}
+
+.markdown-preview-image-placeholder {
+  display: inline-block;
+  padding: 0.2rem 0.4rem;
+  color: #8b949e;
+  background-color: var(--header-bg);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+}
+
 /* Prism Syntax Highlighting (GitHub Dark Theme) */
 .token.comment,
 .token.prolog,
