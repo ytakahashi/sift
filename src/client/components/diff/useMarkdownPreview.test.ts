@@ -9,6 +9,8 @@ import type {
 } from '../../application/ports';
 import { useMarkdownPreview } from './useMarkdownPreview';
 
+const NULL_BLOB_ID = '0'.repeat(40);
+
 function createFile(overrides: Partial<DiffFile> = {}): DiffFile {
   return {
     id: 'file-README.md',
@@ -106,6 +108,52 @@ describe('useMarkdownPreview', () => {
         newLines: ['one', 'two'],
       }),
     );
+  });
+
+  it('uses an empty old side and fetches only the new content for an added file', async () => {
+    // Given
+    const { blobContentReader, fileContentReader } = createReaders();
+    vi.mocked(fileContentReader.fetchFileContent).mockResolvedValue({
+      blobId: 'new-blob',
+      lines: ['# New document', '', 'Body'],
+    });
+    const file = createFile({
+      status: 'added',
+      // `git diff --full-index` emits the absent old side as a full zero object ID.
+      oldBlobId: NULL_BLOB_ID,
+      hunks: [
+        {
+          id: 'hunk-added',
+          header: '@@ -0,0 +1,3 @@',
+          oldStart: 0,
+          oldLines: 0,
+          newStart: 1,
+          newLines: 3,
+          lines: [
+            { id: 'line-1', type: 'add', newLineNumber: 1, content: '# New document' },
+            { id: 'line-2', type: 'add', newLineNumber: 2, content: '' },
+            { id: 'line-3', type: 'add', newLineNumber: 3, content: 'Body' },
+          ],
+        },
+      ],
+    });
+    const { result } = renderHook(() =>
+      useMarkdownPreview(file, 'repo', fileContentReader, blobContentReader),
+    );
+
+    // When
+    act(() => result.current.showPreview());
+
+    // Then
+    await waitFor(() => expect(result.current.mode).toBe('ready'));
+    expect(result.current).toEqual(
+      expect.objectContaining({
+        oldLines: [],
+        newLines: ['# New document', '', 'Body'],
+      }),
+    );
+    expect(blobContentReader.fetchBlobContent).not.toHaveBeenCalled();
+    expect(fileContentReader.fetchFileContent).toHaveBeenCalledWith('repo', 'README.md');
   });
 
   it('retries only the new side when its blob id is stale', async () => {
@@ -334,7 +382,7 @@ describe('useMarkdownPreview', () => {
 
       // Then
       expect(result.current).toEqual(
-        expect.objectContaining({ mode: 'error', error: expect.stringContaining('blob IDs') }),
+        expect.objectContaining({ mode: 'error', error: expect.stringContaining('blob ID') }),
       );
       expect(blobContentReader.fetchBlobContent).not.toHaveBeenCalled();
       expect(fileContentReader.fetchFileContent).not.toHaveBeenCalled();

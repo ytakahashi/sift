@@ -5,6 +5,8 @@ import type { DiffFile } from '../../../domain/diff/types';
 import type { FileNote, LineNote } from '../../../domain/notes/types';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
 
+const NULL_BLOB_ID = '0'.repeat(40);
+
 const viewerDependencies = {
   blobContentReader: {
     fetchBlobContent: vi.fn(),
@@ -144,6 +146,29 @@ function createMarkdownFile(overrides: Partial<DiffFile> = {}): DiffFile {
     ],
     ...overrides,
   };
+}
+
+function createAddedMarkdownFile(): DiffFile {
+  return createMarkdownFile({
+    status: 'added',
+    // `git diff --full-index` emits the absent old side as a full zero object ID.
+    oldBlobId: NULL_BLOB_ID,
+    hunks: [
+      {
+        id: 'hunk-added',
+        header: '@@ -0,0 +1,3 @@',
+        oldStart: 0,
+        oldLines: 0,
+        newStart: 1,
+        newLines: 3,
+        lines: [
+          { id: 'line-1', type: 'add', newLineNumber: 1, content: '# New document' },
+          { id: 'line-2', type: 'add', newLineNumber: 2, content: '' },
+          { id: 'line-3', type: 'add', newLineNumber: 3, content: 'Body' },
+        ],
+      },
+    ],
+  });
 }
 
 function createTwoHunkFile(): DiffFile {
@@ -603,6 +628,51 @@ describe('UnifiedDiffViewer', () => {
     expect(screen.getByRole('button', { name: 'View entire file' })).toBeDefined();
   });
 
+  it('previews an added Markdown file as entirely changed without fetching an old blob', async () => {
+    // Given
+    const user = userEvent.setup();
+    const blobContentReader = {
+      fetchBlobContent: vi.fn(),
+    };
+    const fileContentReader = {
+      fetchFileContent: vi.fn().mockResolvedValue({
+        blobId: 'new-blob',
+        lines: ['# New document', '', 'Body'],
+      }),
+    };
+    const diffToolbarTarget = createDiffToolbarTarget();
+    const { container } = render(
+      <UnifiedDiffViewer
+        blobContentReader={blobContentReader}
+        diffToolbarTarget={diffToolbarTarget}
+        file={createAddedMarkdownFile()}
+        fileContentReader={fileContentReader}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    // Then
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'New document' })).toBeDefined(),
+    );
+    const blocks = Array.from(container.querySelectorAll<HTMLElement>('.markdown-preview-block'));
+    expect(blocks.map((block) => block.dataset.previewKind)).toEqual(['new', 'new']);
+    expect(blocks.every((block) => block.dataset.previewStatus === 'changed')).toBe(true);
+    expect(container.textContent).toContain('Body');
+    expect(blobContentReader.fetchBlobContent).not.toHaveBeenCalled();
+    expect(fileContentReader.fetchFileContent).toHaveBeenCalledWith('repo', 'README.md');
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Source' }));
+
+    // Then
+    expect(container.querySelector('.diff-line-marker')).not.toBeNull();
+  });
+
   it('protects a line note draft by disabling Preview until editing finishes', async () => {
     // Given
     const user = userEvent.setup();
@@ -684,11 +754,6 @@ describe('UnifiedDiffViewer', () => {
     {
       label: 'a non-Markdown file',
       file: createMarkdownFile({ path: 'README.txt', displayPath: 'README.txt' }),
-      paneMode: 'staged' as const,
-    },
-    {
-      label: 'an added file',
-      file: createMarkdownFile({ status: 'added' }),
       paneMode: 'staged' as const,
     },
     {

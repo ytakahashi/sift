@@ -68,9 +68,8 @@ export function UnifiedDiffViewer({
   const canShowMarkdownPreview =
     paneMode === 'staged' &&
     file.kind === 'text' &&
-    file.status === 'modified' &&
-    file.oldBlobId !== undefined &&
     file.newBlobId !== undefined &&
+    (file.status === 'added' || (file.status === 'modified' && file.oldBlobId !== undefined)) &&
     getLanguageFromPath(file.path) === 'markdown';
   const isMarkdownPreviewSelected = markdownPreview.mode !== 'source';
   const isLineNoteEditorOpen = interaction.type === 'editing';

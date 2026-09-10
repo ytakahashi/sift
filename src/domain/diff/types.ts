@@ -23,9 +23,9 @@ export interface DiffFile {
   id: string; // Typically file path, consider creating a "FileId" type
   bucket: FileBucket;
   path: string;
-  /** Full object id for the old side when Git includes an index header. */
+  /** Old-side ID from the index header; added files carry Git's all-zero sentinel. */
   oldBlobId?: string;
-  /** Full object id for the new side when Git includes an index header. */
+  /** New-side ID from the index header; deleted files carry Git's all-zero sentinel. */
   newBlobId?: string;
   oldPath?: string;
   status: 'modified' | 'added' | 'deleted' | 'renamed' | 'binary' | 'submodule' | 'untracked';
