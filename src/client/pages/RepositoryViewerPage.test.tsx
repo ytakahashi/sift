@@ -51,6 +51,9 @@ function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
 }
 
 const testDependencies: AppDependencies = {
+  blobContentReader: {
+    fetchBlobContent: vi.fn(),
+  },
   diffReader: {
     fetchDiff: vi.fn(async () => ({
       metadata: {
