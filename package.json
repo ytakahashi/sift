@@ -16,7 +16,7 @@
     "@modelcontextprotocol/server": "2.0.0",
     "chokidar": "5.0.0",
     "commander": "15.0.0",
-    "hono": "4.13.3",
+    "hono": "4.13.5",
     "zod": "4.4.3"
   },
   "devDependencies": {
