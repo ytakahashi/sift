@@ -1121,8 +1121,17 @@ button.app-brand-home {
   border-left-color: var(--diff-add-color);
 }
 
+/* Not the green the raw view uses for a noted row: a changed block already
+   carries a green left border, which would swallow the indicator exactly where
+   notes are most likely to sit. */
 .markdown-preview-block-note-highlighted {
   box-shadow: inset 3px 0 0 #58a6ff;
+}
+
+.markdown-preview-unanchored-caption {
+  margin: 0;
+  color: #8b949e;
+  font-size: 0.78rem;
 }
 
 .markdown-preview-block-notes,

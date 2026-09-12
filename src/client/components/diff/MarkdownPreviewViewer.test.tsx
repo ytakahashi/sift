@@ -246,8 +246,10 @@ describe('MarkdownPreviewViewer', () => {
       },
       'preview note',
     );
-    expect(onCreateEditorOpenChange).toHaveBeenNthCalledWith(1, true);
-    expect(onCreateEditorOpenChange).toHaveBeenNthCalledWith(2, false);
+    // The viewer reports the editor it actually renders, so the container can
+    // block a view switch for exactly as long as the draft is on screen.
+    expect(onCreateEditorOpenChange).toHaveBeenLastCalledWith(false);
+    expect(onCreateEditorOpenChange).toHaveBeenCalledWith(true);
   });
 
   it('keeps the editor draft when note creation fails', async () => {
@@ -271,6 +273,43 @@ describe('MarkdownPreviewViewer', () => {
     // Then
     expect((await screen.findByRole('alert')).textContent).toBe('Unable to create note.');
     expect(screen.getByRole<HTMLInputElement>('textbox').value).toBe('preserved draft');
+  });
+
+  it('drops an open editor whose block is no longer rendered', async () => {
+    // Given
+    const user = userEvent.setup();
+    const onCreateEditorOpenChange = vi.fn();
+    const noteSupport = createNoteSupport({ onCreateEditorOpenChange });
+    const { rerender } = render(
+      <MarkdownPreviewViewer
+        hunks={createFile().hunks}
+        oldLines={['# Old', '', 'Same']}
+        newLines={['# New', '', 'Same']}
+        noteSupport={noteSupport}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Add note for Line 1' }));
+    expect(onCreateEditorOpenChange).toHaveBeenLastCalledWith(true);
+
+    // When: a diff refresh replaces the previewed content and the block that
+    // held the editor no longer exists
+    rerender(
+      <MarkdownPreviewViewer
+        hunks={createFile().hunks}
+        oldLines={['# Old', '', 'Same']}
+        newLines={['', '# New', '', 'Same']}
+        noteSupport={noteSupport}
+      />,
+    );
+
+    // Then: the editor is gone, and so is the protection it asked for —
+    // otherwise the gutters and the view toggles would stay disabled with no
+    // editor on screen.
+    expect(screen.queryByRole('textbox')).toBeNull();
+    expect(onCreateEditorOpenChange).toHaveBeenLastCalledWith(false);
+    const addNoteButtons = screen.getAllByRole('button', { name: /Add note/ });
+    expect(addNoteButtons.length).toBeGreaterThan(0);
+    expect(addNoteButtons.some((button) => button.hasAttribute('disabled'))).toBe(false);
   });
 
   it('only offers note actions for new blocks overlapping a hunk', () => {
@@ -400,6 +439,26 @@ describe('MarkdownPreviewViewer', () => {
 
     // Then
     expect(onDeleteNote).toHaveBeenCalledWith('note-1');
+  });
+
+  it('disables note deletion while another notes mutation is in flight', () => {
+    // Given / When
+    render(
+      <MarkdownPreviewViewer
+        hunks={createFile().hunks}
+        oldLines={['# Old', '', 'Same']}
+        newLines={['# New', '', 'Same']}
+        noteSupport={createNoteSupport({
+          lineNotes: [createLineNote({ startLine: 1, endLine: 1 })],
+          onDeleteNote: vi.fn(async () => {}),
+          deleteDisabled: true,
+        })}
+      />,
+    );
+
+    // Then: the preview must not offer a second deletion the Source view is
+    // already blocking.
+    expect(screen.getByRole('button', { name: 'Delete' }).hasAttribute('disabled')).toBe(true);
   });
 
   it('reports an open note card editor to its container', async () => {

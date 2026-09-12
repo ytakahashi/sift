@@ -132,15 +132,21 @@ function MarkdownPreviewContent({
     [lineNotes, newBlocks],
   );
 
-  const onCreateEditorOpenChange = noteSupport?.onCreateEditorOpenChange;
-  useEffect(() => {
-    return () => onCreateEditorOpenChange?.(false);
-  }, [onCreateEditorOpenChange]);
+  // The block holding the open editor can disappear when the previewed content
+  // is replaced. Deriving the editor from the rows on screen keeps a stale
+  // range from disabling every gutter and both view toggles invisibly.
+  const activeEditingRange =
+    editingRange !== null && rows.some(({ key }) => key === editingRange.rowKey)
+      ? editingRange
+      : null;
 
-  const closeEditor = (): void => {
-    setEditingRange(null);
-    onCreateEditorOpenChange?.(false);
-  };
+  const onCreateEditorOpenChange = noteSupport?.onCreateEditorOpenChange;
+  const isCreateEditorOpen = activeEditingRange !== null;
+  useEffect(() => {
+    onCreateEditorOpenChange?.(isCreateEditorOpen);
+    // Unmounting releases the draft protection the open editor asked for.
+    return () => onCreateEditorOpenChange?.(false);
+  }, [isCreateEditorOpen, onCreateEditorOpenChange]);
 
   const renderNoteCard = (note: LineNote): ReactElement => (
     <NoteCard
@@ -165,7 +171,7 @@ function MarkdownPreviewContent({
           (lineNotes ?? []).some(
             (note) => note.startLine <= row.block.endLine && row.block.startLine <= note.endLine,
           );
-        const isEditing = editingRange?.rowKey === key;
+        const isEditing = activeEditingRange?.rowKey === key;
 
         return (
           <div className="markdown-preview-row" key={key}>
@@ -175,14 +181,11 @@ function MarkdownPreviewContent({
                   <button
                     aria-label={`Add note for ${formatLineRange(range.startLine, range.endLine)}`}
                     className="markdown-preview-note-button"
-                    disabled={editingRange !== null}
+                    disabled={isCreateEditorOpen}
                     key={`${range.hunkId}:${range.startLine}:${range.endLine}`}
-                    onClick={() => {
-                      onCreateEditorOpenChange?.(true);
-                      setEditingRange({ ...range, rowKey: key });
-                    }}
+                    onClick={() => setEditingRange({ ...range, rowKey: key })}
                     title={
-                      editingRange !== null
+                      isCreateEditorOpen
                         ? 'Finish the open note before adding another one.'
                         : `Add note for ${formatLineRange(range.startLine, range.endLine)}`
                     }
@@ -202,10 +205,13 @@ function MarkdownPreviewContent({
               {blockNotes.length > 0 && (
                 <div className="markdown-preview-block-notes">{blockNotes.map(renderNoteCard)}</div>
               )}
-              {isEditing && editingRange && noteSupport?.onAddNote !== undefined && (
+              {isEditing && activeEditingRange && noteSupport?.onAddNote !== undefined && (
                 <div className="markdown-preview-block-notes">
                   <NoteEditor
-                    contextLabel={formatLineRange(editingRange.startLine, editingRange.endLine)}
+                    contextLabel={formatLineRange(
+                      activeEditingRange.startLine,
+                      activeEditingRange.endLine,
+                    )}
                     onSave={async (value) => {
                       if (value.trim()) {
                         // Close only after the server accepted the note; a
@@ -214,16 +220,16 @@ function MarkdownPreviewContent({
                           {
                             kind: 'line',
                             path: noteSupport.path,
-                            startLine: editingRange.startLine,
-                            endLine: editingRange.endLine,
+                            startLine: activeEditingRange.startLine,
+                            endLine: activeEditingRange.endLine,
                             bucket: noteSupport.bucket,
                           },
                           value,
                         );
                       }
-                      closeEditor();
+                      setEditingRange(null);
                     }}
-                    onCancel={closeEditor}
+                    onCancel={() => setEditingRange(null)}
                   />
                 </div>
               )}
@@ -236,6 +242,9 @@ function MarkdownPreviewContent({
         // still belong to this file, so the preview shows them rather than
         // dropping them.
         <div className="markdown-preview-unanchored-notes">
+          <p className="markdown-preview-unanchored-caption">
+            Notes without a Markdown block to anchor to
+          </p>
           {notePlacement.unanchored.map(renderNoteCard)}
         </div>
       )}

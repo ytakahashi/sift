@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
@@ -738,6 +738,7 @@ describe('UnifiedDiffViewer', () => {
             startLine: 2,
             endLine: 2,
             bucket: 'staged',
+            body: 'stale note body',
             staleness: { kind: 'stale', reason: 'content-changed' },
           }),
         ]}
@@ -756,6 +757,9 @@ describe('UnifiedDiffViewer', () => {
       'true',
       undefined,
     ]);
+    // A stale note has no usable line anchor, so it stays in the file-level
+    // area outside the preview instead of being placed on a block.
+    expect(screen.getByText('stale note body').closest('.markdown-preview-viewer')).toBeNull();
 
     // When
     await user.click(screen.getByRole('button', { name: 'Add note for Line 1' }));
@@ -787,6 +791,109 @@ describe('UnifiedDiffViewer', () => {
       },
       'preview draft',
     );
+  });
+
+  it('shows a note created in Preview on its block without leaving Preview', async () => {
+    // Given
+    const user = userEvent.setup();
+    const blobContentReader = {
+      fetchBlobContent: vi.fn().mockResolvedValue({ lines: ['# Old', 'Same'] }),
+    };
+    const fileContentReader = {
+      fetchFileContent: vi.fn().mockResolvedValue({ blobId: 'new-blob', lines: ['# New', 'Same'] }),
+    };
+    const file = createMarkdownFile();
+    const viewerProps = {
+      blobContentReader,
+      diffToolbarTarget: createDiffToolbarTarget(),
+      file,
+      fileContentReader,
+      onAddNote: vi.fn(async () => {}),
+      paneMode: 'staged' as const,
+      repoId: 'repo',
+    };
+    const { container, rerender } = render(<UnifiedDiffViewer {...viewerProps} notes={[]} />);
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New' })).toBeDefined());
+    await user.click(screen.getByRole('button', { name: 'Add note for Line 1' }));
+    await user.type(screen.getByRole('textbox'), 'fresh note');
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    // When: the created note comes back through the notes prop, as the page
+    // does after the notes hook refetches
+    rerender(
+      <UnifiedDiffViewer
+        {...viewerProps}
+        notes={[
+          createLineNote({
+            id: 'fresh-note',
+            path: 'README.md',
+            bucket: 'staged',
+            body: 'fresh note',
+          }),
+        ]}
+      />,
+    );
+
+    // Then: Preview stays selected and the note appears on the block it was
+    // written against, without a round trip through Source.
+    expect(screen.getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed')).toBe(
+      'true',
+    );
+    const blocks = Array.from(container.querySelectorAll<HTMLElement>('.markdown-preview-block'));
+    expect(within(blocks[1]).getByText('fresh note')).toBeDefined();
+    expect(blocks[1].dataset.noteHighlighted).toBe('true');
+  });
+
+  it('keeps a note visible in Preview when no Markdown block can anchor it', async () => {
+    // Given: every line of the new side was deleted, so the preview renders no
+    // block at all while the note still belongs to this file.
+    const user = userEvent.setup();
+    const emptiedFile = createMarkdownFile({
+      hunks: [
+        {
+          id: 'hunk-1',
+          header: '@@ -1,2 +0,0 @@',
+          oldStart: 1,
+          oldLines: 2,
+          newStart: 1,
+          newLines: 0,
+          lines: [
+            { id: 'line-old-1', type: 'delete', oldLineNumber: 1, content: '# Old' },
+            { id: 'line-old-2', type: 'delete', oldLineNumber: 2, content: 'Same' },
+          ],
+        },
+      ],
+    });
+    const { container } = render(
+      <UnifiedDiffViewer
+        blobContentReader={{
+          fetchBlobContent: vi.fn().mockResolvedValue({ lines: ['# Old', 'Same'] }),
+        }}
+        diffToolbarTarget={createDiffToolbarTarget()}
+        file={emptiedFile}
+        fileContentReader={{
+          fetchFileContent: vi.fn().mockResolvedValue({ blobId: 'new-blob', lines: [] }),
+        }}
+        notes={[
+          createLineNote({
+            path: 'README.md',
+            bucket: 'staged',
+            body: 'note without a block',
+          }),
+        ]}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    // Then
+    await waitFor(() => expect(container.querySelector('.markdown-preview-viewer')).not.toBeNull());
+    expect(container.querySelectorAll('[data-preview-kind="new"]')).toHaveLength(0);
+    expect(screen.getByText('note without a block')).toBeDefined();
   });
 
   it('blocks a view switch while an existing line note is being edited', async () => {
