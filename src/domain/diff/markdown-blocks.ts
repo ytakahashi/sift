@@ -26,6 +26,15 @@ export type MarkdownPreviewRow =
   | { kind: 'new'; block: ClassifiedMarkdownBlock }
   | { kind: 'removed'; block: ClassifiedMarkdownBlock };
 
+/** A block range narrowed to one hunk, ready to be sent as a line note target. */
+export interface ClampedNoteRange {
+  /** 1-based, inclusive new-side line. */
+  startLine: number;
+  /** 1-based, inclusive new-side line. */
+  endLine: number;
+  hunkId: string;
+}
+
 export function classifyMarkdownBlocks(
   blocks: MarkdownBlock[],
   hunks: DiffHunk[],
@@ -152,6 +161,51 @@ export function buildMarkdownPreviewRows(
   return rows;
 }
 
+/**
+ * Narrows a block's source range to the parts a new-side line note can anchor
+ * to, one entry per overlapping hunk. An empty result means the block carries
+ * no note affordance at all.
+ *
+ * Coverage is derived from the lines a hunk actually carries rather than from
+ * its header counts, because `resolveLineNoteTarget` anchors on those same
+ * lines. Deriving both from one source keeps the preview from offering a range
+ * that note creation would then reject.
+ */
+export function clampBlockRangeToHunks(
+  block: { startLine: number; endLine: number },
+  hunks: DiffHunk[],
+): ClampedNoteRange[] {
+  assertValidBlockRange(block);
+  assertRequiredDiffLineNumbers(hunks);
+
+  return hunks.flatMap((hunk) => {
+    const newLineNumbers = hunk.lines
+      .map((line) => line.newLineNumber)
+      .filter((lineNumber): lineNumber is number => lineNumber !== undefined);
+    assertConsecutiveNewLineNumbers(hunk.id, newLineNumbers);
+    if (newLineNumbers.length === 0) {
+      return [];
+    }
+
+    const startLine = Math.max(block.startLine, newLineNumbers[0]);
+    const endLine = Math.min(block.endLine, newLineNumbers[newLineNumbers.length - 1]);
+
+    return startLine <= endLine ? [{ startLine, endLine, hunkId: hunk.id }] : [];
+  });
+}
+
+function assertConsecutiveNewLineNumbers(hunkId: string, lineNumbers: number[]): void {
+  for (let index = 1; index < lineNumbers.length; index++) {
+    const previousLineNumber = lineNumbers[index - 1];
+    const lineNumber = lineNumbers[index];
+    if (lineNumber !== previousLineNumber + 1) {
+      throw new Error(
+        `Diff hunk "${hunkId}" has non-consecutive new-side line numbers ${previousLineNumber} and ${lineNumber}.`,
+      );
+    }
+  }
+}
+
 function findAffectedBlockIndexes(
   blocks: MarkdownBlock[],
   lineNumber: number,
@@ -189,6 +243,19 @@ function findAffectedBlockIndexes(
     affectedIndexes.push(nextBlockIndex);
   }
   return affectedIndexes;
+}
+
+function assertValidBlockRange(block: { startLine: number; endLine: number }): void {
+  if (
+    !Number.isSafeInteger(block.startLine) ||
+    !Number.isSafeInteger(block.endLine) ||
+    block.startLine < 1 ||
+    block.endLine < block.startLine
+  ) {
+    throw new Error(
+      `Markdown block range ${block.startLine}-${block.endLine} is invalid; a range must be 1-based, inclusive and non-empty.`,
+    );
+  }
 }
 
 function assertOrderedNonOverlappingBlocks(blocks: MarkdownBlock[]): void {
