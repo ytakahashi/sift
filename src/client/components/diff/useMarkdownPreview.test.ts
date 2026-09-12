@@ -7,6 +7,7 @@ import type {
   FileContent,
   FileContentReader,
 } from '../../application/ports';
+import { BlobContentFetchError, FileContentFetchError } from '../../application/ports';
 import { useMarkdownPreview } from './useMarkdownPreview';
 
 const NULL_BLOB_ID = '0'.repeat(40);
@@ -223,11 +224,11 @@ describe('useMarkdownPreview', () => {
     expect(fileContentReader.fetchFileContent).toHaveBeenCalledTimes(2);
   });
 
-  it('exposes a content reader error', async () => {
+  it('exposes an old blob size limit error', async () => {
     // Given
     const { blobContentReader, fileContentReader } = createReaders();
     vi.mocked(blobContentReader.fetchBlobContent).mockRejectedValue(
-      new Error('Blob is too large to display.'),
+      new BlobContentFetchError('Blob is too large to display.', 413),
     );
     const file = createFile();
     const { result } = renderHook(() =>
@@ -241,6 +242,27 @@ describe('useMarkdownPreview', () => {
     await waitFor(() => expect(result.current.mode).toBe('error'));
     expect(result.current).toEqual(
       expect.objectContaining({ error: 'Blob is too large to display.' }),
+    );
+  });
+
+  it('exposes a staged index size limit error', async () => {
+    // Given
+    const { blobContentReader, fileContentReader } = createReaders();
+    vi.mocked(fileContentReader.fetchFileContent).mockRejectedValue(
+      new FileContentFetchError('File is too large to display in full.', 413),
+    );
+    const file = createFile();
+    const { result } = renderHook(() =>
+      useMarkdownPreview(file, 'repo', fileContentReader, blobContentReader),
+    );
+
+    // When
+    act(() => result.current.showPreview());
+
+    // Then
+    await waitFor(() => expect(result.current.mode).toBe('error'));
+    expect(result.current).toEqual(
+      expect.objectContaining({ error: 'File is too large to display in full.' }),
     );
   });
 

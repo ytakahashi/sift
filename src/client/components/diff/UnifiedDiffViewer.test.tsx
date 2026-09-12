@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { FileNote, LineNote } from '../../../domain/notes/types';
+import { BlobContentFetchError, FileContentFetchError } from '../../application/ports';
 import { UnifiedDiffViewer } from './UnifiedDiffViewer';
 
 const NULL_BLOB_ID = '0'.repeat(40);
@@ -615,6 +616,7 @@ describe('UnifiedDiffViewer', () => {
     expect(container.querySelector('.diff-line-marker')).toBeNull();
     expect(container.textContent).toContain('file note body');
     expect(container.textContent).not.toContain('line note body');
+    expect(screen.queryByRole('button', { name: 'Select line 1 for note' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'View entire file' })).toBeNull();
     expect(blobContentReader.fetchBlobContent).toHaveBeenCalledWith('repo', 'old-blob');
     expect(fileContentReader.fetchFileContent).toHaveBeenCalledWith('repo', 'README.md');
@@ -625,6 +627,7 @@ describe('UnifiedDiffViewer', () => {
     // Then
     expect(container.querySelector('.diff-line-marker')).not.toBeNull();
     expect(container.textContent).toContain('line note body');
+    expect(screen.getByRole('button', { name: 'Select line 1 for note' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'View entire file' })).toBeDefined();
   });
 
@@ -812,6 +815,7 @@ describe('UnifiedDiffViewer', () => {
 
     // Then
     expect(screen.getByRole('status').textContent).toContain('Loading Markdown preview');
+    expect(container.querySelector('.diff-line-marker')).toBeNull();
     expect(screen.queryByRole('button', { name: 'View entire file' })).toBeNull();
 
     // When
@@ -822,20 +826,20 @@ describe('UnifiedDiffViewer', () => {
     expect(container.querySelector('.diff-line-marker')).not.toBeNull();
   });
 
-  it('shows a Markdown preview error and retries it', async () => {
+  it('shows an old blob size limit error and retries the Markdown preview', async () => {
     // Given
     const user = userEvent.setup();
     const blobContentReader = {
       fetchBlobContent: vi
         .fn()
-        .mockRejectedValueOnce(new Error('Temporary preview failure.'))
+        .mockRejectedValueOnce(new BlobContentFetchError('Blob is too large to display.', 413))
         .mockResolvedValue({ lines: ['# Old', 'Same'] }),
     };
     const fileContentReader = {
       fetchFileContent: vi.fn().mockResolvedValue({ blobId: 'new-blob', lines: ['# New', 'Same'] }),
     };
     const diffToolbarTarget = createDiffToolbarTarget();
-    render(
+    const { container } = render(
       <UnifiedDiffViewer
         blobContentReader={blobContentReader}
         diffToolbarTarget={diffToolbarTarget}
@@ -852,9 +856,10 @@ describe('UnifiedDiffViewer', () => {
 
     // Then
     await waitFor(() =>
-      expect(screen.getByRole('alert').textContent).toBe('Temporary preview failure.'),
+      expect(screen.getByRole('alert').textContent).toBe('Blob is too large to display.'),
     );
     expect(previewButton.getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('.diff-line-marker')).toBeNull();
     expect(screen.queryByRole('button', { name: 'View entire file' })).toBeNull();
 
     // When
@@ -863,6 +868,57 @@ describe('UnifiedDiffViewer', () => {
     // Then
     await waitFor(() => expect(screen.getByRole('heading', { name: 'New' })).toBeDefined());
     expect(blobContentReader.fetchBlobContent).toHaveBeenCalledTimes(2);
+    expect(fileContentReader.fetchFileContent).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a staged index size limit error and retries the added Markdown preview', async () => {
+    // Given
+    const user = userEvent.setup();
+    const blobContentReader = {
+      fetchBlobContent: vi.fn(),
+    };
+    const fileContentReader = {
+      fetchFileContent: vi
+        .fn()
+        .mockRejectedValueOnce(
+          new FileContentFetchError('File is too large to display in full.', 413),
+        )
+        .mockResolvedValue({
+          blobId: 'new-blob',
+          lines: ['# New document', '', 'Body'],
+        }),
+    };
+    const diffToolbarTarget = createDiffToolbarTarget();
+    const { container } = render(
+      <UnifiedDiffViewer
+        blobContentReader={blobContentReader}
+        diffToolbarTarget={diffToolbarTarget}
+        file={createAddedMarkdownFile()}
+        fileContentReader={fileContentReader}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+
+    // When
+    const previewButton = screen.getByRole('button', { name: 'Preview' });
+    await user.click(previewButton);
+
+    // Then
+    await waitFor(() =>
+      expect(screen.getByRole('alert').textContent).toBe('File is too large to display in full.'),
+    );
+    expect(previewButton.getAttribute('aria-pressed')).toBe('true');
+    expect(container.querySelector('.diff-line-marker')).toBeNull();
+    expect(blobContentReader.fetchBlobContent).not.toHaveBeenCalled();
+
+    // When
+    await user.click(previewButton);
+
+    // Then
+    await waitFor(() =>
+      expect(screen.getByRole('heading', { name: 'New document' })).toBeDefined(),
+    );
     expect(fileContentReader.fetchFileContent).toHaveBeenCalledTimes(2);
   });
 
@@ -1029,6 +1085,102 @@ describe('UnifiedDiffViewer', () => {
     // Then
     expect(container.querySelector('tr[data-new-line-number="4"]')).toBeNull();
     expect(screen.getByRole('button', { name: 'View entire file' })).toBeDefined();
+  });
+
+  it('returns a Markdown preview to source when refresh replaces the file object', async () => {
+    // Given: a rendered preview for the current diff generation
+    const user = userEvent.setup();
+    const blobContentReader = {
+      fetchBlobContent: vi
+        .fn()
+        .mockResolvedValueOnce({ lines: ['# Old', 'Same'] })
+        .mockResolvedValueOnce({ lines: ['# New', 'Same'] }),
+    };
+    const fileContentReader = {
+      fetchFileContent: vi
+        .fn()
+        .mockResolvedValueOnce({ blobId: 'new-blob', lines: ['# New', 'Same'] })
+        .mockResolvedValueOnce({
+          blobId: 'refreshed-new-blob',
+          lines: ['# Refreshed', 'Same'],
+        }),
+    };
+    const file = createMarkdownFile();
+    const refreshedFile = createMarkdownFile({
+      oldBlobId: 'refreshed-old-blob',
+      newBlobId: 'refreshed-new-blob',
+      hunks: [
+        {
+          id: 'refreshed-hunk',
+          header: '@@ -1,2 +1,2 @@',
+          oldStart: 1,
+          oldLines: 2,
+          newStart: 1,
+          newLines: 2,
+          lines: [
+            { id: 'refreshed-old-1', type: 'delete', oldLineNumber: 1, content: '# New' },
+            {
+              id: 'refreshed-new-1',
+              type: 'add',
+              newLineNumber: 1,
+              content: '# Refreshed',
+            },
+            {
+              id: 'refreshed-line-2',
+              type: 'context',
+              oldLineNumber: 2,
+              newLineNumber: 2,
+              content: 'Same',
+            },
+          ],
+        },
+      ],
+    });
+    const diffToolbarTarget = createDiffToolbarTarget();
+    const { container, rerender } = render(
+      <UnifiedDiffViewer
+        blobContentReader={blobContentReader}
+        diffToolbarTarget={diffToolbarTarget}
+        file={file}
+        fileContentReader={fileContentReader}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New' })).toBeDefined());
+
+    // When: diff refresh produces a new object for the same file identity
+    rerender(
+      <UnifiedDiffViewer
+        blobContentReader={blobContentReader}
+        diffToolbarTarget={diffToolbarTarget}
+        file={refreshedFile}
+        fileContentReader={fileContentReader}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+
+    // Then: stale preview content is removed and the refreshed source is shown
+    expect(screen.queryByRole('heading', { name: 'New' })).toBeNull();
+    expect(container.querySelector('.diff-line-marker')).not.toBeNull();
+    expect(screen.getByRole('button', { name: 'Preview' }).getAttribute('aria-pressed')).toBe(
+      'false',
+    );
+
+    // When: the refreshed generation is previewed
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+
+    // Then: both readers use the refreshed generation identifiers and content
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'Refreshed' })).toBeDefined());
+    expect(blobContentReader.fetchBlobContent).toHaveBeenLastCalledWith(
+      'repo',
+      'refreshed-old-blob',
+    );
+    expect(fileContentReader.fetchFileContent).toHaveBeenLastCalledWith('repo', 'README.md');
+    expect(blobContentReader.fetchBlobContent).toHaveBeenCalledTimes(2);
+    expect(fileContentReader.fetchFileContent).toHaveBeenCalledTimes(2);
   });
 
   it('does not offer full view in the working pane', () => {
