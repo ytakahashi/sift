@@ -1063,7 +1063,50 @@ button.app-brand-home {
   line-height: 1.6;
 }
 
+.markdown-preview-row {
+  display: grid;
+  grid-template-columns: 1.75rem minmax(0, 1fr);
+  align-items: start;
+}
+
+.markdown-preview-row + .markdown-preview-row {
+  margin-top: 0.5rem;
+}
+
+.markdown-preview-note-gutter {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  padding-top: 0.25rem;
+}
+
+.markdown-preview-note-button {
+  width: 1.4rem;
+  height: 1.4rem;
+  padding: 0;
+  color: #8b949e;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  cursor: pointer;
+  opacity: 0.6;
+}
+
+.markdown-preview-note-button:hover,
+.markdown-preview-note-button:focus-visible {
+  color: var(--text-color);
+  background-color: rgba(110, 118, 129, 0.25);
+  opacity: 1;
+}
+
+.markdown-preview-note-button:disabled {
+  cursor: default;
+  opacity: 0.3;
+}
+
 .markdown-preview-block {
+  min-width: 0;
   padding: 0.25rem 0.75rem;
   border-left: 3px solid transparent;
 }
@@ -1078,7 +1121,24 @@ button.app-brand-home {
   border-left-color: var(--diff-add-color);
 }
 
-.markdown-preview-block + .markdown-preview-block {
+/* Not the green the raw view uses for a noted row: a changed block already
+   carries a green left border, which would swallow the indicator exactly where
+   notes are most likely to sit. */
+.markdown-preview-block-note-highlighted {
+  box-shadow: inset 3px 0 0 #58a6ff;
+}
+
+.markdown-preview-unanchored-caption {
+  margin: 0;
+  color: #8b949e;
+  font-size: 0.78rem;
+}
+
+.markdown-preview-block-notes,
+.markdown-preview-unanchored-notes {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
   margin-top: 0.5rem;
 }
 

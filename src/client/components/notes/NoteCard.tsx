@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useEffect, useState, type ReactElement } from 'react';
 import { isLiveNote } from '../../../domain/notes/note-staleness';
 import type { Note } from '../../../domain/notes/types';
 import { NoteEditor } from './NoteEditor';
@@ -11,6 +11,12 @@ interface NoteCardProps {
   onDelete?: (id: string) => void | Promise<void>;
   /** Disables Delete while another notes mutation is in flight. */
   deleteDisabled?: boolean;
+  /**
+   * Reports whether this card holds an open editor, so a container that can
+   * unmount the card (the Source/Preview toggle) can block the switch instead
+   * of discarding the draft. Must be referentially stable.
+   */
+  onEditorOpenChange?: (noteId: string, isOpen: boolean) => void;
 }
 
 export function NoteCard({
@@ -19,8 +25,16 @@ export function NoteCard({
   onUpdate,
   onDelete,
   deleteDisabled,
+  onEditorOpenChange,
 }: NoteCardProps): ReactElement {
   const [isEditing, setIsEditing] = useState(false);
+
+  useEffect(() => {
+    onEditorOpenChange?.(note.id, isEditing);
+    // Unmounting while editing (a view switch, a diff refresh) has to release
+    // the draft protection this card asked for.
+    return () => onEditorOpenChange?.(note.id, false);
+  }, [isEditing, note.id, onEditorOpenChange]);
 
   const handleSave = async (val: string): Promise<void> => {
     if (val.trim()) {

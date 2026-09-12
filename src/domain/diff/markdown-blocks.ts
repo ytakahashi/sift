@@ -26,6 +26,26 @@ export type MarkdownPreviewRow =
   | { kind: 'new'; block: ClassifiedMarkdownBlock }
   | { kind: 'removed'; block: ClassifiedMarkdownBlock };
 
+/** Line notes placed under the preview blocks that display them. */
+export interface MarkdownBlockNotePlacement<TBlock, TNote> {
+  /** Notes to render under a block, keyed by the block object itself. */
+  byBlock: Map<TBlock, TNote[]>;
+  /**
+   * Notes that found no block to sit under, so the preview can still show them
+   * instead of dropping them silently.
+   */
+  unanchored: TNote[];
+}
+
+/** A block range narrowed to one hunk, ready to be sent as a line note target. */
+export interface ClampedNoteRange {
+  /** 1-based, inclusive new-side line. */
+  startLine: number;
+  /** 1-based, inclusive new-side line. */
+  endLine: number;
+  hunkId: string;
+}
+
 export function classifyMarkdownBlocks(
   blocks: MarkdownBlock[],
   hunks: DiffHunk[],
@@ -152,6 +172,93 @@ export function buildMarkdownPreviewRows(
   return rows;
 }
 
+/**
+ * Narrows a block's source range to the parts a new-side line note can anchor
+ * to, one entry per overlapping hunk. An empty result means the block carries
+ * no note affordance at all.
+ *
+ * Coverage is derived from the lines a hunk actually carries rather than from
+ * its header counts, because `resolveLineNoteTarget` anchors on those same
+ * lines. Deriving both from one source keeps the preview from offering a range
+ * that note creation would then reject.
+ */
+export function clampBlockRangeToHunks(
+  block: { startLine: number; endLine: number },
+  hunks: DiffHunk[],
+): ClampedNoteRange[] {
+  assertValidBlockRange(block);
+  assertRequiredDiffLineNumbers(hunks);
+
+  return hunks.flatMap((hunk) => {
+    const newLineNumbers = hunk.lines
+      .map((line) => line.newLineNumber)
+      .filter((lineNumber): lineNumber is number => lineNumber !== undefined);
+    assertConsecutiveNewLineNumbers(hunk.id, newLineNumbers);
+    if (newLineNumbers.length === 0) {
+      return [];
+    }
+
+    const startLine = Math.max(block.startLine, newLineNumbers[0]);
+    const endLine = Math.min(block.endLine, newLineNumbers[newLineNumbers.length - 1]);
+
+    return startLine <= endLine ? [{ startLine, endLine, hunkId: hunk.id }] : [];
+  });
+}
+
+/**
+ * Places each line note under exactly one block, so a note spanning several
+ * blocks is rendered once rather than repeated under each of them.
+ *
+ * The anchor is the note's last line, matching the raw view, which renders a
+ * note card after the row holding `endLine`. A note anchored to a blank line
+ * between blocks (only reachable from the raw view, since preview ranges are
+ * clamped to block ranges) has no containing block and falls back to the
+ * preceding one.
+ */
+export function assignLineNotesToBlocks<
+  TBlock extends MarkdownBlock,
+  TNote extends { startLine: number; endLine: number },
+>(blocks: TBlock[], notes: readonly TNote[]): MarkdownBlockNotePlacement<TBlock, TNote> {
+  assertOrderedNonOverlappingBlocks(blocks);
+
+  const byBlock = new Map<TBlock, TNote[]>();
+  const unanchored: TNote[] = [];
+
+  for (const note of notes) {
+    assertValidBlockRange(note);
+    // Treating the anchor as whitespace makes the lookup total: it resolves to
+    // the containing block, else the closest neighbour, else nothing at all
+    // when the document has no blocks.
+    const [blockIndex] = findAffectedBlockIndexes(blocks, note.endLine, true);
+    if (blockIndex === undefined) {
+      unanchored.push(note);
+      continue;
+    }
+
+    const block = blocks[blockIndex];
+    const blockNotes = byBlock.get(block);
+    if (blockNotes === undefined) {
+      byBlock.set(block, [note]);
+    } else {
+      blockNotes.push(note);
+    }
+  }
+
+  return { byBlock, unanchored };
+}
+
+function assertConsecutiveNewLineNumbers(hunkId: string, lineNumbers: number[]): void {
+  for (let index = 1; index < lineNumbers.length; index++) {
+    const previousLineNumber = lineNumbers[index - 1];
+    const lineNumber = lineNumbers[index];
+    if (lineNumber !== previousLineNumber + 1) {
+      throw new Error(
+        `Diff hunk "${hunkId}" has non-consecutive new-side line numbers ${previousLineNumber} and ${lineNumber}.`,
+      );
+    }
+  }
+}
+
 function findAffectedBlockIndexes(
   blocks: MarkdownBlock[],
   lineNumber: number,
@@ -189,6 +296,19 @@ function findAffectedBlockIndexes(
     affectedIndexes.push(nextBlockIndex);
   }
   return affectedIndexes;
+}
+
+function assertValidBlockRange(block: { startLine: number; endLine: number }): void {
+  if (
+    !Number.isSafeInteger(block.startLine) ||
+    !Number.isSafeInteger(block.endLine) ||
+    block.startLine < 1 ||
+    block.endLine < block.startLine
+  ) {
+    throw new Error(
+      `Markdown block range ${block.startLine}-${block.endLine} is invalid; a range must be 1-based, inclusive and non-empty.`,
+    );
+  }
 }
 
 function assertOrderedNonOverlappingBlocks(blocks: MarkdownBlock[]): void {

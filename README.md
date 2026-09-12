@@ -18,6 +18,9 @@ A lightweight local diff viewer for inspecting changes with agent-aware ephemera
 - **3-Pane Interface**: Easily navigate between your Working Directory changes and Staged Changes,
   while viewing the diff in the main viewer.
 - **Granular Git Actions**: Stage and unstage changes directly from the UI.
+- **Markdown Rich Diff**: Review staged Markdown changes as rendered output instead of raw `+`/`-`
+  lines, with removed blocks shown in place — and add, edit, or delete notes on a rendered block
+  without switching back to the source view.
 - **Ephemeral Notes**: Add in-memory notes to specific diff lines and ranges, or to entire files —
   including tracked files outside the current diff. This is perfect for jotting down self-reminders
   and double-checking your work before it gets etched into your Git history.

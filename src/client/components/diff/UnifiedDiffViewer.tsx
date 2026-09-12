@@ -1,9 +1,10 @@
-import React, { useEffect, useRef, useState, type ReactElement } from 'react';
+import React, { useCallback, useEffect, useRef, useState, type ReactElement } from 'react';
 import { createPortal } from 'react-dom';
 import { UnfoldVertical } from 'lucide-react';
 import type { BaseDiffViewerProps } from './BaseDiffViewer';
 import { isLiveNote } from '../../../domain/notes/note-staleness';
 import { findHunkContainingRange } from '../../../domain/notes/resolve-line-note-target';
+import type { LineNote } from '../../../domain/notes/types';
 import { formatLineRange } from '../../presentation/notes/line-range';
 import { NoteEditor } from '../notes/NoteEditor';
 import { NoteCard } from '../notes/NoteCard';
@@ -47,10 +48,30 @@ export function UnifiedDiffViewer({
   const markdownPreview = useMarkdownPreview(file, repoId, fileContentReader, blobContentReader);
   const viewerRef = useRef<HTMLDivElement>(null);
   const [interaction, setInteraction] = useState<LineInteraction>({ type: 'idle' });
+  const [isPreviewNoteCreateEditorOpen, setIsPreviewNoteCreateEditorOpen] = useState(false);
+  // Note cards keep their editor state internally, so each one reports itself
+  // here: only the mounted view's cards are ever in this set, and an unmount
+  // (including a diff refresh) removes them again.
+  const [openNoteCardIds, setOpenNoteCardIds] = useState<ReadonlySet<string>>(() => new Set());
+  const handleNoteCardEditorOpenChange = useCallback((noteId: string, isOpen: boolean): void => {
+    setOpenNoteCardIds((previousIds) => {
+      if (previousIds.has(noteId) === isOpen) {
+        return previousIds;
+      }
+      const nextIds = new Set(previousIds);
+      if (isOpen) {
+        nextIds.add(noteId);
+      } else {
+        nextIds.delete(noteId);
+      }
+      return nextIds;
+    });
+  }, []);
   const [rangeSelectionError, setRangeSelectionError] = useState<string | null>(null);
   const fileNotes = notes.filter((note) => note.kind === 'file' && isLiveNote(note));
   const paneLineNotes = notes.filter(
-    (note) => note.kind === 'line' && note.bucket === paneMode && isLiveNote(note),
+    (note): note is LineNote =>
+      note.kind === 'line' && note.bucket === paneMode && isLiveNote(note),
   );
   // Stale notes lose their line anchor — the recorded range no longer describes
   // what is on screen — but keep the pane they were written in, so they show up
@@ -72,7 +93,11 @@ export function UnifiedDiffViewer({
     (file.status === 'added' || (file.status === 'modified' && file.oldBlobId !== undefined)) &&
     getLanguageFromPath(file.path) === 'markdown';
   const isMarkdownPreviewSelected = markdownPreview.mode !== 'source';
-  const isLineNoteEditorOpen = interaction.type === 'editing';
+  // Source and Preview are mutually exclusive, so whichever editors are open
+  // belong to the view currently on screen and would lose their draft if the
+  // other view replaced it.
+  const isLineNoteEditorOpen =
+    interaction.type === 'editing' || isPreviewNoteCreateEditorOpen || openNoteCardIds.size > 0;
   const lineNoteEditorSwitchTitle = isLineNoteEditorOpen
     ? 'Finish editing the line note before switching views.'
     : undefined;
@@ -232,7 +257,9 @@ export function UnifiedDiffViewer({
             <button
               aria-pressed={!isMarkdownPreviewSelected}
               className="button markdown-view-toggle-button"
+              disabled={isMarkdownPreviewSelected && isLineNoteEditorOpen}
               onClick={markdownPreview.showSource}
+              title={isMarkdownPreviewSelected ? lineNoteEditorSwitchTitle : undefined}
               type="button"
             >
               Source
@@ -240,12 +267,9 @@ export function UnifiedDiffViewer({
             <button
               aria-pressed={isMarkdownPreviewSelected}
               className="button markdown-view-toggle-button"
-              disabled={
-                markdownPreview.mode === 'loading' ||
-                (!isMarkdownPreviewSelected && isLineNoteEditorOpen)
-              }
+              disabled={markdownPreview.mode === 'loading' || isLineNoteEditorOpen}
               onClick={markdownPreview.showPreview}
-              title={!isMarkdownPreviewSelected ? lineNoteEditorSwitchTitle : undefined}
+              title={lineNoteEditorSwitchTitle}
               type="button"
             >
               Preview
@@ -283,6 +307,17 @@ export function UnifiedDiffViewer({
           hunks={file.hunks}
           oldLines={markdownPreview.oldLines}
           newLines={markdownPreview.newLines}
+          noteSupport={{
+            path: file.path,
+            bucket: paneMode,
+            lineNotes: paneLineNotes,
+            onAddNote,
+            onUpdateNote,
+            onDeleteNote,
+            deleteDisabled: notesDeleteDisabled,
+            onCreateEditorOpenChange: setIsPreviewNoteCreateEditorOpen,
+            onNoteEditorOpenChange: handleNoteCardEditorOpenChange,
+          }}
         />
       )}
       {/* Keep Source and Preview exclusive while Preview is loading or has
@@ -496,6 +531,7 @@ export function UnifiedDiffViewer({
                             onUpdate={onUpdateNote}
                             onDelete={onDeleteNote}
                             deleteDisabled={notesDeleteDisabled}
+                            onEditorOpenChange={handleNoteCardEditorOpenChange}
                           />
                         </div>
                       </td>

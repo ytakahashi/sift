@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffHunk, DiffLine } from './types';
 import {
+  assignLineNotesToBlocks,
   buildMarkdownPreviewRows,
   classifyMarkdownBlocks,
+  clampBlockRangeToHunks,
   type ClassifiedMarkdownBlock,
   type MarkdownBlock,
 } from './markdown-blocks';
@@ -53,6 +55,50 @@ function createPreviewHunk(
     newStart,
     newLines: lines.filter((line) => line.type !== 'delete').length,
     lines,
+  };
+}
+
+function createRangeHunk(id: string, newStart: number, newLines: number): DiffHunk {
+  // Carries the new-side lines the header declares, as the parser guarantees,
+  // so the clamp is exercised against realistic hunk data.
+  const lines: DiffLine[] = Array.from({ length: newLines }, (_, index) => ({
+    id: `line-${id}-${index}`,
+    type: 'context',
+    oldLineNumber: index + 1,
+    newLineNumber: newStart + index,
+    content: `line ${newStart + index}`,
+  }));
+
+  return {
+    id,
+    header: '',
+    oldStart: 1,
+    oldLines: newLines,
+    newStart,
+    newLines,
+    lines,
+  };
+}
+
+function createDeletionOnlyHunk(
+  id: string,
+  oldStart: number,
+  newStart: number,
+  oldLines: number,
+): DiffHunk {
+  return {
+    id,
+    header: '',
+    oldStart,
+    oldLines,
+    newStart,
+    newLines: 0,
+    lines: Array.from({ length: oldLines }, (_, index) => ({
+      id: `line-${id}-${index}`,
+      type: 'delete',
+      oldLineNumber: oldStart + index,
+      content: `removed ${oldStart + index}`,
+    })),
   };
 }
 
@@ -560,6 +606,312 @@ describe('buildMarkdownPreviewRows', () => {
     // When / Then
     expect(() => buildMarkdownPreviewRows([], oldBlocks, hunks)).toThrow(
       'Removed Markdown blocks are not ordered by their new-side insertion point.',
+    );
+  });
+});
+
+describe('clampBlockRangeToHunks', () => {
+  it('preserves a block range fully contained in one hunk', () => {
+    // Given
+    const block = { startLine: 12, endLine: 14 };
+    const hunks = [createRangeHunk('hunk-1', 10, 7)];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([{ startLine: 12, endLine: 14, hunkId: 'hunk-1' }]);
+  });
+
+  it.each([
+    {
+      description: 'before the hunk',
+      block: { startLine: 8, endLine: 12 },
+      expected: { startLine: 10, endLine: 12, hunkId: 'hunk-1' },
+    },
+    {
+      description: 'after the hunk',
+      block: { startLine: 14, endLine: 18 },
+      expected: { startLine: 14, endLine: 16, hunkId: 'hunk-1' },
+    },
+  ])('clamps a block extending $description', ({ block, expected }) => {
+    // Given
+    const hunks = [createRangeHunk('hunk-1', 10, 7)];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([expected]);
+  });
+
+  it('keeps an inclusive one-line overlap at a hunk boundary', () => {
+    // Given
+    const block = { startLine: 16, endLine: 20 };
+    const hunks = [createRangeHunk('hunk-1', 10, 7)];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([{ startLine: 16, endLine: 16, hunkId: 'hunk-1' }]);
+  });
+
+  it('returns one range per overlapping hunk in input order', () => {
+    // Given
+    const block = { startLine: 8, endLine: 30 };
+    const hunks = [createRangeHunk('hunk-1', 10, 3), createRangeHunk('hunk-2', 25, 3)];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([
+      { startLine: 10, endLine: 12, hunkId: 'hunk-1' },
+      { startLine: 25, endLine: 27, hunkId: 'hunk-2' },
+    ]);
+  });
+
+  it('returns no range when the block does not overlap a hunk', () => {
+    // Given
+    const block = { startLine: 1, endLine: 5 };
+    const hunks = [createRangeHunk('hunk-1', 10, 3)];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([]);
+  });
+
+  it('returns no range when there are no hunks', () => {
+    // Given
+    const block = { startLine: 1, endLine: 5 };
+
+    // When
+    const result = clampBlockRangeToHunks(block, []);
+
+    // Then
+    expect(result).toEqual([]);
+  });
+
+  it('ignores a deletion-only hunk, which covers no new-side line', () => {
+    // Given: Git places a deletion-only hunk's newStart on the preceding line,
+    // so header arithmetic alone would suggest an overlap that does not exist.
+    const block = { startLine: 8, endLine: 12 };
+    const hunks = [createDeletionOnlyHunk('hunk-1', 10, 9, 3)];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([]);
+  });
+
+  it('clamps to the lines a hunk actually carries rather than its header counts', () => {
+    // Given: a hunk whose header over-declares its new-side length. Note
+    // creation anchors on the real lines, so the clamp must agree with those.
+    const block = { startLine: 1, endLine: 30 };
+    const hunks = [{ ...createRangeHunk('hunk-1', 10, 3), newLines: 10 }];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([{ startLine: 10, endLine: 12, hunkId: 'hunk-1' }]);
+  });
+
+  it('skips deleted lines, which consume no new-side line number', () => {
+    // Given: a realistic modified hunk mixing context, deletion and addition.
+    // Deletions carry no newLineNumber, so the new-side numbers that remain
+    // after filtering are still consecutive from newStart.
+    const block = { startLine: 1, endLine: 30 };
+    const hunks = [
+      createPreviewHunk('hunk-1', 5, 10, [
+        { id: 'line-1', type: 'context', oldLineNumber: 5, newLineNumber: 10, content: 'kept' },
+        { id: 'line-2', type: 'delete', oldLineNumber: 6, content: 'dropped' },
+        { id: 'line-3', type: 'add', newLineNumber: 11, content: 'inserted' },
+        { id: 'line-4', type: 'context', oldLineNumber: 7, newLineNumber: 12, content: 'kept' },
+      ]),
+    ];
+
+    // When
+    const result = clampBlockRangeToHunks(block, hunks);
+
+    // Then
+    expect(result).toEqual([{ startLine: 10, endLine: 12, hunkId: 'hunk-1' }]);
+  });
+
+  it.each([
+    {
+      description: 'ends before it starts',
+      block: { startLine: 12, endLine: 8 },
+      expectedMessage: 'Markdown block range 12-8 is invalid',
+    },
+    {
+      description: 'starts before the first source line',
+      block: { startLine: 0, endLine: 4 },
+      expectedMessage: 'Markdown block range 0-4 is invalid',
+    },
+  ])('rejects a block range that $description', ({ block, expectedMessage }) => {
+    // Given
+    const hunks = [createRangeHunk('hunk-1', 10, 7)];
+
+    // When / Then: an invalid range must fail loudly instead of collapsing into
+    // the empty result that means "no note affordance for this block".
+    expect(() => clampBlockRangeToHunks(block, hunks)).toThrow(expectedMessage);
+  });
+
+  it('rejects a hunk line that is missing its new-side line number', () => {
+    // Given
+    const hunk = createRangeHunk('hunk-1', 10, 1);
+    const hunks = [{ ...hunk, lines: [{ ...hunk.lines[0], newLineNumber: undefined }] }];
+
+    // When / Then
+    expect(() => clampBlockRangeToHunks({ startLine: 10, endLine: 10 }, hunks)).toThrow(
+      'is missing newLineNumber',
+    );
+  });
+
+  it.each([
+    {
+      description: 'has a gap',
+      lineNumbers: [10, 12],
+      expectedMessage: 'non-consecutive new-side line numbers 10 and 12',
+    },
+    {
+      description: 'moves backwards',
+      lineNumbers: [11, 10],
+      expectedMessage: 'non-consecutive new-side line numbers 11 and 10',
+    },
+  ])(
+    'rejects a hunk whose new-side line sequence $description',
+    ({ lineNumbers, expectedMessage }) => {
+      // Given
+      const hunk = createRangeHunk('hunk-1', 10, lineNumbers.length);
+      const hunks = [
+        {
+          ...hunk,
+          lines: hunk.lines.map((line, index) => ({
+            ...line,
+            newLineNumber: lineNumbers[index],
+          })),
+        },
+      ];
+
+      // When / Then: endpoint arithmetic is safe only when every line in the
+      // resulting range is present for line note resolution.
+      expect(() => clampBlockRangeToHunks({ startLine: 10, endLine: 12 }, hunks)).toThrow(
+        expectedMessage,
+      );
+    },
+  );
+});
+
+describe('assignLineNotesToBlocks', () => {
+  function createNote(
+    id: string,
+    startLine: number,
+    endLine: number,
+  ): { id: string; startLine: number; endLine: number } {
+    return { id, startLine, endLine };
+  }
+
+  it('places a note under the block containing its last line', () => {
+    // Given
+    const blocks = [createBlock(1, 2), createBlock(4, 5)];
+
+    // When
+    const { byBlock, unanchored } = assignLineNotesToBlocks(blocks, [createNote('note-1', 4, 5)]);
+
+    // Then
+    expect(byBlock.get(blocks[1])).toEqual([createNote('note-1', 4, 5)]);
+    expect(byBlock.has(blocks[0])).toBe(false);
+    expect(unanchored).toEqual([]);
+  });
+
+  it('places a note spanning several blocks only under the block holding its last line', () => {
+    // Given
+    const blocks = [createBlock(1, 2), createBlock(4, 5), createBlock(7, 8)];
+
+    // When: the raw view anchors the note card on `endLine`, so the preview does too
+    const { byBlock } = assignLineNotesToBlocks(blocks, [createNote('note-1', 1, 7)]);
+
+    // Then
+    expect(byBlock.get(blocks[2])).toEqual([createNote('note-1', 1, 7)]);
+    expect(byBlock.size).toBe(1);
+  });
+
+  it('falls back to the preceding block for a note anchored to a separator line', () => {
+    // Given: line 3 is the blank line between two blocks, which no Markdown
+    // node covers; only the raw view can anchor a note there.
+    const blocks = [createBlock(1, 2), createBlock(4, 5)];
+
+    // When
+    const { byBlock, unanchored } = assignLineNotesToBlocks(blocks, [createNote('note-1', 3, 3)]);
+
+    // Then
+    expect(byBlock.get(blocks[0])).toEqual([createNote('note-1', 3, 3)]);
+    expect(unanchored).toEqual([]);
+  });
+
+  it('falls back to the first block for a note anchored above the document', () => {
+    // Given
+    const blocks = [createBlock(3, 4)];
+
+    // When
+    const { byBlock } = assignLineNotesToBlocks(blocks, [createNote('note-1', 1, 1)]);
+
+    // Then
+    expect(byBlock.get(blocks[0])).toEqual([createNote('note-1', 1, 1)]);
+  });
+
+  it('falls back to the last block for a note anchored below the document', () => {
+    // Given
+    const blocks = [createBlock(1, 2), createBlock(4, 5)];
+
+    // When
+    const { byBlock } = assignLineNotesToBlocks(blocks, [createNote('note-1', 9, 9)]);
+
+    // Then
+    expect(byBlock.get(blocks[1])).toEqual([createNote('note-1', 9, 9)]);
+  });
+
+  it('reports notes as unanchored when the document has no blocks', () => {
+    // Given / When
+    const { byBlock, unanchored } = assignLineNotesToBlocks([], [createNote('note-1', 1, 1)]);
+
+    // Then: the preview still has to show them somewhere
+    expect(byBlock.size).toBe(0);
+    expect(unanchored).toEqual([createNote('note-1', 1, 1)]);
+  });
+
+  it('keeps input order for several notes on the same block', () => {
+    // Given
+    const blocks = [createBlock(1, 3)];
+
+    // When
+    const { byBlock } = assignLineNotesToBlocks(blocks, [
+      createNote('note-1', 1, 1),
+      createNote('note-2', 3, 3),
+      createNote('note-3', 2, 2),
+    ]);
+
+    // Then
+    expect(byBlock.get(blocks[0])?.map((note) => note.id)).toEqual(['note-1', 'note-2', 'note-3']);
+  });
+
+  it('rejects a note range that cannot be anchored', () => {
+    // Given / When / Then
+    expect(() =>
+      assignLineNotesToBlocks([createBlock(1, 2)], [createNote('note-1', 3, 2)]),
+    ).toThrow('Markdown block range 3-2 is invalid');
+  });
+
+  it('rejects unordered blocks', () => {
+    // Given / When / Then: the anchor lookup is a binary search over source order
+    expect(() => assignLineNotesToBlocks([createBlock(4, 5), createBlock(1, 2)], [])).toThrow(
+      'blocks must be ordered and non-overlapping',
     );
   });
 });
