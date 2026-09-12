@@ -26,6 +26,17 @@ export type MarkdownPreviewRow =
   | { kind: 'new'; block: ClassifiedMarkdownBlock }
   | { kind: 'removed'; block: ClassifiedMarkdownBlock };
 
+/** Line notes placed under the preview blocks that display them. */
+export interface MarkdownBlockNotePlacement<TBlock, TNote> {
+  /** Notes to render under a block, keyed by the block object itself. */
+  byBlock: Map<TBlock, TNote[]>;
+  /**
+   * Notes that found no block to sit under, so the preview can still show them
+   * instead of dropping them silently.
+   */
+  unanchored: TNote[];
+}
+
 /** A block range narrowed to one hunk, ready to be sent as a line note target. */
 export interface ClampedNoteRange {
   /** 1-based, inclusive new-side line. */
@@ -192,6 +203,48 @@ export function clampBlockRangeToHunks(
 
     return startLine <= endLine ? [{ startLine, endLine, hunkId: hunk.id }] : [];
   });
+}
+
+/**
+ * Places each line note under exactly one block, so a note spanning several
+ * blocks is rendered once rather than repeated under each of them.
+ *
+ * The anchor is the note's last line, matching the raw view, which renders a
+ * note card after the row holding `endLine`. A note anchored to a blank line
+ * between blocks (only reachable from the raw view, since preview ranges are
+ * clamped to block ranges) has no containing block and falls back to the
+ * preceding one.
+ */
+export function assignLineNotesToBlocks<
+  TBlock extends MarkdownBlock,
+  TNote extends { startLine: number; endLine: number },
+>(blocks: TBlock[], notes: readonly TNote[]): MarkdownBlockNotePlacement<TBlock, TNote> {
+  assertOrderedNonOverlappingBlocks(blocks);
+
+  const byBlock = new Map<TBlock, TNote[]>();
+  const unanchored: TNote[] = [];
+
+  for (const note of notes) {
+    assertValidBlockRange(note);
+    // Treating the anchor as whitespace makes the lookup total: it resolves to
+    // the containing block, else the closest neighbour, else nothing at all
+    // when the document has no blocks.
+    const [blockIndex] = findAffectedBlockIndexes(blocks, note.endLine, true);
+    if (blockIndex === undefined) {
+      unanchored.push(note);
+      continue;
+    }
+
+    const block = blocks[blockIndex];
+    const blockNotes = byBlock.get(block);
+    if (blockNotes === undefined) {
+      byBlock.set(block, [note]);
+    } else {
+      blockNotes.push(note);
+    }
+  }
+
+  return { byBlock, unanchored };
 }
 
 function assertConsecutiveNewLineNumbers(hunkId: string, lineNumbers: number[]): void {

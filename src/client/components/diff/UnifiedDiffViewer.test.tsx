@@ -615,7 +615,9 @@ describe('UnifiedDiffViewer', () => {
     expect(previewButton.getAttribute('aria-pressed')).toBe('true');
     expect(container.querySelector('.diff-line-marker')).toBeNull();
     expect(container.textContent).toContain('file note body');
-    expect(container.textContent).not.toContain('line note body');
+    // Notes stay visible in Preview; only the Source-specific line selection
+    // and full-file affordances are gone.
+    expect(container.textContent).toContain('line note body');
     expect(screen.queryByRole('button', { name: 'Select line 1 for note' })).toBeNull();
     expect(screen.queryByRole('button', { name: 'View entire file' })).toBeNull();
     expect(blobContentReader.fetchBlobContent).toHaveBeenCalledWith('repo', 'old-blob');
@@ -708,6 +710,140 @@ describe('UnifiedDiffViewer', () => {
 
     // Then
     expect(previewButton.hasAttribute('disabled')).toBe(false);
+  });
+
+  it('creates a line note from Preview and protects its draft from a view switch', async () => {
+    // Given
+    const user = userEvent.setup();
+    const blobContentReader = {
+      fetchBlobContent: vi.fn().mockResolvedValue({ lines: ['# Old', 'Same'] }),
+    };
+    const fileContentReader = {
+      fetchFileContent: vi.fn().mockResolvedValue({ blobId: 'new-blob', lines: ['# New', 'Same'] }),
+    };
+    const onAddNote = vi.fn(async () => {});
+    const diffToolbarTarget = createDiffToolbarTarget();
+    const { container } = render(
+      <UnifiedDiffViewer
+        blobContentReader={blobContentReader}
+        diffToolbarTarget={diffToolbarTarget}
+        file={createMarkdownFile()}
+        fileContentReader={fileContentReader}
+        notes={[
+          createLineNote({ path: 'README.md', bucket: 'staged' }),
+          createLineNote({ id: 'working-note', path: 'README.md', startLine: 2, endLine: 2 }),
+          createLineNote({
+            id: 'stale-note',
+            path: 'README.md',
+            startLine: 2,
+            endLine: 2,
+            bucket: 'staged',
+            staleness: { kind: 'stale', reason: 'content-changed' },
+          }),
+        ]}
+        onAddNote={onAddNote}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Preview' }));
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New' })).toBeDefined());
+
+    // Then: only the live note from this pane contributes a Preview highlight
+    const blocks = Array.from(container.querySelectorAll<HTMLElement>('.markdown-preview-block'));
+    expect(blocks.map((block) => block.dataset.noteHighlighted)).toEqual([
+      undefined,
+      'true',
+      undefined,
+    ]);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Add note for Line 1' }));
+    await user.type(screen.getByRole('textbox'), 'preview draft');
+
+    // Then: neither toggle may replace the view holding the draft. Re-clicking
+    // the already selected Preview would refetch and remount the viewer.
+    const sourceButton = screen.getByRole('button', { name: 'Source' });
+    const previewButton = screen.getByRole('button', { name: 'Preview' });
+    expect(sourceButton.hasAttribute('disabled')).toBe(true);
+    expect(previewButton.hasAttribute('disabled')).toBe(true);
+    expect(sourceButton.getAttribute('title')).toBe(
+      'Finish editing the line note before switching views.',
+    );
+    expect(screen.getByRole<HTMLTextAreaElement>('textbox').value).toBe('preview draft');
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    // Then
+    await waitFor(() => expect(sourceButton.hasAttribute('disabled')).toBe(false));
+    expect(onAddNote).toHaveBeenCalledWith(
+      {
+        kind: 'line',
+        path: 'README.md',
+        startLine: 1,
+        endLine: 1,
+        bucket: 'staged',
+      },
+      'preview draft',
+    );
+  });
+
+  it('blocks a view switch while an existing line note is being edited', async () => {
+    // Given
+    const user = userEvent.setup();
+    const blobContentReader = {
+      fetchBlobContent: vi.fn().mockResolvedValue({ lines: ['# Old', 'Same'] }),
+    };
+    const fileContentReader = {
+      fetchFileContent: vi.fn().mockResolvedValue({ blobId: 'new-blob', lines: ['# New', 'Same'] }),
+    };
+    const onUpdateNote = vi.fn(async () => {});
+    render(
+      <UnifiedDiffViewer
+        blobContentReader={blobContentReader}
+        diffToolbarTarget={createDiffToolbarTarget()}
+        file={createMarkdownFile()}
+        fileContentReader={fileContentReader}
+        notes={[createLineNote({ path: 'README.md', bucket: 'staged' })]}
+        onUpdateNote={onUpdateNote}
+        paneMode="staged"
+        repoId="repo"
+      />,
+    );
+    const previewButton = screen.getByRole('button', { name: 'Preview' });
+
+    // When: a note card in the Source view is being edited
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+
+    // Then: a note card keeps its draft internally, so the switch has to be
+    // blocked rather than unmounting the card.
+    expect(previewButton.hasAttribute('disabled')).toBe(true);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    // Then
+    expect(previewButton.hasAttribute('disabled')).toBe(false);
+
+    // When: the same note is edited from the Preview view
+    await user.click(previewButton);
+    await waitFor(() => expect(screen.getByRole('heading', { name: 'New' })).toBeDefined());
+    await user.click(screen.getByRole('button', { name: 'Edit' }));
+    await user.clear(screen.getByRole('textbox'));
+    await user.type(screen.getByRole('textbox'), 'edited from preview');
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Source' }).hasAttribute('disabled')).toBe(true);
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Save' }));
+
+    // Then
+    await waitFor(() =>
+      expect(screen.getByRole('button', { name: 'Source' }).hasAttribute('disabled')).toBe(false),
+    );
+    expect(onUpdateNote).toHaveBeenCalledWith('line-note', 'edited from preview');
   });
 
   it('preserves a file note draft while switching between Source and Preview', async () => {

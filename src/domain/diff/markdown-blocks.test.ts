@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { DiffHunk, DiffLine } from './types';
 import {
+  assignLineNotesToBlocks,
   buildMarkdownPreviewRows,
   classifyMarkdownBlocks,
   clampBlockRangeToHunks,
@@ -805,4 +806,112 @@ describe('clampBlockRangeToHunks', () => {
       );
     },
   );
+});
+
+describe('assignLineNotesToBlocks', () => {
+  function createNote(
+    id: string,
+    startLine: number,
+    endLine: number,
+  ): { id: string; startLine: number; endLine: number } {
+    return { id, startLine, endLine };
+  }
+
+  it('places a note under the block containing its last line', () => {
+    // Given
+    const blocks = [createBlock(1, 2), createBlock(4, 5)];
+
+    // When
+    const { byBlock, unanchored } = assignLineNotesToBlocks(blocks, [createNote('note-1', 4, 5)]);
+
+    // Then
+    expect(byBlock.get(blocks[1])).toEqual([createNote('note-1', 4, 5)]);
+    expect(byBlock.has(blocks[0])).toBe(false);
+    expect(unanchored).toEqual([]);
+  });
+
+  it('places a note spanning several blocks only under the block holding its last line', () => {
+    // Given
+    const blocks = [createBlock(1, 2), createBlock(4, 5), createBlock(7, 8)];
+
+    // When: the raw view anchors the note card on `endLine`, so the preview does too
+    const { byBlock } = assignLineNotesToBlocks(blocks, [createNote('note-1', 1, 7)]);
+
+    // Then
+    expect(byBlock.get(blocks[2])).toEqual([createNote('note-1', 1, 7)]);
+    expect(byBlock.size).toBe(1);
+  });
+
+  it('falls back to the preceding block for a note anchored to a separator line', () => {
+    // Given: line 3 is the blank line between two blocks, which no Markdown
+    // node covers; only the raw view can anchor a note there.
+    const blocks = [createBlock(1, 2), createBlock(4, 5)];
+
+    // When
+    const { byBlock, unanchored } = assignLineNotesToBlocks(blocks, [createNote('note-1', 3, 3)]);
+
+    // Then
+    expect(byBlock.get(blocks[0])).toEqual([createNote('note-1', 3, 3)]);
+    expect(unanchored).toEqual([]);
+  });
+
+  it('falls back to the first block for a note anchored above the document', () => {
+    // Given
+    const blocks = [createBlock(3, 4)];
+
+    // When
+    const { byBlock } = assignLineNotesToBlocks(blocks, [createNote('note-1', 1, 1)]);
+
+    // Then
+    expect(byBlock.get(blocks[0])).toEqual([createNote('note-1', 1, 1)]);
+  });
+
+  it('falls back to the last block for a note anchored below the document', () => {
+    // Given
+    const blocks = [createBlock(1, 2), createBlock(4, 5)];
+
+    // When
+    const { byBlock } = assignLineNotesToBlocks(blocks, [createNote('note-1', 9, 9)]);
+
+    // Then
+    expect(byBlock.get(blocks[1])).toEqual([createNote('note-1', 9, 9)]);
+  });
+
+  it('reports notes as unanchored when the document has no blocks', () => {
+    // Given / When
+    const { byBlock, unanchored } = assignLineNotesToBlocks([], [createNote('note-1', 1, 1)]);
+
+    // Then: the preview still has to show them somewhere
+    expect(byBlock.size).toBe(0);
+    expect(unanchored).toEqual([createNote('note-1', 1, 1)]);
+  });
+
+  it('keeps input order for several notes on the same block', () => {
+    // Given
+    const blocks = [createBlock(1, 3)];
+
+    // When
+    const { byBlock } = assignLineNotesToBlocks(blocks, [
+      createNote('note-1', 1, 1),
+      createNote('note-2', 3, 3),
+      createNote('note-3', 2, 2),
+    ]);
+
+    // Then
+    expect(byBlock.get(blocks[0])?.map((note) => note.id)).toEqual(['note-1', 'note-2', 'note-3']);
+  });
+
+  it('rejects a note range that cannot be anchored', () => {
+    // Given / When / Then
+    expect(() =>
+      assignLineNotesToBlocks([createBlock(1, 2)], [createNote('note-1', 3, 2)]),
+    ).toThrow('Markdown block range 3-2 is invalid');
+  });
+
+  it('rejects unordered blocks', () => {
+    // Given / When / Then: the anchor lookup is a binary search over source order
+    expect(() => assignLineNotesToBlocks([createBlock(4, 5), createBlock(1, 2)], [])).toThrow(
+      'blocks must be ordered and non-overlapping',
+    );
+  });
 });
