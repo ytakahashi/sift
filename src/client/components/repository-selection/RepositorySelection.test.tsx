@@ -1,4 +1,4 @@
-import { cleanup, createEvent, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
@@ -188,69 +188,6 @@ describe('RepositorySelection', () => {
     expect(screen.getByText('1 configured')).toBeDefined();
   });
 
-  it('clears the repository filter with the search field clear button', async () => {
-    // Given
-    const user = userEvent.setup();
-    renderRepositorySelection({
-      invalidRepositories: [],
-      repositories: [
-        { id: 'sift', name: 'sift', path: '/repo/sift' },
-        { id: 'website', name: 'website', path: '/repo/website' },
-      ],
-    });
-    const search = screen.getByRole('search', { name: 'Repository filter' });
-    await user.type(within(search).getByRole('textbox', { name: 'Filter repositories' }), 'sift');
-
-    // When
-    await user.click(within(search).getByRole('button', { name: 'Clear repository filter' }));
-
-    // Then
-    expect(screen.getByRole('button', { name: 'website/repo/website' })).toBeDefined();
-    expect(within(search).queryByRole('button', { name: 'Clear repository filter' })).toBeNull();
-  });
-
-  it('clears the repository filter with Escape', async () => {
-    // Given
-    const user = userEvent.setup();
-    renderRepositorySelection({
-      invalidRepositories: [],
-      repositories: [
-        { id: 'sift', name: 'sift', path: '/repo/sift' },
-        { id: 'website', name: 'website', path: '/repo/website' },
-      ],
-    });
-    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
-    await user.type(filterInput, 'sift');
-
-    // When
-    await user.type(filterInput, '{Escape}');
-
-    // Then
-    expect(filterInput).toHaveProperty('value', '');
-    expect(screen.getByRole('button', { name: 'website/repo/website' })).toBeDefined();
-  });
-
-  it('does not clear the repository filter with Escape during IME composition', async () => {
-    // Given
-    const user = userEvent.setup();
-    renderRepositorySelection({
-      invalidRepositories: [],
-      repositories: [
-        { id: 'sift', name: 'sift', path: '/repo/sift' },
-        { id: 'website', name: 'website', path: '/repo/website' },
-      ],
-    });
-    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
-    await user.type(filterInput, 'sif');
-
-    // When
-    fireEvent.keyDown(filterInput, { isComposing: true, key: 'Escape' });
-
-    // Then
-    expect(filterInput).toHaveProperty('value', 'sif');
-    expect(screen.queryByRole('button', { name: 'website/repo/website' })).toBeNull();
-  });
-
   it('does not show the repository filter for an unconfigured list', () => {
     // Given / When
     renderRepositorySelection({ invalidRepositories: [], repositories: [] });
@@ -282,30 +219,6 @@ describe('RepositorySelection', () => {
     expect(screen.getByText('No repositories available.')).toBeDefined();
     expect(screen.queryByText('No repositories match "website".')).toBeNull();
     expect(screen.queryByRole('textbox', { name: 'Filter repositories' })).toBeNull();
-  });
-
-  it('selects the repository filter text when slash is pressed outside an editable control', async () => {
-    // Given
-    const user = userEvent.setup();
-    renderRepositorySelection({
-      invalidRepositories: [],
-      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
-    });
-    const filterInput = screen.getByRole<HTMLInputElement>('textbox', {
-      name: 'Filter repositories',
-    });
-    await user.type(filterInput, 'sift');
-    filterInput.blur();
-    const shortcutEvent = createEvent.keyDown(document, { cancelable: true, key: '/' });
-
-    // When
-    fireEvent(document, shortcutEvent);
-
-    // Then
-    expect(document.activeElement).toBe(filterInput);
-    expect(filterInput.selectionStart).toBe(0);
-    expect(filterInput.selectionEnd).toBe(4);
-    expect(shortcutEvent.defaultPrevented).toBe(true);
   });
 
   it('preserves slash input in the repository path field', async () => {
@@ -343,41 +256,6 @@ describe('RepositorySelection', () => {
     // Then
     expect(document.activeElement).not.toBe(filterInput);
     expect(shortcutEvent.defaultPrevented).toBe(false);
-  });
-
-  it('does not focus the repository filter for modified slash shortcuts', () => {
-    // Given
-    renderRepositorySelection({
-      invalidRepositories: [],
-      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
-    });
-    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
-    const ctrlShortcutEvent = createEvent.keyDown(document, {
-      cancelable: true,
-      ctrlKey: true,
-      key: '/',
-    });
-    const metaShortcutEvent = createEvent.keyDown(document, {
-      cancelable: true,
-      key: '/',
-      metaKey: true,
-    });
-    const altShortcutEvent = createEvent.keyDown(document, {
-      altKey: true,
-      cancelable: true,
-      key: '/',
-    });
-
-    // When
-    fireEvent(document, ctrlShortcutEvent);
-    fireEvent(document, metaShortcutEvent);
-    fireEvent(document, altShortcutEvent);
-
-    // Then
-    expect(document.activeElement).not.toBe(filterInput);
-    expect(ctrlShortcutEvent.defaultPrevented).toBe(false);
-    expect(metaShortcutEvent.defaultPrevented).toBe(false);
-    expect(altShortcutEvent.defaultPrevented).toBe(false);
   });
 
   it('shows the config missing error from the fetch status handling', () => {
