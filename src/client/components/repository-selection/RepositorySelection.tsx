@@ -1,12 +1,5 @@
-import {
-  useEffect,
-  useRef,
-  useState,
-  type DragEvent,
-  type FormEvent,
-  type ReactElement,
-} from 'react';
-import { GripVertical, Search, X } from 'lucide-react';
+import { useState, type DragEvent, type FormEvent, type ReactElement } from 'react';
+import { GripVertical, X } from 'lucide-react';
 import type {
   InvalidRepository,
   RepositoryId,
@@ -18,6 +11,7 @@ import {
   normalizeRepositoryFilterQuery,
 } from '../../presentation/repository-filter/repository-filter';
 import { AppHeader } from '../app-header/AppHeader';
+import { RepositoryFilterInput } from '../repository-filter/RepositoryFilterInput';
 
 export interface RepositorySelectionProps {
   addError: string | null;
@@ -36,13 +30,6 @@ export interface RepositorySelectionProps {
   repositories: RepositoryList | null;
   saving: boolean;
   clearEditError: () => void;
-}
-
-function isEditableElement(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.matches('input, textarea, select') || target.isContentEditable)
-  );
 }
 
 function RepositoryRow({
@@ -199,7 +186,6 @@ export function RepositorySelection({
   saving,
   clearEditError,
 }: RepositorySelectionProps): ReactElement {
-  const filterInputRef = useRef<HTMLInputElement>(null);
   const [isAddingRepository, setIsAddingRepository] = useState(false);
   const [isEditingRepositoryList, setIsEditingRepositoryList] = useState(false);
   const [pendingDeleteIds, setPendingDeleteIds] = useState<Set<RepositoryId>>(new Set());
@@ -224,38 +210,6 @@ export function RepositorySelection({
   const visibleItemCount = visibleItems.length + visibleInvalidItems.length;
   const trimmedRepositoryPath = repositoryPath.trim();
   const canSubmitRepository = trimmedRepositoryPath.length > 0 && !adding;
-
-  useEffect(() => {
-    // Keep keyboard input within the add form instead of moving focus back to the filter.
-    if (isAddingRepository) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      // Preserve slash input in the filter itself and other editable controls.
-      if (
-        event.key !== '/' ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        isEditableElement(event.target)
-      ) {
-        return;
-      }
-
-      const filterInput = filterInputRef.current;
-      if (!filterInput) {
-        return;
-      }
-
-      event.preventDefault();
-      filterInput.focus();
-      filterInput.select();
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isAddingRepository]);
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>): Promise<void> => {
     event.preventDefault();
@@ -437,34 +391,12 @@ export function RepositorySelection({
             </span>
           </div>
           {itemCount > 0 && (
-            <div aria-label="Repository filter" className="repository-filter" role="search">
-              <Search aria-hidden="true" className="repository-filter-icon" size={16} />
-              <input
-                aria-label="Filter repositories"
-                className="repository-filter-input"
-                onChange={(event) => setFilterQuery(event.target.value)}
-                onKeyDown={(event) => {
-                  // Escape during IME composition cancels the conversion, not the filter.
-                  if (event.key === 'Escape' && !event.nativeEvent.isComposing) {
-                    setFilterQuery('');
-                  }
-                }}
-                placeholder="Filter repositories"
-                ref={filterInputRef}
-                type="text"
-                value={filterQuery}
-              />
-              {filterQuery.length > 0 && (
-                <button
-                  aria-label="Clear repository filter"
-                  className="repository-filter-clear"
-                  onClick={() => setFilterQuery('')}
-                  type="button"
-                >
-                  <X size={16} />
-                </button>
-              )}
-            </div>
+            <RepositoryFilterInput
+              onChange={setFilterQuery}
+              // Keep keyboard input within the add form instead of moving focus back to the filter.
+              shortcutEnabled={!isAddingRepository}
+              value={filterQuery}
+            />
           )}
           {visibleItemCount > 0 ? (
             <ul className="repository-list">
