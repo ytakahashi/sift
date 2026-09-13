@@ -16,7 +16,7 @@ import type {
 import {
   matchesRepositoryFilter,
   normalizeRepositoryFilterQuery,
-} from '../../presentation/repository-selection/repository-filter';
+} from '../../presentation/repository-filter/repository-filter';
 import { AppHeader } from '../app-header/AppHeader';
 
 export interface RepositorySelectionProps {
