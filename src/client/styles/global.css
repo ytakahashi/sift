@@ -408,7 +408,7 @@ button.app-brand-home {
   flex-direction: column;
   width: var(--repository-sidebar-width);
   min-width: var(--repository-sidebar-width);
-  overflow-y: auto;
+  overflow: hidden;
   background: #010409;
   border-left: 1px solid var(--border-color);
 }
@@ -424,6 +424,17 @@ button.app-brand-home {
   color: #f0f6fc;
   font-size: 0.85rem;
   font-weight: 650;
+}
+
+.repository-filter.repository-sidebar-filter {
+  flex: 0 0 auto;
+  margin: 0.6rem 0.75rem;
+}
+
+.repository-sidebar-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
 }
 
 .repository-sidebar-list {
