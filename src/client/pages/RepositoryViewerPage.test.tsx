@@ -716,6 +716,27 @@ describe('RepositoryViewerPage interactions', () => {
     expect(screen.getByRole('button', { name: 'Open repository sidebar' })).toBeDefined();
   });
 
+  it('resets the repository filter after the sidebar is closed', async () => {
+    // Given
+    const user = userEvent.setup();
+    render(<Page />);
+    await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+    const filterInput = await screen.findByRole('textbox', { name: 'Filter repositories' });
+    await user.type(filterInput, 'missing');
+    expect(screen.getByText('No repositories match "missing".')).toBeDefined();
+
+    // When
+    await user.click(screen.getByRole('button', { name: 'Close repository sidebar' }));
+    await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+
+    // Then
+    expect(await screen.findByRole('textbox', { name: 'Filter repositories' })).toHaveProperty(
+      'value',
+      '',
+    );
+    expect(screen.getByRole('button', { name: /my-app/ })).toBeDefined();
+  });
+
   it('selects another repository from the sidebar and closes it', async () => {
     // Given
     const user = userEvent.setup();
