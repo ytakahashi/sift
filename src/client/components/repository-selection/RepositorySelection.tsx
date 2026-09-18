@@ -10,6 +10,11 @@ import {
   matchesRepositoryFilter,
   normalizeRepositoryFilterQuery,
 } from '../../presentation/repository-filter/repository-filter';
+import {
+  moveItem,
+  resolveDropPosition,
+  type DropPosition,
+} from '../../presentation/reorder/reorder';
 import { AppHeader } from '../app-header/AppHeader';
 import { RepositoryFilterInput } from '../repository-filter/RepositoryFilterInput';
 
@@ -47,7 +52,7 @@ function RepositoryRow({
   repository,
   saving,
 }: {
-  dragOverPosition: 'before' | 'after' | null;
+  dragOverPosition: DropPosition | null;
   dragging: boolean;
   isEditing: boolean;
   onDragEnd: () => void;
@@ -192,7 +197,7 @@ export function RepositorySelection({
   const [pendingOrder, setPendingOrder] = useState<RepositoryId[] | null>(null);
   const [draggingId, setDraggingId] = useState<RepositoryId | null>(null);
   const [dragOverId, setDragOverId] = useState<RepositoryId | null>(null);
-  const [dropPosition, setDropPosition] = useState<'before' | 'after'>('before');
+  const [dropPosition, setDropPosition] = useState<DropPosition>('before');
   const [repositoryPath, setRepositoryPath] = useState('');
   const [filterQuery, setFilterQuery] = useState('');
   const items = repositories?.repositories ?? [];
@@ -329,8 +334,7 @@ export function RepositorySelection({
 
     const target = (event.currentTarget || event.target) as HTMLElement;
     const rect = target.getBoundingClientRect();
-    const midY = rect.top + rect.height / 2;
-    const position = event.clientY < midY ? 'before' : 'after';
+    const position = resolveDropPosition(event.clientY, rect.top, rect.height);
 
     setDragOverId(repoId);
     setDropPosition(position);
@@ -347,8 +351,9 @@ export function RepositorySelection({
       !pendingDeleteIds.has(repoId)
     ) {
       setPendingOrder((currentOrder) =>
-        moveRepository(
+        moveItem(
           currentOrder ?? items.map((repository) => repository.id),
+          (id) => id,
           sourceId,
           repoId,
           dropPosition,
@@ -537,20 +542,4 @@ function orderRepositories(
   const orderedIds = new Set(orderedRepositories.map((repository) => repository.id));
   const newRepositories = repositories.filter((repository) => !orderedIds.has(repository.id));
   return [...orderedRepositories, ...newRepositories];
-}
-
-function moveRepository(
-  orderedIds: RepositoryId[],
-  sourceId: RepositoryId,
-  targetId: RepositoryId,
-  position: 'before' | 'after',
-): RepositoryId[] {
-  if (sourceId === targetId || !orderedIds.includes(sourceId) || !orderedIds.includes(targetId)) {
-    return orderedIds;
-  }
-
-  const withoutSource = orderedIds.filter((id) => id !== sourceId);
-  const targetIndex = withoutSource.indexOf(targetId);
-  const insertIndex = position === 'before' ? targetIndex : targetIndex + 1;
-  return [...withoutSource.slice(0, insertIndex), sourceId, ...withoutSource.slice(insertIndex)];
 }
