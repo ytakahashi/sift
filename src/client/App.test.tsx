@@ -1,4 +1,12 @@
-import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
+import {
+  act,
+  cleanup,
+  createEvent,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppDependencies } from './composition/dependencies';
@@ -200,6 +208,7 @@ describe('App repository tabs', () => {
 
   afterEach(() => {
     cleanup();
+    vi.restoreAllMocks();
     delete window.siftDesktop;
     window.history.pushState(null, '', '/');
   });
@@ -246,7 +255,6 @@ describe('App repository tabs', () => {
     // browser history. Without this guard, pressing Back would step through
     // the same view multiple times.
     expect(pushStateSpy).not.toHaveBeenCalled();
-    pushStateSpy.mockRestore();
   });
 
   it('keeps tabs visible when returning to the viewer from selection', async () => {
@@ -303,5 +311,42 @@ describe('App repository tabs', () => {
     });
     expect(await screen.findByRole('button', { name: 'repo-b' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'my-app' })).toBeDefined();
+  });
+
+  it('reorders tabs without changing the active route or history', async () => {
+    // Given: two tabs are open and the second repository is active.
+    window.history.pushState(null, '', '/repos/my-app');
+    const { container } = render(<App dependencies={testDependencies} />);
+    await screen.findByRole('button', { name: 'my-app' });
+    act(() => {
+      desktopOpenListener?.('repo-b');
+    });
+    await screen.findByRole('button', { name: 'repo-b' });
+    const items = container.querySelectorAll<HTMLLIElement>('.repository-tab-item');
+    const dataTransfer = { effectAllowed: 'none', dropEffect: 'none', setData: vi.fn() };
+    vi.spyOn(HTMLElement.prototype, 'getBoundingClientRect').mockReturnValue({
+      left: 0,
+      width: 100,
+    } as DOMRect);
+    const pushStateSpy = vi.spyOn(window.history, 'pushState');
+
+    // When: the active tab is dropped before the first tab.
+    fireEvent.dragStart(items[1], { dataTransfer });
+    const dropEvent = createEvent.drop(items[0]);
+    Object.defineProperty(dropEvent, 'clientX', { value: 25 });
+    Object.defineProperty(dropEvent, 'dataTransfer', { value: dataTransfer });
+    fireEvent(items[0], dropEvent);
+
+    // Then: only the visible tab order changes.
+    expect(
+      [...container.querySelectorAll<HTMLLIElement>('.repository-tab-item')].map(
+        (item) => item.querySelector('.repository-tab-label')?.textContent,
+      ),
+    ).toEqual(['repo-b', 'my-app']);
+    expect(window.location.pathname).toBe('/repos/repo-b');
+    expect(pushStateSpy).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'repo-b' }).getAttribute('aria-current')).toBe(
+      'page',
+    );
   });
 });

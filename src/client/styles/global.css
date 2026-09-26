@@ -212,6 +212,7 @@ button.app-brand-home {
 }
 
 .repository-tab-item {
+  position: relative;
   display: flex;
   align-items: center;
   flex: 1 1 0;
@@ -219,6 +220,30 @@ button.app-brand-home {
   border-right: 1px solid var(--border-color);
   background-color: var(--header-bg);
   color: #8b949e;
+}
+
+.repository-tab-item.is-dragging {
+  opacity: 0.5;
+}
+
+/* The active tab uses box-shadow for its underline, so the drop line is separate. */
+.repository-tab-item.is-drop-before::before,
+.repository-tab-item.is-drop-after::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--accent-color);
+  pointer-events: none;
+}
+
+.repository-tab-item.is-drop-before::before {
+  left: 0;
+}
+
+.repository-tab-item.is-drop-after::before {
+  right: 0;
 }
 
 .repository-tab-item:hover {
