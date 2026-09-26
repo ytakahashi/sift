@@ -190,4 +190,67 @@ describe('useRepositoryTabs', () => {
     expect(next).toBeNull();
     expect(result.current.tabs).toBe(before);
   });
+
+  it('moves tabs before and after another tab using the latest order', () => {
+    // Given: two tabs are open.
+    const { result } = renderHook(() => useRepositoryTabs());
+    act(() => {
+      result.current.openTab('repo-a');
+      result.current.openTab('repo-b');
+    });
+
+    // When: a new tab opens before a move, then moves are made in both directions.
+    act(() => {
+      result.current.openTab('repo-c');
+      result.current.moveTab('repo-c', 'repo-a', 'before');
+    });
+    expect(result.current.tabs.map((tab) => tab.id)).toEqual(['repo-c', 'repo-a', 'repo-b']);
+    act(() => {
+      result.current.moveTab('repo-c', 'repo-b', 'after');
+    });
+
+    // Then: each move resolves against the current tab array.
+    expect(result.current.tabs.map((tab) => tab.id)).toEqual(['repo-a', 'repo-b', 'repo-c']);
+  });
+
+  it('keeps the tabs reference for unchanged and unknown moves', () => {
+    // Given: two tabs are open.
+    const { result } = renderHook(() => useRepositoryTabs());
+    act(() => {
+      result.current.openTab('repo-a');
+      result.current.openTab('repo-b');
+    });
+    const before = result.current.tabs;
+
+    // When: the move is already satisfied or either id is unknown.
+    act(() => {
+      result.current.moveTab('repo-a', 'repo-b', 'before');
+      result.current.moveTab('repo-a', 'repo-missing', 'after');
+      result.current.moveTab('repo-missing', 'repo-b', 'before');
+    });
+
+    // Then: there is no state change.
+    expect(result.current.tabs).toBe(before);
+  });
+
+  it('uses the reordered left neighbor when closing a tab', () => {
+    // Given: three tabs are open and the last tab is moved to the front.
+    const { result } = renderHook(() => useRepositoryTabs());
+    act(() => {
+      result.current.openTab('repo-a');
+      result.current.openTab('repo-b');
+      result.current.openTab('repo-c');
+      result.current.moveTab('repo-c', 'repo-a', 'before');
+    });
+
+    // When: the middle tab is closed.
+    let neighbor: string | null = null;
+    act(() => {
+      neighbor = result.current.closeTab('repo-a');
+    });
+
+    // Then: the tab now shown to its left is selected.
+    expect(neighbor).toBe('repo-c');
+    expect(result.current.tabs.map((tab) => tab.id)).toEqual(['repo-c', 'repo-b']);
+  });
 });

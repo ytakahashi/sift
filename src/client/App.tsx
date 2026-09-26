@@ -9,7 +9,7 @@ interface AppProps {
 }
 
 function App({ dependencies }: AppProps): ReactElement {
-  const { route, tabs, navigateToSelection, selectTab, closeTab, setTabName } =
+  const { route, tabs, navigateToSelection, selectTab, closeTab, moveTab, setTabName } =
     useRepositoryTabNavigation();
 
   if (route.type === 'selection') {
@@ -25,6 +25,7 @@ function App({ dependencies }: AppProps): ReactElement {
       tabs={tabs}
       onSelectTab={selectTab}
       onCloseTab={closeTab}
+      onMoveTab={moveTab}
       onRepositoryResolved={setTabName}
     />
   );

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type { RepositoryTab } from '../../presentation/repository-tabs/repository-tab';
+import { moveItem, type DropPosition } from '../../presentation/reorder/reorder';
 
 export interface UseRepositoryTabsResult {
   tabs: RepositoryTab[];
@@ -8,6 +9,8 @@ export interface UseRepositoryTabsResult {
   setTabName: (id: RepositoryId, name: string) => void;
   /** Removes the tab and returns the next active id (left → right neighbor), or null if no tab remains. */
   closeTab: (id: RepositoryId) => RepositoryId | null;
+  /** Moves a tab next to another tab; unknown ids and unchanged positions are ignored. */
+  moveTab: (sourceId: RepositoryId, targetId: RepositoryId, position: DropPosition) => void;
 }
 
 export function useRepositoryTabs(): UseRepositoryTabsResult {
@@ -52,10 +55,19 @@ export function useRepositoryTabs(): UseRepositoryTabsResult {
     [tabs],
   );
 
+  const moveTab = useCallback(
+    (sourceId: RepositoryId, targetId: RepositoryId, position: DropPosition): void => {
+      // A tab may open or close during a drag, so resolve ids against the latest order.
+      setTabs((prev) => moveItem(prev, (tab) => tab.id, sourceId, targetId, position));
+    },
+    [],
+  );
+
   return {
     tabs,
     openTab,
     setTabName,
     closeTab,
+    moveTab,
   };
 }

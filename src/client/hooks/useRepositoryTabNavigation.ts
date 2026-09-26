@@ -2,6 +2,7 @@ import { useCallback, useEffect } from 'react';
 import type { RepositoryId } from '../../domain/repository/repository';
 import { resolveCloseTabNavigation } from '../presentation/repository-tabs/close-tab-navigation';
 import type { RepositoryTab } from '../presentation/repository-tabs/repository-tab';
+import type { DropPosition } from '../presentation/reorder/reorder';
 import type { AppRoute } from '../presentation/routing/repository-route';
 import { useAppRoute } from './routing/useAppRoute';
 import { useRepositoryTabs } from './tabs/useRepositoryTabs';
@@ -12,6 +13,7 @@ export interface UseRepositoryTabNavigationResult {
   navigateToSelection: () => void;
   selectTab: (repoId: RepositoryId) => void;
   closeTab: (repoId: RepositoryId) => void;
+  moveTab: (sourceId: RepositoryId, targetId: RepositoryId, position: DropPosition) => void;
   setTabName: (repoId: RepositoryId, name: string) => void;
 }
 
@@ -22,7 +24,7 @@ export interface UseRepositoryTabNavigationResult {
  */
 export function useRepositoryTabNavigation(): UseRepositoryTabNavigationResult {
   const { navigate, navigateToSelection, route } = useAppRoute();
-  const { tabs, openTab, setTabName, closeTab } = useRepositoryTabs();
+  const { tabs, openTab, setTabName, closeTab, moveTab } = useRepositoryTabs();
 
   const activeRepoId: RepositoryId | null = route.type === 'repository' ? route.repoId : null;
 
@@ -79,6 +81,7 @@ export function useRepositoryTabNavigation(): UseRepositoryTabNavigationResult {
     navigateToSelection,
     selectTab,
     closeTab: handleCloseTab,
+    moveTab,
     setTabName,
   };
 }

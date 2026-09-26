@@ -137,6 +137,7 @@ function Page({
       tabs={[]}
       onSelectTab={vi.fn()}
       onCloseTab={vi.fn()}
+      onMoveTab={vi.fn()}
       onRepositoryResolved={vi.fn()}
     />
   );

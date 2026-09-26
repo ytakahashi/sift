@@ -3,6 +3,7 @@ import { ArrowLeftToLine, ArrowRightFromLine, ArrowRightToLine } from 'lucide-re
 import { isNoteEligibleFile } from '../../domain/notes/note-eligibility';
 import type { RepositoryId, RepositoryList } from '../../domain/repository/repository';
 import type { RepositoryTab } from '../presentation/repository-tabs/repository-tab';
+import type { DropPosition } from '../presentation/reorder/reorder';
 import { RepositoryTabs } from '../components/repository-tabs/RepositoryTabs';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
@@ -41,6 +42,7 @@ export interface RepositoryViewerPageProps {
   tabs: RepositoryTab[];
   onSelectTab: (repoId: RepositoryId) => void;
   onCloseTab: (repoId: RepositoryId) => void;
+  onMoveTab: (sourceId: RepositoryId, targetId: RepositoryId, position: DropPosition) => void;
   onRepositoryResolved: (repoId: RepositoryId, name: string) => void;
 }
 
@@ -52,6 +54,7 @@ export function RepositoryViewerPage({
   tabs,
   onSelectTab,
   onCloseTab,
+  onMoveTab,
   onRepositoryResolved,
 }: RepositoryViewerPageProps): ReactElement {
   const [isRepositorySidebarOpen, setIsRepositorySidebarOpen] = useState(false);
@@ -87,6 +90,7 @@ export function RepositoryViewerPage({
       tabs={tabs}
       onSelectTab={onSelectTab}
       onCloseTab={onCloseTab}
+      onMoveTab={onMoveTab}
       onRepositoryResolved={onRepositoryResolved}
     />
   );
@@ -106,6 +110,7 @@ interface RepositoryWorkspaceProps {
   tabs: RepositoryTab[];
   onSelectTab: (repoId: RepositoryId) => void;
   onCloseTab: (repoId: RepositoryId) => void;
+  onMoveTab: (sourceId: RepositoryId, targetId: RepositoryId, position: DropPosition) => void;
   onRepositoryResolved: (repoId: RepositoryId, name: string) => void;
 }
 
@@ -140,6 +145,7 @@ function RepositoryWorkspace({
   tabs,
   onSelectTab,
   onCloseTab,
+  onMoveTab,
   onRepositoryResolved,
 }: RepositoryWorkspaceProps): ReactElement {
   const [isFileListOpen, setIsFileListOpen] = useState(true);
@@ -298,7 +304,13 @@ function RepositoryWorkspace({
           </>
         }
       />
-      <RepositoryTabs tabs={tabs} activeId={repoId} onSelect={onSelectTab} onClose={onCloseTab} />
+      <RepositoryTabs
+        tabs={tabs}
+        activeId={repoId}
+        onSelect={onSelectTab}
+        onClose={onCloseTab}
+        onMove={onMoveTab}
+      />
       <main className="app-main" ref={appMainRef}>
         {notesPanel.isOpen && (
           <NotesListModal
