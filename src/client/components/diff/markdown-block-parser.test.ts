@@ -69,6 +69,25 @@ describe('parseMarkdownBlocks', () => {
     ]);
   });
 
+  it('extracts a GFM table as one top-level block', () => {
+    // Given
+    const text = ['| a | b |', '| - | - |', '| 1 | 2 |', '', 'After'].join('\n');
+
+    // When
+    const blocks = parseMarkdownBlocks(text);
+
+    // Then
+    expect(blocks).toEqual([
+      {
+        id: 'table-1-3',
+        startLine: 1,
+        endLine: 3,
+        raw: '| a | b |\n| - | - |\n| 1 | 2 |',
+      },
+      { id: 'paragraph-5-5', startLine: 5, endLine: 5, raw: 'After' },
+    ]);
+  });
+
   it('uses source offsets to preserve CRLF inside raw blocks', () => {
     // Given
     const text = 'first line\r\nsecond line\r\n\r\n# Heading\r\n';

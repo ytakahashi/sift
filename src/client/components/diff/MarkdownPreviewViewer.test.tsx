@@ -156,6 +156,51 @@ describe('MarkdownPreviewViewer', () => {
     expect(container.querySelector('hr')).not.toBeNull();
   });
 
+  it('renders GitHub Flavored Markdown extensions', () => {
+    // Given
+    const lines = [
+      '| Name | Value |',
+      '| ---- | ----: |',
+      '| a | 1 |',
+      '',
+      '~~removed~~',
+      '',
+      '- [x] done',
+      '- [ ] todo',
+      '',
+      'See https://example.com',
+    ];
+
+    // When
+    const { container } = render(
+      <MarkdownPreviewViewer
+        hunks={createFile({ hunks: [] }).hunks}
+        oldLines={lines}
+        newLines={lines}
+      />,
+    );
+
+    // Then
+    expect(Array.from(container.querySelectorAll('th')).map((cell) => cell.textContent)).toEqual([
+      'Name',
+      'Value',
+    ]);
+    expect(Array.from(container.querySelectorAll('td')).map((cell) => cell.textContent)).toEqual([
+      'a',
+      '1',
+    ]);
+    expect(container.querySelector('del')?.textContent).toBe('removed');
+    const checkboxes = Array.from(container.querySelectorAll<HTMLInputElement>('li input'));
+    expect(checkboxes.map((checkbox) => checkbox.checked)).toEqual([true, false]);
+    expect(checkboxes.every((checkbox) => checkbox.disabled)).toBe(true);
+    // Bare URLs become links too, so they must go through the same
+    // non-navigating placeholder as explicit Markdown links.
+    expect(container.querySelector('a')).toBeNull();
+    expect(screen.getByText('https://example.com').getAttribute('title')).toBe(
+      'https://example.com',
+    );
+  });
+
   it('does not interpret raw HTML or retain dangerous Markdown URLs', () => {
     // Given
     const lines = ['<img src="missing" onerror="alert(1)">', '', '[unsafe](javascript:alert(1))'];

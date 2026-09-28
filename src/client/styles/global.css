@@ -1221,6 +1221,36 @@ button.app-brand-home {
   border-radius: 0;
 }
 
+/* Block display lets a wide table scroll inside its block instead of widening
+   the whole preview pane. */
+.markdown-preview-block table {
+  display: block;
+  overflow-x: auto;
+  max-width: 100%;
+  border-collapse: collapse;
+}
+
+.markdown-preview-block th,
+.markdown-preview-block td {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid var(--border-color);
+}
+
+.markdown-preview-block th {
+  font-weight: 600;
+  background-color: var(--header-bg);
+}
+
+.markdown-preview-block .contains-task-list {
+  padding-left: 0;
+  list-style: none;
+}
+
+.markdown-preview-block .task-list-item input {
+  margin: 0 0.4rem 0 0;
+  vertical-align: middle;
+}
+
 .markdown-preview-link-placeholder {
   color: #58a6ff;
   text-decoration: underline dotted;

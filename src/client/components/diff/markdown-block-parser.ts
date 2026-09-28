@@ -1,10 +1,13 @@
 import { unified } from 'unified';
+import remarkGfm from 'remark-gfm';
 import remarkParse from 'remark-parse';
 import type { MarkdownBlock } from '../../../domain/diff/markdown-blocks';
 
 // This frozen shared instance handles parse-only calls. Consumers that add
 // transformation plugins must use createMarkdownProcessor to get a mutable clone.
-const frozenMarkdownProcessor = unified().use(remarkParse).freeze();
+// GFM is a syntax extension, not a transform: without it a table parses as one
+// paragraph, so it must live here to keep block extraction and rendering agreed.
+const frozenMarkdownProcessor = unified().use(remarkParse).use(remarkGfm).freeze();
 
 /**
  * Creates the shared Markdown syntax pipeline for both block extraction and
