@@ -44,4 +44,60 @@ describe('createApp', () => {
     expect(response.status).toBe(400);
     await expect(response.json()).resolves.toEqual({ error: 'A valid blob ID is required.' });
   });
+
+  it('rejects a browser-simple JSON action before resolving a repository', async () => {
+    // Given: the request body is valid JSON sent as text/plain
+    const readConfig = vi.fn();
+    const app = createApp({
+      repoWatchManager: {
+        broadcastNotesChanged: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+        subscribe: vi.fn().mockResolvedValue(undefined),
+      },
+      readConfig,
+    });
+
+    // When
+    const response = await app.request('/api/repositories/repo/actions/discard-all-working-files', {
+      method: 'POST',
+      headers: { host: '127.0.0.1:49321', 'Content-Type': 'text/plain' },
+      body: '{}',
+    });
+
+    // Then: the action route never gets as far as repository resolution
+    expect(response.status).toBe(415);
+    expect(readConfig).not.toHaveBeenCalled();
+  });
+
+  it('rejects a foreign Origin before changing repository configuration', async () => {
+    // Given
+    const addRepository = vi.fn();
+    const app = createApp({
+      repoWatchManager: {
+        broadcastNotesChanged: vi.fn(),
+        close: vi.fn().mockResolvedValue(undefined),
+        subscribe: vi.fn().mockResolvedValue(undefined),
+      },
+      repositoryConfigUpdater: {
+        addRepository,
+        removeRepository: vi.fn(),
+        reorderRepositories: vi.fn(),
+      },
+    });
+
+    // When
+    const response = await app.request('/api/repositories', {
+      method: 'POST',
+      headers: {
+        host: '127.0.0.1:49321',
+        Origin: 'http://attacker.example',
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ path: '/repo' }),
+    });
+
+    // Then
+    expect(response.status).toBe(403);
+    expect(addRepository).not.toHaveBeenCalled();
+  });
 });
