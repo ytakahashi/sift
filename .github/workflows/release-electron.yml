@@ -1,10 +1,25 @@
 name: Release Electron App
 
-# `release.yml` bumps the version, publishes to npm and creates a draft GitHub Release.
-# This workflow builds the signed and notarized macOS app for that tag and attaches it
-# to the same (still draft) Release.
+# Builds the signed and notarized macOS app. Two entry points:
+#
+# - workflow_call from `release.yml`: builds `github.sha` with the upcoming version applied, before
+#   anything is published, and hands the app over as a workflow artifact. `release.yml` attaches
+#   it to the GitHub Release once every build has succeeded.
+# - workflow_dispatch: rebuilds the app for an existing tag and attaches it to that (still draft)
+#   Release, e.g. when only the app build failed.
 
 on:
+  workflow_call:
+    inputs:
+      version:
+        description: Version to build, applied on top of the caller's commit
+        required: true
+        type: string
+      dry-run:
+        description: Dry run (build and verify only)
+        required: false
+        default: false
+        type: boolean
   workflow_dispatch:
     inputs:
       tag:
@@ -17,8 +32,9 @@ on:
         default: false
         type: boolean
 
+# `inputs.tag` is only set on workflow_dispatch and `inputs.version` only on workflow_call.
 concurrency:
-  group: release-electron-${{ inputs.tag }}
+  group: release-electron-${{ inputs.tag || inputs.version }}
 
 permissions:
   contents: write
@@ -30,10 +46,11 @@ jobs:
     timeout-minutes: 60
 
     steps:
+      # On workflow_call `github.sha` is the caller's commit, i.e. the one `release.yml` tags.
       - name: Checkout target ref
         uses: actions/checkout@v6
         with:
-          ref: ${{ inputs.tag }}
+          ref: ${{ inputs.tag || github.sha }}
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -47,7 +64,7 @@ jobs:
       # The input is free-form, so make sure it is a tag and that it matches
       # the version baked into the artifacts.
       - name: Verify tag
-        if: ${{ !inputs.dry-run }}
+        if: ${{ inputs.tag && !inputs.dry-run }}
         env:
           TAG: ${{ inputs.tag }}
         run: |
@@ -60,6 +77,14 @@ jobs:
             echo "Tag $TAG does not match package version v$VERSION"
             exit 1
           fi
+
+      # The version commit does not exist yet, so reproduce its only change here.
+      # electron-builder takes the app version and artifact names from package.json.
+      - name: Apply release version
+        if: ${{ inputs.version }}
+        env:
+          VERSION: ${{ inputs.version }}
+        run: npm pkg set version="$VERSION"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -103,21 +128,21 @@ jobs:
           spctl --assess --verbose --type exec "$APP_PATH"
           xcrun stapler validate "$APP_PATH"
 
+      # `release.yml` downloads this artifact by name to attach it to the Release.
+      - name: Upload assets as workflow artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: sift-macos
+          path: dist/*.dmg
+          if-no-files-found: error
+          retention-days: 1
+
       # Without `draft: true` the action publishes the draft Release after uploading.
       - name: Upload assets to GitHub Release
-        if: ${{ !inputs.dry-run }}
+        if: ${{ inputs.tag && !inputs.dry-run }}
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ inputs.tag }}
           draft: true
           fail_on_unmatched_files: true
           files: dist/*.dmg
-
-      - name: Upload assets as workflow artifact
-        if: ${{ inputs.dry-run }}
-        uses: actions/upload-artifact@v7
-        with:
-          name: sift-macos-dry-run
-          path: dist/*.dmg
-          if-no-files-found: error
-          retention-days: 1

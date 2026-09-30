@@ -1,5 +1,9 @@
 name: Release
 
+# Releases the npm package and the macOS app in one run. Everything is built and verified before
+# anything is published, so a failing app build (signing, notarization) cannot leave a published
+# npm version or a pushed tag without its app behind.
+
 on:
   workflow_dispatch:
     inputs:
@@ -13,7 +17,7 @@ on:
           - minor
           - patch
       dry-run:
-        description: 'Dry run (skip npm publish upload, git push, and GitHub Release)'
+        description: 'Dry run (skip npm upload, git push, and GitHub Release)'
         required: false
         default: false
         type: boolean
@@ -22,12 +26,74 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
 
 permissions:
-  contents: write
-  id-token: write
+  contents: read
 
 jobs:
-  build:
+  prepare:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.package_version.outputs.VERSION }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v6
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version: 24
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Only computes the version; the commit and tag are created by the publish job.
+      - name: Set version
+        env:
+          RELEASE_TYPE: ${{ inputs.release-type }}
+        run: pnpm version "$RELEASE_TYPE" --no-git-tag-version
+
+      - name: Get version
+        id: package_version
+        run: |
+          VERSION=$(npm pkg get version | tr -d '"')
+          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Check code quality
+        run: |
+          pnpm run format
+          pnpm run lint
+          pnpm run typecheck
+          pnpm run test
+
+      - name: Build
+        run: pnpm run build:npm
+
+      - name: Check package
+        run: pnpm run package:check
+
+  app:
+    needs: prepare
+    # Must cover what release-electron.yml declares, even though only its workflow_dispatch path
+    # writes to the Release.
+    permissions:
+      contents: write
+    uses: ./.github/workflows/release-electron.yml
+    with:
+      version: ${{ needs.prepare.outputs.version }}
+      dry-run: ${{ inputs.dry-run }}
+    # The signing secrets live in the `release-macos` environment, which the called job declares.
+    # Environment secrets still resolve to empty strings there unless the caller inherits secrets.
+    secrets: inherit
+
+  publish:
+    needs: [prepare, app]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -49,47 +115,54 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
+      # The app job built this same commit with the version applied by hand, so the tag points at
+      # exactly what was built as long as both jobs arrive at the same version.
       - name: Set version
-        run: pnpm version ${{ github.event.inputs.release-type }}
-
-      - name: Get version
-        id: package_version
+        env:
+          RELEASE_TYPE: ${{ inputs.release-type }}
+          EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
+          pnpm version "$RELEASE_TYPE"
           VERSION=$(npm pkg get version | tr -d '"')
-          echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
-
-      - name: Check code quality
-        run: |
-          pnpm run format
-          pnpm run lint
-          pnpm run typecheck
-          pnpm run test
+          if [ "$VERSION" != "$EXPECTED_VERSION" ]; then
+            echo "Version $VERSION does not match the built version $EXPECTED_VERSION"
+            exit 1
+          fi
 
       - name: Build
         run: pnpm run build:npm
 
-      - name: Check package
-        run: pnpm run package:check
-
       - name: Publish to npm
+        env:
+          DRY_RUN: ${{ inputs.dry-run }}
         run: |
-          if [ "${{ github.event.inputs.dry-run }}" = "true" ]; then
+          if [ "$DRY_RUN" = "true" ]; then
             npm publish --access public --ignore-scripts --dry-run
           else
             npm publish --access public --ignore-scripts
           fi
 
       - name: Push changes
-        if: github.event.inputs.dry-run != 'true'
+        if: ${{ !inputs.dry-run }}
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           git push origin HEAD:${{ github.ref_name }}
-          git push origin v${{ steps.package_version.outputs.VERSION }}
+          git push origin "v$VERSION"
 
+      - name: Download app assets
+        uses: actions/download-artifact@v8
+        with:
+          name: sift-macos
+          path: dist
+
+      # Without `draft: true` the action publishes the Release right away.
       - name: Create Release
-        if: github.event.inputs.dry-run != 'true'
-        id: create_release
+        if: ${{ !inputs.dry-run }}
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: v${{ steps.package_version.outputs.VERSION }}
+          tag_name: v${{ needs.prepare.outputs.version }}
           draft: true
           generate_release_notes: true
+          fail_on_unmatched_files: true
+          files: dist/*.dmg
