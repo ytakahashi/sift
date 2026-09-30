@@ -84,6 +84,9 @@ jobs:
     with:
       version: ${{ needs.prepare.outputs.version }}
       dry-run: ${{ inputs.dry-run }}
+    # The signing secrets live in the `release-macos` environment, which the called job declares.
+    # Environment secrets still resolve to empty strings there unless the caller inherits secrets.
+    secrets: inherit
 
   publish:
     needs: [prepare, app]
