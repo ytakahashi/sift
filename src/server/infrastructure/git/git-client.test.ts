@@ -56,9 +56,13 @@ describe('GitClient.hashObjects', () => {
 
     // Then: the batch runs in the repository root with paths on stdin
     expect(spawn).toHaveBeenCalledTimes(1);
-    expect(spawn).toHaveBeenCalledWith('git', ['hash-object', '--stdin-paths'], {
-      cwd: '/repo/root',
-    });
+    expect(spawn).toHaveBeenCalledWith(
+      'git',
+      ['--literal-pathspecs', 'hash-object', '--stdin-paths'],
+      {
+        cwd: '/repo/root',
+      },
+    );
     expect(child.stdin.written).toBe('a.ts\nb/c.ts\n');
     expect(child.stdin.ended).toBe(true);
   });
@@ -138,9 +142,11 @@ describe('GitClient.getObjectType', () => {
 
       // Then
       await expect(promise).resolves.toBe(type);
-      expect(spawn).toHaveBeenCalledWith('git', ['cat-file', '--batch-check=%(objecttype)'], {
-        cwd: '/repo/root',
-      });
+      expect(spawn).toHaveBeenCalledWith(
+        'git',
+        ['--literal-pathspecs', 'cat-file', '--batch-check=%(objecttype)'],
+        { cwd: '/repo/root' },
+      );
       expect(child.stdin.written).toBe('abc123\n');
       expect(child.stdin.ended).toBe(true);
     },
@@ -218,7 +224,6 @@ describe('GitClient index content commands', () => {
     // Then
     expect(entry).toEqual({ mode: '100755', blobId: 'deadbeef' });
     expect(runGitCommand).toHaveBeenCalledWith([
-      '--literal-pathspecs',
       'ls-files',
       '--stage',
       '-z',
@@ -291,6 +296,34 @@ describe('GitClient index content commands', () => {
   });
 });
 
+describe('GitClient.runGitCommand', () => {
+  type ExecFileCallback = (error: Error | null, result: { stdout: string; stderr: string }) => void;
+
+  it('passes literal pathspecs to Git before the command', async () => {
+    // Given: a path whose brackets would otherwise match another filename
+    vi.mocked(execFile).mockImplementation(((
+      _file: string,
+      _args: string[],
+      _options: unknown,
+      callback: ExecFileCallback,
+    ) => {
+      callback(null, { stdout: '', stderr: '' });
+    }) as unknown as typeof execFile);
+    const client = new GitClient('/repo/root');
+
+    // When
+    await client.runGitCommand(['add', '--', '/repo/root/app/[id]/page.tsx']);
+
+    // Then
+    expect(execFile).toHaveBeenCalledWith(
+      'git',
+      ['--literal-pathspecs', 'add', '--', '/repo/root/app/[id]/page.tsx'],
+      expect.objectContaining({ cwd: '/repo/root' }),
+      expect.any(Function),
+    );
+  });
+});
+
 describe('GitClient.getBlobContent', () => {
   type ExecFileCallback = (error: Error | null, result: { stdout: Buffer; stderr: Buffer }) => void;
 
@@ -320,7 +353,7 @@ describe('GitClient.getBlobContent', () => {
     expect(result).toEqual(stdout);
     expect(execFile).toHaveBeenCalledWith(
       'git',
-      ['cat-file', '-p', 'blob-id'],
+      ['--literal-pathspecs', 'cat-file', '-p', 'blob-id'],
       expect.objectContaining({ encoding: 'buffer' }),
       expect.any(Function),
     );
@@ -343,7 +376,7 @@ describe('GitClient.getBlobContent', () => {
 
     // When / Then
     await expect(client.getBlobContent('blob-id')).rejects.toThrow(
-      'Git command failed: git cat-file -p blob-id',
+      'Git command failed: git --literal-pathspecs cat-file -p blob-id',
     );
   });
 });
