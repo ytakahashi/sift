@@ -3,6 +3,14 @@ import { promisify } from 'node:util';
 
 const execFileAsync = promisify(execFile);
 
+// Paths passed after `--` must remain literal: Git otherwise expands names
+// such as Next.js `[id]` and can mutate unrelated files in workspace actions.
+// This also disables pathspec magic (e.g. `:(exclude)`, `:(glob)`), so a
+// command that needs it cannot go through this client as-is.
+function withLiteralPathspecs(args: string[]): string[] {
+  return ['--literal-pathspecs', ...args];
+}
+
 export type GitObjectType = 'blob' | 'tree' | 'commit' | 'tag';
 
 export class GitClient {
@@ -23,9 +31,10 @@ export class GitClient {
     args: string[],
     options?: { encoding: 'buffer' },
   ): Promise<string | Buffer> {
+    const gitArgs = withLiteralPathspecs(args);
     try {
       if (options?.encoding === 'buffer') {
-        const { stdout } = await execFileAsync('git', args, {
+        const { stdout } = await execFileAsync('git', gitArgs, {
           cwd: this.repoRoot,
           maxBuffer: 10 * 1024 * 1024, // 10MB
           encoding: 'buffer',
@@ -33,14 +42,14 @@ export class GitClient {
         return stdout;
       }
 
-      const { stdout } = await execFileAsync('git', args, {
+      const { stdout } = await execFileAsync('git', gitArgs, {
         cwd: this.repoRoot,
         maxBuffer: 10 * 1024 * 1024, // 10MB
       });
       return stdout;
     } catch (error: unknown) {
       const msg = error instanceof Error ? error.message : String(error);
-      throw new Error(`Git command failed: git ${args.join(' ')}\n${msg}`, { cause: error });
+      throw new Error(`Git command failed: git ${gitArgs.join(' ')}\n${msg}`, { cause: error });
     }
   }
 
@@ -77,14 +86,7 @@ export class GitClient {
   }
 
   async getIndexEntry(path: string): Promise<{ mode: string; blobId: string } | null> {
-    const output = await this.runGitCommand([
-      '--literal-pathspecs',
-      'ls-files',
-      '--stage',
-      '-z',
-      '--',
-      path,
-    ]);
+    const output = await this.runGitCommand(['ls-files', '--stage', '-z', '--', path]);
 
     for (const record of output.split('\0')) {
       if (record === '') {
@@ -172,7 +174,8 @@ export class GitClient {
 
   private async execGitWithInput(args: string[], input: string): Promise<string> {
     return await new Promise<string>((resolvePromise, rejectPromise) => {
-      const child = spawn('git', args, { cwd: this.repoRoot });
+      const gitArgs = withLiteralPathspecs(args);
+      const child = spawn('git', gitArgs, { cwd: this.repoRoot });
       let stdout = '';
       let stderr = '';
 
@@ -183,11 +186,13 @@ export class GitClient {
         stderr += chunk.toString('utf8');
       });
       child.on('error', (error: Error) => {
-        rejectPromise(new Error(`Git command failed: git ${args.join(' ')}\n${error.message}`));
+        rejectPromise(new Error(`Git command failed: git ${gitArgs.join(' ')}\n${error.message}`));
       });
       child.on('close', (code: number | null) => {
         if (code !== 0) {
-          rejectPromise(new Error(`Git command failed: git ${args.join(' ')}\n${stderr.trim()}`));
+          rejectPromise(
+            new Error(`Git command failed: git ${gitArgs.join(' ')}\n${stderr.trim()}`),
+          );
           return;
         }
         resolvePromise(stdout);
