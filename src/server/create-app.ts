@@ -6,6 +6,7 @@ import { createHealthRoutes } from './routes/health';
 import { createDiffRoutes } from './routes/diff';
 import { createActionRoutes } from './routes/actions';
 import { createHostGuard } from './routes/host-guard';
+import { createCsrfGuard } from './routes/csrf-guard';
 import { createNotesRoutes } from './routes/notes';
 import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
@@ -54,6 +55,8 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
   app.use('*', logger());
   // DNS rebinding protection for every API and SSE route.
   app.use('*', createHostGuard());
+  // CSRF protection for state-changing API requests.
+  app.use('/api/*', createCsrfGuard());
 
   // Mount API routes
   app.route('/api/health', createHealthRoutes({ version: APP_INFO.version }));
