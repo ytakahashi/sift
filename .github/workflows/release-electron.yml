@@ -48,7 +48,7 @@ jobs:
     steps:
       # On workflow_call `github.sha` is the caller's commit, i.e. the one `release.yml` tags.
       - name: Checkout target ref
-        uses: actions/checkout@v6
+        uses: actions/checkout@v7
         with:
           ref: ${{ inputs.tag || github.sha }}
 

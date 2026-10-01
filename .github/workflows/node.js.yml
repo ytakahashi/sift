@@ -9,7 +9,6 @@ on:
       - "main"
   pull_request:
 
-# macOS runners have a small concurrency limit, so drop superseded runs of the same pull request.
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
@@ -64,8 +63,6 @@ jobs:
 
       - run: pnpm install --frozen-lockfile
 
-      # electron-builder.dev.yml sets `identity: null`, so this needs no signing secrets and also
-      # runs on pull requests from forks.
       - run: pnpm run build:mac:dev
 
       # The output directory depends on the runner architecture (e.g. dist/mac-arm64), so search
