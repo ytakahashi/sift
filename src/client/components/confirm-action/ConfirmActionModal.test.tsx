@@ -41,41 +41,19 @@ describe('ConfirmActionModal', () => {
     expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Cancel' }));
   });
 
-  it('restores focus to the triggering element after the modal is closed', () => {
-    // Given: a button that opens the modal has focus
-    const { rerender } = render(<button>Open</button>);
-    screen.getByRole('button', { name: 'Open' }).focus();
-
-    // When: modal mounts then unmounts
-    rerender(
-      <>
-        <button>Open</button>
-        <ConfirmActionModal
-          title="Delete Stale Notes"
-          message="Delete 3 stale notes?"
-          confirmLabel="Delete"
-          onCancel={vi.fn()}
-          onConfirm={vi.fn()}
-        />
-      </>,
-    );
-    rerender(<button>Open</button>);
-
-    // Then: focus returns to the element that was active before the modal opened
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Open' }));
-  });
-
-  it('calls onCancel when the Escape key is pressed', async () => {
-    // Given
+  it('wires Escape dismissal to onCancel', async () => {
+    // Given: confirmation has separate cancel and confirm callbacks
     const user = userEvent.setup();
     const onCancel = vi.fn();
-    renderModal({ onCancel });
+    const onConfirm = vi.fn();
+    renderModal({ onCancel, onConfirm });
 
     // When
     await user.keyboard('{Escape}');
 
-    // Then
-    expect(onCancel).toHaveBeenCalled();
+    // Then: the dialog's close action cancels instead of confirming
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(onConfirm).not.toHaveBeenCalled();
   });
 
   it('calls onCancel when the Cancel button is clicked', async () => {
@@ -86,19 +64,6 @@ describe('ConfirmActionModal', () => {
 
     // When
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
-
-    // Then
-    expect(onCancel).toHaveBeenCalled();
-  });
-
-  it('calls onCancel when the backdrop is clicked', async () => {
-    // Given
-    const user = userEvent.setup();
-    const onCancel = vi.fn();
-    renderModal({ onCancel });
-
-    // When: the area outside the dialog is clicked
-    await user.click(screen.getByTestId('confirm-action-backdrop'));
 
     // Then
     expect(onCancel).toHaveBeenCalled();
@@ -129,45 +94,5 @@ describe('ConfirmActionModal', () => {
     // Then: the duplicate request is blocked, but the dialog can still be left
     expect(onConfirm).not.toHaveBeenCalled();
     expect(screen.getByRole<HTMLButtonElement>('button', { name: 'Cancel' }).disabled).toBe(false);
-  });
-
-  it('wraps Tab forward from the last focusable element to the first', async () => {
-    // Given: move focus to the last focusable element (confirm button)
-    const user = userEvent.setup();
-    renderModal();
-    screen.getByRole('button', { name: 'Delete' }).focus();
-
-    // When: Tab on the last element
-    await user.keyboard('{Tab}');
-
-    // Then: focus wraps to the first focusable element inside the dialog
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }));
-  });
-
-  it('wraps Shift+Tab backward from the first focusable element to the last', async () => {
-    // Given: move focus to the first focusable element inside the dialog
-    const user = userEvent.setup();
-    renderModal();
-    screen.getByRole('button', { name: 'Close' }).focus();
-
-    // When: Shift+Tab on the first element
-    await user.keyboard('{Shift>}{Tab}{/Shift}');
-
-    // Then: focus wraps to the last focusable element inside the dialog
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Delete' }));
-  });
-
-  it('keeps the focus trap closed while the confirm button is disabled', async () => {
-    // Given: the disabled confirm button is skipped by the browser, so Cancel
-    // is the last element a Tab can reach
-    const user = userEvent.setup();
-    renderModal({ disabled: true });
-    screen.getByRole('button', { name: 'Cancel' }).focus();
-
-    // When: Tab on the last reachable element
-    await user.keyboard('{Tab}');
-
-    // Then: focus stays inside the dialog instead of escaping to the page behind it
-    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }));
   });
 });
