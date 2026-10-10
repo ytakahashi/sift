@@ -12,6 +12,9 @@ import { createRepositoryRoutes } from './routes/repositories';
 import { createWatchRoutes } from './routes/watch';
 import { createFileContentRoutes } from './routes/file-content';
 import { createBlobContentRoutes } from './routes/blob-content';
+import { createFilesystemRoutes } from './routes/filesystem';
+import type { DirectoryBrowser } from './services/directory-browser';
+import { createDirectoryBrowser } from './infrastructure/filesystem/directory-browser-impl';
 import type { NotesStore } from './services/notes-store';
 import type { RepositoryConfigUpdater } from './services/repository-config';
 import type { RepoWatchManager } from './watch/repo-watch-manager';
@@ -35,6 +38,7 @@ import { WorkspaceActionServiceImpl } from './infrastructure/workspace-action-se
 import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 
 export interface CreateAppOptions {
+  directoryBrowser?: DirectoryBrowser;
   repoWatchManager: RepoWatchManager;
   readConfig?: () => Promise<RepositoryConfigReadResult>;
   repositoryConfigUpdater?: RepositoryConfigUpdater;
@@ -60,6 +64,12 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
 
   // Mount API routes
   app.route('/api/health', createHealthRoutes({ version: APP_INFO.version }));
+  app.route(
+    '/api/filesystem',
+    createFilesystemRoutes({
+      directoryBrowser: options.directoryBrowser ?? createDirectoryBrowser(),
+    }),
+  );
   app.route(
     '/api/repositories',
     createRepositoryRoutes({

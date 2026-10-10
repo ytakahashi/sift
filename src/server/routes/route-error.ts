@@ -13,6 +13,7 @@ import {
   RepositoryValidationError,
 } from '../services/repository-resolver';
 import type { ErrorResponseCode } from '../contract/error-codes';
+import { DirectoryBrowseError } from '../services/directory-browser';
 
 function noteTargetResolutionCode(kind: NoteTargetResolutionError['kind']): ErrorResponseCode {
   switch (kind) {
@@ -33,6 +34,9 @@ function noteTargetResolutionCode(kind: NoteTargetResolutionError['kind']): Erro
 }
 
 export function handleRouteError(c: Context<Env>, error: unknown): Response {
+  if (error instanceof DirectoryBrowseError) {
+    return c.json({ error: error.message }, error.statusCode);
+  }
   if (error instanceof RepositoryConfigResolutionError) {
     return c.json({ error: error.message }, error.kind === 'missing' ? 404 : 400);
   }

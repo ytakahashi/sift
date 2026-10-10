@@ -1,8 +1,103 @@
+import { readdir, stat } from 'node:fs/promises';
+import { homedir } from 'node:os';
 import { describe, expect, it, vi } from 'vitest';
 import { APP_INFO } from './app-info';
 import { createApp } from './create-app';
 
+vi.mock('node:fs/promises', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:fs/promises')>()),
+  readdir: vi.fn(),
+  stat: vi.fn(),
+}));
+vi.mock('node:os', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('node:os')>()),
+  homedir: vi.fn().mockReturnValue('/home/user'),
+}));
+
 describe('createApp', () => {
+  it('mounts the filesystem route with the injected browser', async () => {
+    // Given
+    const listing = {
+      path: '/repositories',
+      parentPath: '/',
+      entries: [],
+      isGitRepository: false,
+      truncated: false,
+    };
+    const listDirectories = vi.fn().mockResolvedValue(listing);
+    const readConfig = vi.fn();
+    const app = createApp({
+      repoWatchManager: {
+        broadcastNotesChanged: vi.fn(),
+        close: vi.fn(),
+        subscribe: vi.fn(),
+      },
+      readConfig,
+      directoryBrowser: { listDirectories },
+    });
+
+    // When
+    const response = await app.request(
+      '/api/filesystem/directories?path=%2Frepositories&showHidden=true',
+      {
+        headers: { host: 'localhost' },
+      },
+    );
+
+    // Then: browsing is independent of registered repository configuration
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual(listing);
+    expect(listDirectories).toHaveBeenCalledExactlyOnceWith('/repositories', { showHidden: true });
+    expect(readConfig).not.toHaveBeenCalled();
+  });
+
+  it('wires the default filesystem adapter without real I/O', async () => {
+    // Given: only process boundaries are mocked; the route and adapter are real
+    vi.mocked(readdir).mockResolvedValueOnce([]);
+    vi.mocked(stat).mockRejectedValueOnce(Object.assign(new Error('missing'), { code: 'ENOENT' }));
+    const app = createApp({
+      repoWatchManager: { broadcastNotesChanged: vi.fn(), close: vi.fn(), subscribe: vi.fn() },
+    });
+
+    // When
+    const response = await app.request('/api/filesystem/directories', {
+      headers: { host: 'localhost' },
+    });
+
+    // Then
+    expect(response.status).toBe(200);
+    await expect(response.json()).resolves.toEqual({
+      path: '/home/user',
+      parentPath: '/home',
+      entries: [],
+      isGitRepository: false,
+      truncated: false,
+    });
+    expect(homedir).toHaveBeenCalled();
+    expect(readdir).toHaveBeenCalledWith('/home/user', { withFileTypes: true });
+  });
+
+  it.each(['attacker.example', undefined])(
+    'rejects browsing with Host %s before filesystem access',
+    async (host) => {
+      // Given
+      const listDirectories = vi.fn();
+      const app = createApp({
+        repoWatchManager: { broadcastNotesChanged: vi.fn(), close: vi.fn(), subscribe: vi.fn() },
+        directoryBrowser: { listDirectories },
+      });
+
+      // When
+      const response = await app.request('/api/filesystem/directories', {
+        headers: host === undefined ? {} : { host },
+      });
+
+      // Then
+      expect(response.status).toBe(403);
+      expect(listDirectories).not.toHaveBeenCalled();
+    },
+  );
+
   it('serves the running package version on the health route', async () => {
     // Given
     const app = createApp({
