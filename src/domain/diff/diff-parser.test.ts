@@ -2,6 +2,98 @@ import { describe, it, expect } from 'vitest';
 import { parseDiff } from './diff-parser';
 
 describe('parseDiff', () => {
+  it('preserves header-like hunk content and line numbers', () => {
+    // Given: changed lines whose diff prefixes make them look like file headers
+    const raw = [
+      'diff --git a/query.sql b/query.sql',
+      '--- a/query.sql',
+      '+++ b/query.sql',
+      '@@ -1,3 +1,3 @@',
+      ' select 1;',
+      '--- old comment',
+      '+++ new comment',
+      ' select 2;',
+      '@@ -10 +10 @@',
+      '--- another comment',
+      '+++ another comment',
+    ].join('\n');
+
+    // When: parsing both hunks
+    const [file] = parseDiff(raw, 'working');
+
+    // Then: header-like lines consume their respective line numbers
+    expect(file.hunks).toHaveLength(2);
+    expect(file.hunks[0].lines).toMatchObject([
+      { type: 'context', content: 'select 1;', oldLineNumber: 1, newLineNumber: 1 },
+      { type: 'delete', content: '-- old comment', oldLineNumber: 2 },
+      { type: 'add', content: '++ new comment', newLineNumber: 2 },
+      { type: 'context', content: 'select 2;', oldLineNumber: 3, newLineNumber: 3 },
+    ]);
+    expect(file.hunks[1].lines).toMatchObject([
+      { type: 'delete', content: '-- another comment', oldLineNumber: 10 },
+      { type: 'add', content: '++ another comment', newLineNumber: 10 },
+    ]);
+  });
+
+  it('treats empty lines inside a hunk as blank context lines', () => {
+    // Given: a diff generated with diff.suppressBlankEmpty, which emits blank context lines as ""
+    const raw = [
+      'diff --git a/a.txt b/a.txt',
+      '--- a/a.txt',
+      '+++ b/a.txt',
+      '@@ -1,3 +1,3 @@',
+      ' a',
+      '',
+      '-b',
+      '+B',
+      '@@ -20 +20 @@',
+      '-x',
+      '+X',
+    ].join('\n');
+
+    // When: parsing the diff
+    const [file] = parseDiff(raw, 'working');
+
+    // Then: the empty line counts toward the first hunk, so the second hunk stays separate
+    expect(file.hunks).toHaveLength(2);
+    expect(file.hunks[0].lines).toMatchObject([
+      { type: 'context', content: 'a', oldLineNumber: 1, newLineNumber: 1 },
+      { type: 'context', content: '', oldLineNumber: 2, newLineNumber: 2 },
+      { type: 'delete', content: 'b', oldLineNumber: 3 },
+      { type: 'add', content: 'B', newLineNumber: 3 },
+    ]);
+    expect(file.hunks[1].lines).toMatchObject([
+      { type: 'delete', content: 'x', oldLineNumber: 20 },
+      { type: 'add', content: 'X', newLineNumber: 20 },
+    ]);
+  });
+
+  it.each([
+    { header: '@@ -0,0 +1 @@', body: '+++ comment', type: 'add', content: '++ comment' },
+    { header: '@@ -1 +0,0 @@', body: '--- comment', type: 'delete', content: '-- comment' },
+  ])(
+    'parses header-like content with an empty side: $header',
+    ({ header, body, type, content }) => {
+      // Given: a hunk with no lines on one side and header-like content on the other
+      const raw = [
+        'diff --git a/file.txt b/file.txt',
+        '--- a/file.txt',
+        '+++ b/file.txt',
+        header,
+        body,
+        '--- a/ignored.txt',
+        '+++ b/ignored.txt',
+      ].join('\n');
+
+      // When: parsing the diff
+      const [file] = parseDiff(raw, 'working');
+
+      // Then: only the declared body belongs to the hunk; subsequent headers are excluded
+      expect(file.hunks[0].lines).toMatchObject([{ type, content }]);
+      expect(file.hunks[0].lines).toHaveLength(1);
+    },
+  );
+
   it('returns an empty array for an empty string', () => {
     // Given: an empty diff string
     const raw = '';

@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { createPatchForHunk } from './git-patch';
 import type { DiffFile, DiffHunk } from '../diff/types';
+import { parseDiff } from '../diff/diff-parser';
 
 function createFile(overrides: Partial<DiffFile> = {}): DiffFile {
   return {
@@ -40,6 +41,19 @@ function createHunk(overrides: Partial<DiffHunk> = {}): DiffHunk {
 }
 
 describe('createPatchForHunk', () => {
+  it('retains header-like content in a patch reconstructed from a parsed diff', () => {
+    // Given: a complete hunk containing header-like deletions and additions
+    const headers = ['diff --git a/query.sql b/query.sql', '--- a/query.sql', '+++ b/query.sql'];
+    const body = [' select 1;', '--- old comment', '+++ new comment', ' select 2;'];
+    const [file] = parseDiff([...headers, '@@ -1,3 +1,3 @@', ...body].join('\n'), 'working');
+
+    // When: reconstructing the patch used for staging or reverse application when unstaging
+    const patch = createPatchForHunk(file, file.hunks[0]);
+
+    // Then: the complete body is preserved and matches the declared hunk line counts
+    expect(patch).toBe([...headers, file.hunks[0].header, ...body, ''].join('\n'));
+  });
+
   it('generates a valid unified diff patch', () => {
     // Given: a file and a hunk with context, delete, and add lines
     const file = createFile();
