@@ -45,6 +45,51 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
 
     if (!currentFile) continue;
 
+    // Hunk content can look like file headers (e.g. deleting "-- comment").
+    // Use both declared line counts so additions still parse after deletions exhaust the old side.
+    if (
+      currentHunk &&
+      (oldLineNum < currentHunk.oldStart + currentHunk.oldLines ||
+        newLineNum < currentHunk.newStart + currentHunk.newLines)
+    ) {
+      if (line.startsWith('\\ No newline at end of file')) {
+        continue; // Meta line
+      }
+
+      const typeChar = line.charAt(0);
+      const isAdd = typeChar === '+';
+      const isDel = typeChar === '-';
+      // diff.suppressBlankEmpty emits empty context lines as "" instead of " ".
+      const isContext = typeChar === ' ' || line === '';
+
+      if (isAdd || isDel || isContext) {
+        let type: DiffLineType;
+        let oNum: number | undefined = undefined;
+        let nNum: number | undefined = undefined;
+
+        if (isAdd) {
+          type = 'add';
+          nNum = newLineNum++;
+        } else if (isDel) {
+          type = 'delete';
+          oNum = oldLineNum++;
+        } else {
+          type = 'context';
+          oNum = oldLineNum++;
+          nNum = newLineNum++;
+        }
+
+        currentHunk.lines.push({
+          id: `line-${currentHunk.id}-${currentHunk.lines.length}`,
+          type,
+          oldLineNumber: oNum,
+          newLineNumber: nNum,
+          content: line.substring(1),
+        });
+      }
+      continue;
+    }
+
     if (line.startsWith('new file mode ')) {
       currentFile.status = 'added';
       currentFile.kind = 'text'; // unless binary
@@ -115,43 +160,6 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
         oldLineNum = oldStart;
         newLineNum = newStart;
         continue;
-      }
-    }
-
-    if (currentHunk) {
-      if (line.startsWith('\\ No newline at end of file')) {
-        continue; // Meta line
-      }
-
-      const typeChar = line.charAt(0);
-      const isAdd = typeChar === '+';
-      const isDel = typeChar === '-';
-      const isContext = typeChar === ' ';
-
-      if (isAdd || isDel || isContext) {
-        let type: DiffLineType;
-        let oNum: number | undefined = undefined;
-        let nNum: number | undefined = undefined;
-
-        if (isAdd) {
-          type = 'add';
-          nNum = newLineNum++;
-        } else if (isDel) {
-          type = 'delete';
-          oNum = oldLineNum++;
-        } else {
-          type = 'context';
-          oNum = oldLineNum++;
-          nNum = newLineNum++;
-        }
-
-        currentHunk.lines.push({
-          id: `line-${currentHunk.id}-${currentHunk.lines.length}`,
-          type,
-          oldLineNumber: oNum,
-          newLineNumber: nNum,
-          content: line.substring(1),
-        });
       }
     }
   }
