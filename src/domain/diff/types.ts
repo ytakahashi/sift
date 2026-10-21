@@ -52,4 +52,7 @@ export type DiffLine = {
   oldLineNumber?: number;
   newLineNumber?: number;
   content: string;
+  // Set when Git emits "\ No newline at end of file" after this line. Patches rebuilt from the
+  // hunk must re-emit the marker, or `git apply` sees a trailing newline that does not exist.
+  noNewlineAtEnd?: boolean;
 };

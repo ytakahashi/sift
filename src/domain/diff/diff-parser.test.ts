@@ -351,13 +351,14 @@ describe('parseDiff', () => {
     expect(files[0].status).toBe('submodule');
   });
 
-  it('skips "No newline at end of file" marker', () => {
-    // Given: a raw diff string with "No newline at end of file" markers
+  it('flags the line preceding a "No newline at end of file" marker', () => {
+    // Given: a raw diff where both sides lack a trailing newline
     const raw = [
       'diff --git a/file.ts b/file.ts',
       '--- a/file.ts',
       '+++ b/file.ts',
-      '@@ -1,1 +1,1 @@',
+      '@@ -1,2 +1,2 @@',
+      ' keep',
       '-old',
       '\\ No newline at end of file',
       '+new',
@@ -367,11 +368,40 @@ describe('parseDiff', () => {
     // When: parsing the diff
     const files = parseDiff(raw, 'working');
 
-    // Then: it skips the marker lines and only contains delete/add lines
+    // Then: markers are not lines themselves; they flag only the lines they follow
     const lines = files[0].hunks[0].lines;
-    expect(lines).toHaveLength(2);
-    expect(lines[0].type).toBe('delete');
-    expect(lines[1].type).toBe('add');
+    expect(lines.map(({ type, content }) => ({ type, content }))).toEqual([
+      { type: 'context', content: 'keep' },
+      { type: 'delete', content: 'old' },
+      { type: 'add', content: 'new' },
+    ]);
+    expect(lines.map((line) => line.noNewlineAtEnd)).toEqual([undefined, true, true]);
+  });
+
+  it('flags a context line followed by a marker after the hunk counts are consumed', () => {
+    // Given: a file without a trailing newline, where the marker follows the last context line
+    const raw = [
+      'diff --git a/file.ts b/file.ts',
+      '--- a/file.ts',
+      '+++ b/file.ts',
+      '@@ -1,2 +1,2 @@',
+      '-old',
+      '+new',
+      ' last',
+      '\\ No newline at end of file',
+      'diff --git a/next.ts b/next.ts',
+    ].join('\n');
+
+    // When: parsing the diff
+    const files = parseDiff(raw, 'working');
+
+    // Then: the marker still applies to the hunk it belongs to
+    expect(files).toHaveLength(2);
+    expect(files[0].hunks[0].lines.at(-1)).toMatchObject({
+      type: 'context',
+      content: 'last',
+      noNewlineAtEnd: true,
+    });
   });
 
   it('handles hunk header without line count (defaults to 1)', () => {

@@ -54,6 +54,34 @@ describe('createPatchForHunk', () => {
     expect(patch).toBe([...headers, file.hunks[0].header, ...body, ''].join('\n'));
   });
 
+  it.each([
+    {
+      scenario: 'the old side lacks a trailing newline',
+      body: ['-old', '\\ No newline at end of file', '+new'],
+    },
+    {
+      scenario: 'the new side lacks a trailing newline',
+      body: ['-old', '+new', '\\ No newline at end of file'],
+    },
+    {
+      scenario: 'both sides share a last line without a trailing newline',
+      body: ['-old', '+new', ' last', '\\ No newline at end of file'],
+    },
+  ])('retains "No newline at end of file" markers when $scenario', ({ body }) => {
+    // Given: a parsed hunk at the end of a file without a trailing newline
+    const headers = ['diff --git a/file.txt b/file.txt', '--- a/file.txt', '+++ b/file.txt'];
+    const [file] = parseDiff(
+      [...headers, `@@ -1,${body.length - 2} +1,${body.length - 2} @@`, ...body].join('\n'),
+      'working',
+    );
+
+    // When: reconstructing the patch
+    const patch = createPatchForHunk(file, file.hunks[0]);
+
+    // Then: markers stay right after the lines they belong to, so git applies the hunk as-is
+    expect(patch).toBe([...headers, file.hunks[0].header, ...body, ''].join('\n'));
+  });
+
   it('generates a valid unified diff patch', () => {
     // Given: a file and a hunk with context, delete, and add lines
     const file = createFile();
