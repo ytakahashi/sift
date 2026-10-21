@@ -45,6 +45,16 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
 
     if (!currentFile) continue;
 
+    // "\ No newline at end of file" follows the last line of a side, possibly after both declared
+    // line counts are consumed, so it is checked before the hunk-range test below.
+    if (currentHunk && line.startsWith('\\')) {
+      const previousLine = currentHunk.lines.at(-1);
+      if (previousLine) {
+        previousLine.noNewlineAtEnd = true;
+      }
+      continue;
+    }
+
     // Hunk content can look like file headers (e.g. deleting "-- comment").
     // Use both declared line counts so additions still parse after deletions exhaust the old side.
     if (
@@ -52,10 +62,6 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
       (oldLineNum < currentHunk.oldStart + currentHunk.oldLines ||
         newLineNum < currentHunk.newStart + currentHunk.newLines)
     ) {
-      if (line.startsWith('\\ No newline at end of file')) {
-        continue; // Meta line
-      }
-
       const typeChar = line.charAt(0);
       const isAdd = typeChar === '+';
       const isDel = typeChar === '-';

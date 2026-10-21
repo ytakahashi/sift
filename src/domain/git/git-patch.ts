@@ -17,6 +17,9 @@ export function createPatchForHunk(file: DiffFile, hunk: DiffHunk): string {
     } else {
       patch += ` ${line.content}\n`;
     }
+    if (line.noNewlineAtEnd) {
+      patch += '\\ No newline at end of file\n';
+    }
   }
 
   return patch;
