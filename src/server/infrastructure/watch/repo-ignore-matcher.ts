@@ -1,6 +1,7 @@
 import { execFileSync } from 'node:child_process';
 import path from 'node:path';
 import type { MatchFunction } from 'chokidar';
+import type { GitMetadataWatchTargets } from './git-metadata-watch-targets';
 
 function isWithinPath(candidatePath: string, basePath: string): boolean {
   return candidatePath === basePath || candidatePath.startsWith(`${basePath}${path.sep}`);
@@ -41,38 +42,37 @@ function listIgnoredPaths(repoRoot: string): IgnoredPath[] {
   }
 }
 
-function resolveGitDirectory(repoRoot: string): string {
-  try {
-    const resolvedPath = execFileSync('git', ['rev-parse', '--git-path', '.'], {
-      cwd: repoRoot,
-      encoding: 'utf8',
-    }).trim();
-
-    return path.isAbsolute(resolvedPath) ? resolvedPath : path.join(repoRoot, resolvedPath);
-  } catch {
-    // Keep matcher setup best-effort like ignored path loading. The common
-    // layout fallback still prevents watching most internal Git churn.
-    return path.join(repoRoot, '.git');
-  }
-}
-
-export function createRepoIgnoreMatcher(repoRoot: string, watchPaths: string[]): MatchFunction {
+export function createRepoIgnoreMatcher(
+  repoRoot: string,
+  targets: GitMetadataWatchTargets,
+): MatchFunction {
   // Chokidar calls this for every candidate path under the watched roots.
   // The matcher ignores paths that cannot affect the displayed diff, while
-  // keeping explicit metadata watch paths active:
+  // keeping Git metadata that signals repository state changes active:
   //
-  // - `/repo/.git/objects/12/abcd...` => ignored; object database churn should
-  //   not schedule refreshes directly.
-  // - `/repo/.git/index` => not ignored when it is listed in watchPaths; this is
-  //   the primary signal for stage/unstage.
+  // - `/repo/.git` => not ignored; this metadata directory is watched so that
+  //   replacing `index` via rename stays visible.
+  // - `/repo/.git/index` => not ignored; this is the primary signal for
+  //   stage/unstage.
+  // - `/repo/.git/refs/heads/main` => not ignored; refs are watched recursively.
+  // - `/repo/.git/index.lock`, `/repo/.git/objects/12/abcd...` => ignored;
+  //   temporary locks and object database churn should not schedule refreshes.
+  // - `/common/.git/objects/...` for a linked worktree at `/linked` => ignored,
+  //   although it is outside repoRoot, because `/common/.git` is watched for
+  //   shared `packed-refs`.
+  // - `/tmp/custom/other` with `GIT_INDEX_FILE=/tmp/custom/index` => ignored;
+  //   `/tmp/custom` is watched only for the index replacement.
+  // - `/repo/src/file.ts` with `GIT_INDEX_FILE=/repo/custom-index` => judged
+  //   by the gitignore rules below; the index's parent is the worktree itself.
   // - `/repo/node_modules/pkg/index.js` => ignored when Git reports
   //   `node_modules/` as an ignored directory.
   // - `/repo/src/file.ts` => not ignored unless Git reports that exact path or
   //   one of its parent directories as ignored.
   // - `/external/file.ts` => not ignored here; chokidar should only pass these
   //   when the path was explicitly watched.
-  const allowedGitPaths = watchPaths.filter((watchPath) => watchPath !== repoRoot);
-  const gitDirectory = resolveGitDirectory(repoRoot);
+  //
+  // `targets.gitDirectories` always contains the current Git directory because
+  // HEAD lives directly under it, so no separate Git directory lookup is needed.
   const ignoredPaths = listIgnoredPaths(repoRoot);
 
   return (watchPath: string): boolean => {
@@ -82,16 +82,28 @@ export function createRepoIgnoreMatcher(repoRoot: string, watchPaths: string[]):
 
     const absolutePath = resolvePath(repoRoot, watchPath);
 
-    if (allowedGitPaths.some((allowedPath) => isWithinPath(absolutePath, allowedPath))) {
+    // Parent directories must be allowed only by exact match; allowing their
+    // descendants would also watch object database churn and temporary locks.
+    if (
+      targets.directories.includes(absolutePath) ||
+      targets.files.includes(absolutePath) ||
+      isWithinPath(absolutePath, targets.refsDirectory)
+    ) {
       return false;
     }
 
-    if (isWithinPath(absolutePath, gitDirectory)) {
+    // Git directories may live inside repoRoot (`.git`) or outside it (shared
+    // metadata of linked worktrees); their internals are ignored either way.
+    if (targets.gitDirectories.some((directory) => isWithinPath(absolutePath, directory))) {
       return true;
     }
 
     if (!isWithinPath(absolutePath, repoRoot)) {
-      return false;
+      // A metadata directory outside repoRoot (e.g. one holding a custom
+      // GIT_INDEX_FILE) is watched only for its metadata files. Inside repoRoot
+      // the same rule must not apply: a custom index may sit in the worktree,
+      // and ignoring its parent's descendants would hide every worktree edit.
+      return targets.directories.some((directory) => isWithinPath(absolutePath, directory));
     }
 
     return ignoredPaths.some((ignoredPath) => {

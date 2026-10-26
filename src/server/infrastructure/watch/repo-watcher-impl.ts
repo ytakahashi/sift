@@ -7,6 +7,7 @@ import path from 'node:path';
 import { promisify } from 'node:util';
 import type { RepoWatcher } from '../../watch/repo-watcher';
 import { createRepoIgnoreMatcher } from './repo-ignore-matcher';
+import type { GitMetadataWatchTargets } from './git-metadata-watch-targets';
 
 const execFileAsync = promisify(execFile);
 const MAX_BUFFER_BYTES = 10 * 1024 * 1024;
@@ -202,24 +203,31 @@ function resolveGitPathSync(repoRoot: string, name: string): string {
   return path.isAbsolute(resolvedPath) ? resolvedPath : path.join(repoRoot, resolvedPath);
 }
 
-function createWatchPaths(repoRoot: string): string[] {
-  // Watch both the worktree and specific Git metadata files/directories. The
-  // metadata paths catch stage/unstage, branch changes, and packed refs updates.
-  return [
-    repoRoot,
-    resolveGitPathSync(repoRoot, 'index'),
-    resolveGitPathSync(repoRoot, 'HEAD'),
-    resolveGitPathSync(repoRoot, 'refs'),
-    resolveGitPathSync(repoRoot, 'packed-refs'),
-  ];
+function createGitMetadataWatchTargets(repoRoot: string): GitMetadataWatchTargets {
+  const index = resolveGitPathSync(repoRoot, 'index');
+  const head = resolveGitPathSync(repoRoot, 'HEAD');
+  const packedRefs = resolveGitPathSync(repoRoot, 'packed-refs');
+  const files = [index, head, packedRefs];
+  return {
+    files,
+    directories: [...new Set(files.map((file) => path.dirname(file)))],
+    // The index is excluded here: GIT_INDEX_FILE can place it anywhere,
+    // including inside the worktree, so its parent is not necessarily Git's.
+    gitDirectories: [...new Set([head, packedRefs].map((file) => path.dirname(file)))],
+    refsDirectory: resolveGitPathSync(repoRoot, 'refs'),
+  };
 }
 
-function createFileWatcher(repoRoot: string, paths: string[]): FSWatcher {
+function createFileWatcher(repoRoot: string, targets: GitMetadataWatchTargets): FSWatcher {
+  // Git replaces metadata files via rename. Single-file watches on macOS can
+  // remain bound to old inodes when chokidar throttles the replacement event.
+  // Watch their parent directories so subsequent replacements remain visible.
+  const paths = [repoRoot, ...targets.directories, targets.refsDirectory];
   // Ignore initial add events because the initial fingerprint is already
   // captured synchronously before chokidar starts watching.
   return chokidar.watch(paths, {
     ignoreInitial: true,
-    ignored: createRepoIgnoreMatcher(repoRoot, paths),
+    ignored: createRepoIgnoreMatcher(repoRoot, targets),
   });
 }
 
@@ -280,8 +288,7 @@ export function createRepoWatcher(repoRoot: string, onChanged: () => void): Repo
     }, 200);
   };
 
-  const watchPaths = createWatchPaths(repoRoot);
-  const watcher = createFileWatcher(repoRoot, watchPaths);
+  const watcher = createFileWatcher(repoRoot, createGitMetadataWatchTargets(repoRoot));
   watcher.on('all', () => {
     scheduleCheck();
   });
