@@ -167,10 +167,6 @@ describe('createRepoWatcher', () => {
         return '.git/packed-refs\n';
       }
 
-      if (command === 'rev-parse --git-path .') {
-        return '.git\n';
-      }
-
       throw new Error(`Unexpected sync command: ${command}`);
     });
 
@@ -205,6 +201,62 @@ describe('createRepoWatcher', () => {
       }),
       close: closeMock,
     }));
+  });
+
+  it('watches metadata parent directories instead of replaceable files', () => {
+    // Given: a repository with the standard Git directory layout
+    // When: its watcher is created
+    createRepoWatcher('/repo/root', vi.fn());
+
+    // Then: shared parent directories are watched once and no file is watched directly
+    expect(watchMock).toHaveBeenCalledWith(
+      ['/repo/root', '/repo/root/.git', '/repo/root/.git/refs'],
+      { ignoreInitial: true, ignored: expect.any(Function) },
+    );
+  });
+
+  it('resolves distinct worktree and shared metadata directories without duplicates', () => {
+    // Given: Git resolves index and HEAD to a linked worktree metadata directory
+    const defaultImplementation = execFileSyncMock.getMockImplementation()!;
+    execFileSyncMock.mockImplementation((file: string, args: string[]) => {
+      if (args[0] === 'rev-parse' && args[1] === '--git-path') {
+        const name = args[2];
+        return name === 'index' || name === 'HEAD'
+          ? `/common/.git/worktrees/feature/${name}\n`
+          : `/common/.git/${name}\n`;
+      }
+      return defaultImplementation(file, args);
+    });
+
+    // When
+    createRepoWatcher('/linked', vi.fn());
+
+    // Then: both directories and shared refs are watched, with no duplicate worktree path
+    expect(watchMock).toHaveBeenCalledWith(
+      ['/linked', '/common/.git/worktrees/feature', '/common/.git', '/common/.git/refs'],
+      { ignoreInitial: true, ignored: expect.any(Function) },
+    );
+  });
+
+  it('does not treat the parent of a custom index inside the worktree as Git internals', () => {
+    // Given: GIT_INDEX_FILE places the index directly under the repository root
+    const defaultImplementation = execFileSyncMock.getMockImplementation()!;
+    execFileSyncMock.mockImplementation((file: string, args: string[]) =>
+      args.join(' ') === 'rev-parse --git-path index'
+        ? '/repo/root/custom-index\n'
+        : defaultImplementation(file, args),
+    );
+
+    // When
+    createRepoWatcher('/repo/root', vi.fn());
+
+    // Then: worktree files stay watchable, while .git internals are still ignored.
+    // The real matcher is passed to chokidar here; its gitignore listing is not
+    // mocked and falls back to "nothing ignored".
+    const { ignored } = watchMock.mock.calls[0][1] as { ignored: (path: string) => boolean };
+    expect(ignored('/repo/root/src/file.ts')).toBe(false);
+    expect(ignored('/repo/root/custom-index')).toBe(false);
+    expect(ignored('/repo/root/.git/objects/ab/1234')).toBe(true);
   });
 
   it('broadcasts only when the git fingerprint changes', async () => {
