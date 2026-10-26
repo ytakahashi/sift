@@ -161,7 +161,10 @@ Example requests after the MCP server is connected:
 
 ### Prerequisites
 
-- [pnpm](https://pnpm.io/)
+- [pnpm](https://pnpm.io/) >= 11
+
+Any pnpm 11 or later works as a launcher: the pnpm and Node.js versions used for development are
+pinned by `devEngines` in `package.json`, and pnpm downloads and switches to them automatically.
 
 ### Setup
 

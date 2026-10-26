@@ -41,7 +41,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: package.json
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -58,7 +58,7 @@ jobs:
       - name: Get version
         id: package_version
         run: |
-          VERSION=$(npm pkg get version | tr -d '"')
+          VERSION=$(pnpm pkg get version)
           echo "VERSION=$VERSION" >> $GITHUB_OUTPUT
 
       - name: Check code quality
@@ -102,7 +102,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: package.json
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v6
@@ -123,7 +123,7 @@ jobs:
           EXPECTED_VERSION: ${{ needs.prepare.outputs.version }}
         run: |
           pnpm version "$RELEASE_TYPE"
-          VERSION=$(npm pkg get version | tr -d '"')
+          VERSION=$(pnpm pkg get version)
           if [ "$VERSION" != "$EXPECTED_VERSION" ]; then
             echo "Version $VERSION does not match the built version $EXPECTED_VERSION"
             exit 1
@@ -137,9 +137,9 @@ jobs:
           DRY_RUN: ${{ inputs.dry-run }}
         run: |
           if [ "$DRY_RUN" = "true" ]; then
-            npm publish --access public --ignore-scripts --dry-run
+            pnpm publish --access public --ignore-scripts --no-git-checks --dry-run
           else
-            npm publish --access public --ignore-scripts
+            pnpm publish --access public --ignore-scripts --no-git-checks
           fi
 
       - name: Push changes
