@@ -22,10 +22,18 @@ jobs:
 
     strategy:
       matrix:
-        node-version:
-          - 22.x
-          - 24.x
+        include:
+          # The development runtime pinned by `devEngines.runtime`.
+          - node-version-file: package.json
+            install-flags: --frozen-lockfile
           # See supported Node.js release schedule at https://nodejs.org/en/about/releases/
+          - node-version: 22.x
+            install-flags: --no-frozen-lockfile
+            runtime-on-fail: ignore
+
+    env:
+      # Must be set job-wide: `pnpm run` reinstalls the pinned runtime when it is unset.
+      pnpm_config_runtime_on_fail: ${{ matrix.runtime-on-fail }}
 
     steps:
       - uses: actions/checkout@v7
@@ -35,9 +43,10 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: ${{ matrix.node-version }}
+          node-version-file: ${{ matrix.node-version-file }}
           cache: pnpm
 
-      - run: pnpm install --frozen-lockfile
+      - run: pnpm install ${{ matrix.install-flags }}
 
       - run: pnpm run format
       - run: pnpm run lint
@@ -58,7 +67,7 @@ jobs:
 
       - uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: package.json
           cache: pnpm
 
       - run: pnpm install --frozen-lockfile

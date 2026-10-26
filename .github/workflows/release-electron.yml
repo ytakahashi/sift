@@ -58,7 +58,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v7
         with:
-          node-version: 24
+          node-version-file: package.json
           cache: pnpm
 
       # The input is free-form, so make sure it is a tag and that it matches
@@ -84,7 +84,7 @@ jobs:
         if: ${{ inputs.version }}
         env:
           VERSION: ${{ inputs.version }}
-        run: npm pkg set version="$VERSION"
+        run: pnpm pkg set version="$VERSION"
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
