@@ -2,9 +2,7 @@ allowBuilds:
   electron: true
   electron-winstaller: false
   esbuild: true
-minimumReleaseAgeExclude:
-  - hono@4.13.0
-  - '@testing-library/user-event@14.6.3'
+minimumReleaseAgeStrict: true
 preferSymlinkedExecutables: true
 # Pin dependencies to exact versions on `pnpm add`.
 savePrefix: ''
