@@ -447,3 +447,67 @@ describe('parseDiff', () => {
     expect(files[0].hunks[0].lines[1].id).toBe('line-hunk-file.ts-1-1');
   });
 });
+
+describe('Git path headers', () => {
+  it.each([
+    ['日本語.txt', 'a/日本語.txt', 'b/日本語.txt'],
+    [
+      '日本語.txt',
+      '"a/\\346\\227\\245\\346\\234\\254\\350\\252\\236.txt"',
+      '"b/\\346\\227\\245\\346\\234\\254\\350\\252\\236.txt"',
+    ],
+    ['a b/c b/d.txt', 'a/a b/c b/d.txt', 'b/a b/c b/d.txt'],
+    ['tab\tline\n"\\.txt', '"a/tab\\tline\\n\\"\\\\.txt"', '"b/tab\\tline\\n\\"\\\\.txt"'],
+  ])('preserves %j even without text headers', (path, oldPath, newPath) => {
+    // Given: binary and mode-only diffs do not include --- / +++ headers
+    const raw = `diff --git ${oldPath} ${newPath}\nold mode 100644\nnew mode 100755\n`;
+
+    // When
+    const [file] = parseDiff(raw, 'working');
+
+    // Then
+    expect(file).toMatchObject({ path, displayPath: path });
+    expect(file.oldPath).toBeUndefined();
+  });
+
+  it('uses unprefixed rename metadata for an ambiguous header', () => {
+    // Given: a pure rename has no text headers, and spaces are not quoted
+    const raw = [
+      'diff --git a/old b/name b/new b/name',
+      'similarity index 100%',
+      'rename from old b/name',
+      'rename to new b/name',
+    ].join('\n');
+
+    // When
+    const [file] = parseDiff(raw, 'staged');
+
+    // Then
+    expect(file).toMatchObject({
+      path: 'new b/name',
+      oldPath: 'old b/name',
+      status: 'renamed',
+      displayPath: 'new b/name',
+    });
+  });
+
+  it('uses text headers as authoritative paths and preserves trailing spaces', () => {
+    // Given
+    const raw = [
+      'diff --git a/ambiguous b/header b/other',
+      '--- a/actual b/path \t',
+      '+++ b/actual b/path \t',
+      '@@ -1 +1 @@',
+      '-old',
+      '+new',
+    ].join('\n');
+
+    // When
+    const [file] = parseDiff(raw, 'working');
+
+    // Then
+    expect(file).toMatchObject({ path: 'actual b/path ', displayPath: 'actual b/path ' });
+    expect(file.oldPath).toBeUndefined();
+    expect(file.hunks[0].id).toContain('actual b/path ');
+  });
+});

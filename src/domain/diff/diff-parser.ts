@@ -1,5 +1,13 @@
 import { DiffFile, DiffHunk, DiffLineType, FileBucket } from './types';
 import { createDiffFileId } from './file-id';
+import { decodeGitPath, parseGitDiffPaths } from '../git/git-path';
+
+function finishFile(file: DiffFile): DiffFile {
+  file.id = createDiffFileId(file.path);
+  file.displayPath = file.path;
+  if (file.oldPath === file.path) file.oldPath = undefined;
+  return file;
+}
 
 export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
   const files: DiffFile[] = [];
@@ -20,21 +28,20 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
         if (currentHunk) {
           currentFile.hunks.push(currentHunk);
         }
-        files.push(currentFile);
+        files.push(finishFile(currentFile));
       }
 
-      const match = line.match(/^diff --git a\/(.+) b\/(.+)$/);
-      const aPath = match ? match[1] : '';
-      const bPath = match ? match[2] : '';
+      const [aPath, bPath] = parseGitDiffPaths(line);
 
+      // Later headers may refine the paths, so finishFile derives id and displayPath.
       currentFile = {
-        id: createDiffFileId(bPath),
+        id: '',
         bucket,
         path: bPath,
-        oldPath: aPath !== bPath ? aPath : undefined,
+        oldPath: aPath,
         status: 'modified', // Default, might be updated by subsequent lines
         kind: 'text',
-        displayPath: bPath,
+        displayPath: '',
         hunks: [],
       };
       // Reset hunk state
@@ -107,7 +114,11 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
     }
     if (line.startsWith('rename from ')) {
       currentFile.status = 'renamed';
-      // keep path from bPath, oldPath from aPath
+      currentFile.oldPath = decodeGitPath(line.slice(12));
+      continue;
+    }
+    if (line.startsWith('rename to ')) {
+      currentFile.path = decodeGitPath(line.slice(10));
       continue;
     }
     if (line.startsWith('similarity index ')) {
@@ -135,7 +146,14 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
     }
 
     if (line.startsWith('--- ') || line.startsWith('+++ ')) {
-      // Standard Git diff headers.
+      if (!currentHunk) {
+        // Unquoted paths may end with a tab separator; quoted tabs belong to the path.
+        const path = decodeGitPath(line.slice(4).split('\t')[0]);
+        if (path !== '/dev/null') {
+          if (line.startsWith('--- ')) currentFile.oldPath = path.slice(2);
+          else currentFile.path = path.slice(2);
+        }
+      }
       continue;
     }
 
@@ -174,7 +192,7 @@ export function parseDiff(rawDiff: string, bucket: FileBucket): DiffFile[] {
     if (currentHunk) {
       currentFile.hunks.push(currentHunk);
     }
-    files.push(currentFile);
+    files.push(finishFile(currentFile));
   }
 
   return files;

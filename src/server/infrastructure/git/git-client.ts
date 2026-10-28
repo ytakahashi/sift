@@ -54,7 +54,21 @@ export class GitClient {
   }
 
   async getDiffOutput(staged: boolean): Promise<string> {
-    const args = ['diff', '--no-ext-diff', '--color=never', '--full-index'];
+    // Stable prefixes are part of the parser contract, regardless of user configuration.
+    // diff.renames=copies would emit copies, which DiffFile cannot represent and hunk patches
+    // would apply as renames that remove the source from the index.
+    const args = [
+      '-c',
+      'core.quotePath=false',
+      '-c',
+      'diff.renames=true',
+      'diff',
+      '--no-ext-diff',
+      '--color=never',
+      '--full-index',
+      '--src-prefix=a/',
+      '--dst-prefix=b/',
+    ];
     if (staged) {
       args.push('--cached');
     }
@@ -62,9 +76,9 @@ export class GitClient {
   }
 
   async getUntrackedFiles(): Promise<string[]> {
-    const args = ['ls-files', '--others', '--exclude-standard'];
+    const args = ['ls-files', '--others', '--exclude-standard', '-z'];
     const output = await this.runGitCommand(args);
-    return output.split('\n').filter(Boolean);
+    return output.split('\0').filter(Boolean);
   }
 
   async getStatus(): Promise<string> {

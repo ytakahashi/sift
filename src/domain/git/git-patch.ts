@@ -1,12 +1,13 @@
 import type { DiffFile, DiffHunk } from '../diff/types';
+import { encodeGitPath } from './git-path';
 
 export function createPatchForHunk(file: DiffFile, hunk: DiffHunk): string {
-  const aPath = file.oldPath || file.path;
-  const bPath = file.path;
+  const aPath = encodeGitPath(`a/${file.oldPath || file.path}`);
+  const bPath = encodeGitPath(`b/${file.path}`);
 
-  let patch = `diff --git a/${aPath} b/${bPath}\n`;
-  patch += `--- a/${aPath}\n`;
-  patch += `+++ b/${bPath}\n`;
+  let patch = `diff --git ${aPath} ${bPath}\n`;
+  patch += `--- ${aPath}\n`;
+  patch += `+++ ${bPath}\n`;
   patch += `${hunk.header}\n`;
 
   for (const line of hunk.lines) {
