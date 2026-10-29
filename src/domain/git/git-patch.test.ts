@@ -117,6 +117,43 @@ describe('createPatchForHunk', () => {
     expect(lines[2]).toBe('+++ b/new-name.ts');
   });
 
+  it.each([
+    {
+      scenario: 'non-ASCII characters stay unescaped',
+      oldPath: '日本語.txt',
+      path: '日本語.txt',
+      aPath: 'a/日本語.txt',
+      bPath: 'b/日本語.txt',
+    },
+    {
+      scenario: 'whitespace is quoted',
+      oldPath: 'old b/name ',
+      path: 'new b/name ',
+      aPath: '"a/old b/name "',
+      bPath: '"b/new b/name "',
+    },
+    {
+      scenario: 'control characters, quotes, and backslashes are escaped',
+      oldPath: 'tab\tline\n"\\.txt',
+      path: 'del\x7f.txt',
+      aPath: '"a/tab\\011line\\012\\"\\\\.txt"',
+      bPath: '"b/del\\177.txt"',
+    },
+  ])('encodes header paths when $scenario', ({ oldPath, path, aPath, bPath }) => {
+    // Given
+    const file = createFile({ path, oldPath });
+    const hunk = createHunk({ lines: [] });
+
+    // When
+    const patch = createPatchForHunk(file, hunk);
+
+    // Then: control characters use octal escapes, which git apply decodes like named escapes
+    const lines = patch.split('\n');
+    expect(lines[0]).toBe(`diff --git ${aPath} ${bPath}`);
+    expect(lines[1]).toBe(`--- ${aPath}`);
+    expect(lines[2]).toBe(`+++ ${bPath}`);
+  });
+
   it('uses path for both sides when no oldPath is set', () => {
     // Given: a file without an oldPath
     const file = createFile({ path: 'same.ts', oldPath: undefined });

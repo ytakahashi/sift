@@ -253,10 +253,16 @@ describe('GitClient index content commands', () => {
 
     // Then
     expect(runGitCommand).toHaveBeenCalledWith([
+      '-c',
+      'core.quotePath=false',
+      '-c',
+      'diff.renames=true',
       'diff',
       '--no-ext-diff',
       '--color=never',
       '--full-index',
+      '--src-prefix=a/',
+      '--dst-prefix=b/',
       '--cached',
     ]);
   });
@@ -378,5 +384,18 @@ describe('GitClient.getBlobContent', () => {
     await expect(client.getBlobContent('blob-id')).rejects.toThrow(
       'Git command failed: git --literal-pathspecs cat-file -p blob-id',
     );
+  });
+});
+
+describe('GitClient.getUntrackedFiles', () => {
+  it('preserves Unicode, whitespace, and quotes in NUL-delimited paths', async () => {
+    // Given
+    const paths = ['日本語.txt', 'line\nbreak.txt', 'tab\tname', '"quoted"', 'back\\slash'];
+    const client = new GitClient('/repo/root');
+    const run = vi.spyOn(client, 'runGitCommand').mockResolvedValue(paths.join('\0') + '\0');
+
+    // When / Then
+    await expect(client.getUntrackedFiles()).resolves.toEqual(paths);
+    expect(run).toHaveBeenCalledWith(['ls-files', '--others', '--exclude-standard', '-z']);
   });
 });
