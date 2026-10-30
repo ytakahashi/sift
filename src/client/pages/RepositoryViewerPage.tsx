@@ -33,6 +33,12 @@ import { DiscardConfirmModal } from '../components/discard-confirm/DiscardConfir
 import { AppHeader } from '../components/app-header/AppHeader';
 import { toHeadLabel } from '../presentation/app-header/head-label';
 import type { AppDependencies } from '../composition/dependencies';
+import { useKeyboardShortcut } from '../hooks/keyboard-shortcuts/useKeyboardShortcut';
+import { keyboardShortcuts } from '../presentation/keyboard-shortcuts/keyboardShortcuts';
+import {
+  formatShortcut,
+  toAriaKeyShortcuts,
+} from '../presentation/keyboard-shortcuts/keyboardShortcut';
 
 export interface RepositoryViewerPageProps {
   dependencies: AppDependencies;
@@ -267,11 +273,25 @@ function RepositoryWorkspace({
   } = usePaneResize({
     reservedRightWidthPx: isRepositorySidebarOpen ? repositorySidebarWidthPx : 0,
   });
+  const toggleFileList = (): void => setIsFileListOpen((isOpen) => !isOpen);
+  const platform = dependencies.keyboardPlatform;
+  // The Notes overlay does not use ModalDialog, so suspend its background shortcuts explicitly.
+  useKeyboardShortcut(keyboardShortcuts.toggleFileList, platform, toggleFileList, {
+    enabled: !notesPanel.isOpen,
+  });
+  useKeyboardShortcut(
+    keyboardShortcuts.toggleRepositorySidebar,
+    platform,
+    onToggleRepositorySidebar,
+    { enabled: !notesPanel.isOpen },
+  );
   const repositorySidebarToggleLabel = isRepositorySidebarOpen
     ? 'Close repository sidebar'
     : 'Open repository sidebar';
+  const repositorySidebarToggleTitle = `${repositorySidebarToggleLabel} (${formatShortcut(keyboardShortcuts.toggleRepositorySidebar, platform)})`;
   const RepositorySidebarToggleIcon = isRepositorySidebarOpen ? ArrowRightToLine : ArrowLeftToLine;
   const fileListToggleLabel = isFileListOpen ? 'Hide file list' : 'Show file list';
+  const fileListToggleTitle = `${fileListToggleLabel} (${formatShortcut(keyboardShortcuts.toggleFileList, platform)})`;
   const FileListToggleIcon = isFileListOpen ? ArrowLeftToLine : ArrowRightFromLine;
 
   return (
@@ -292,11 +312,15 @@ function RepositoryWorkspace({
               Refresh
             </button>
             <button
+              aria-keyshortcuts={toAriaKeyShortcuts(
+                keyboardShortcuts.toggleRepositorySidebar,
+                platform,
+              )}
               aria-label={repositorySidebarToggleLabel}
               aria-pressed={isRepositorySidebarOpen}
               className="button repository-sidebar-toggle-button"
               onClick={onToggleRepositorySidebar}
-              title={repositorySidebarToggleLabel}
+              title={repositorySidebarToggleTitle}
               type="button"
             >
               <RepositorySidebarToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />
@@ -409,10 +433,11 @@ function RepositoryWorkspace({
             <div className="diff-header-title-group">
               <button
                 aria-expanded={isFileListOpen}
+                aria-keyshortcuts={toAriaKeyShortcuts(keyboardShortcuts.toggleFileList, platform)}
                 aria-label={fileListToggleLabel}
                 className="button file-list-toggle-button"
-                onClick={() => setIsFileListOpen((isOpen) => !isOpen)}
-                title={fileListToggleLabel}
+                onClick={toggleFileList}
+                title={fileListToggleTitle}
                 type="button"
               >
                 <FileListToggleIcon aria-hidden="true" size={18} strokeWidth={1.8} />

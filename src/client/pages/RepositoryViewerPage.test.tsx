@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DiffFile } from '../../domain/diff/types';
 import type { HeadRef } from '../../domain/git/head-ref';
 import type { Note } from '../../domain/notes/types';
+import type { KeyboardPlatform } from '../application/keyboard-shortcuts/keyboard-platform';
 import type { AppDependencies } from '../composition/dependencies';
 import { useDiffData } from '../hooks/diff/useDiffData';
 import { useNotes } from '../hooks/notes/useNotes';
@@ -59,6 +60,7 @@ function createFile(id: string, bucket: 'working' | 'staged'): DiffFile {
 }
 
 const testDependencies: AppDependencies = {
+  keyboardPlatform: 'other',
   blobContentReader: {
     fetchBlobContent: vi.fn(),
   },
@@ -124,13 +126,15 @@ const testDependencies: AppDependencies = {
 function Page({
   onSelectRepository = vi.fn(),
   repoId = 'my-app',
+  keyboardPlatform = 'other',
 }: {
   onSelectRepository?: (repoId: string) => void;
   repoId?: string;
+  keyboardPlatform?: KeyboardPlatform;
 } = {}): ReactElement {
   return (
     <RepositoryViewerPage
-      dependencies={testDependencies}
+      dependencies={{ ...testDependencies, keyboardPlatform }}
       repoId={repoId}
       onNavigateToRoot={vi.fn()}
       onSelectRepository={onSelectRepository}
@@ -624,6 +628,128 @@ describe('RepositoryViewerPage interactions', () => {
     expect(screen.getAllByRole('listbox', { name: 'Changed files' })).toHaveLength(2);
     expect(screen.getByRole('separator', { name: 'Resize sidebar and diff panes' })).toBeDefined();
     expect(screen.getByRole('button', { name: 'Hide file list' })).toBeDefined();
+  });
+
+  it.each([
+    ['mac', { metaKey: true }, '⌘B', '⌥⌘B', 'Meta'],
+    ['other', { ctrlKey: true }, 'Ctrl+B', 'Ctrl+Alt+B', 'Control'],
+  ] as const)(
+    'toggles independent panes and exposes shortcuts on %s',
+    async (platform, modifiers, fileLabel, sidebarLabel, ariaMod) => {
+      // Given
+      render(<Page keyboardPlatform={platform} />);
+      const fileButton = screen.getByRole('button', { name: 'Hide file list' });
+      const sidebarButton = screen.getByRole('button', { name: 'Open repository sidebar' });
+      expect(fileButton.title).toBe(`Hide file list (${fileLabel})`);
+      expect(fileButton.getAttribute('aria-keyshortcuts')).toBe(`${ariaMod}+B`);
+      expect(sidebarButton.title).toBe(`Open repository sidebar (${sidebarLabel})`);
+      expect(sidebarButton.getAttribute('aria-keyshortcuts')).toBe(`${ariaMod}+Alt+B`);
+
+      // When
+      fireEvent.keyDown(document, { code: 'KeyB', ...modifiers });
+
+      // Then: only the file list changes, and its definition remains available for reopening
+      expect(screen.queryAllByRole('listbox', { name: 'Changed files' })).toHaveLength(0);
+      expect(screen.getByRole('button', { name: 'Show file list' }).title).toBe(
+        `Show file list (${fileLabel})`,
+      );
+      expect(screen.queryByRole('complementary', { name: 'Repository list' })).toBeNull();
+
+      // When: Option may change the reported character on macOS
+      fireEvent.keyDown(document, { code: 'KeyB', key: '∫', altKey: true, ...modifiers });
+
+      // Then: the repository sidebar opens without changing the file list
+      expect(await screen.findByRole('complementary', { name: 'Repository list' })).toBeDefined();
+      expect(screen.getByRole('button', { name: 'Close repository sidebar' }).title).toBe(
+        `Close repository sidebar (${sidebarLabel})`,
+      );
+      expect(screen.queryAllByRole('listbox', { name: 'Changed files' })).toHaveLength(0);
+
+      // When: close the sidebar while its filter input is focused, and restore the file list
+      const filter = screen.getByRole('textbox', { name: 'Filter repositories' });
+      filter.focus();
+      fireEvent.keyDown(filter, { code: 'KeyB', altKey: true, ...modifiers });
+      fireEvent.keyDown(document, { code: 'KeyB', ...modifiers });
+
+      // Then
+      expect(screen.queryByRole('complementary', { name: 'Repository list' })).toBeNull();
+      expect(screen.getAllByRole('listbox', { name: 'Changed files' })).toHaveLength(2);
+    },
+  );
+
+  it.each([
+    [
+      'View Notes (0)',
+      'mac',
+      { metaKey: true },
+      () => screen.getByTestId('notes-modal-panel'),
+      '×',
+    ],
+    ['Discard All', 'mac', { metaKey: true }, () => screen.getByRole('dialog'), 'Cancel'],
+    [
+      'View Notes (0)',
+      'other',
+      { ctrlKey: true },
+      () => screen.getByTestId('notes-modal-panel'),
+      '×',
+    ],
+    ['Discard All', 'other', { ctrlKey: true }, () => screen.getByRole('dialog'), 'Cancel'],
+  ] as const)(
+    'suspends background shortcuts while %s is open on %s',
+    async (openLabel, platform, modifiers, getOverlay, closeLabel) => {
+      // Given
+      const user = userEvent.setup();
+      render(<Page keyboardPlatform={platform} />);
+      await user.click(screen.getByRole('button', { name: openLabel }));
+      const overlay = getOverlay();
+
+      // When
+      fireEvent.keyDown(document, { code: 'KeyB', ...modifiers });
+      fireEvent.keyDown(overlay, { code: 'KeyB', altKey: true, ...modifiers });
+
+      // Then: neither background pane changes while the overlay is present
+      expect(screen.getAllByRole('listbox', { name: 'Changed files' })).toHaveLength(2);
+      expect(screen.getByRole('button', { name: 'Hide file list' })).toBeDefined();
+      expect(screen.queryByRole('complementary', { name: 'Repository list' })).toBeNull();
+      expect(overlay.isConnected).toBe(true);
+
+      // When: dismiss without confirming a destructive action, then retry both shortcuts
+      await user.click(
+        within(overlay).getByRole('button', {
+          name: closeLabel,
+        }),
+      );
+      fireEvent.keyDown(document, { code: 'KeyB', ...modifiers });
+      fireEvent.keyDown(document, { code: 'KeyB', altKey: true, ...modifiers });
+
+      // Then
+      expect(overlay.isConnected).toBe(false);
+      expect(screen.getByRole('button', { name: 'Show file list' })).toBeDefined();
+      expect(await screen.findByRole('complementary', { name: 'Repository list' })).toBeDefined();
+    },
+  );
+
+  it('registers shortcuts once after switching repositories and remounting', () => {
+    // Given: switching repositories remounts the workspace
+    const { rerender, unmount } = render(<Page />);
+    rerender(<Page repoId="other-app" />);
+
+    // When
+    fireEvent.keyDown(document, { code: 'KeyB', ctrlKey: true });
+
+    // Then: a single press performs one toggle
+    expect(screen.getByRole('button', { name: 'Show file list' })).toBeDefined();
+
+    // When: the page is removed and opened again
+    unmount();
+    const event = new KeyboardEvent('keydown', { code: 'KeyB', ctrlKey: true, cancelable: true });
+    document.dispatchEvent(event);
+    expect(event.defaultPrevented).toBe(false);
+    render(<Page />);
+    fireEvent.keyDown(document, { code: 'KeyB', ctrlKey: true });
+
+    // Then
+    expect(screen.getByRole('button', { name: 'Show file list' })).toBeDefined();
   });
 
   it('renders selected repository name in the header with absolute path tooltip', async () => {

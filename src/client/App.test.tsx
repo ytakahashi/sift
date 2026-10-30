@@ -48,6 +48,7 @@ vi.mock('./components/diff/UnifiedDiffViewer', () => ({
 }));
 
 const testDependencies: AppDependencies = {
+  keyboardPlatform: 'other',
   blobContentReader: {
     fetchBlobContent: vi.fn(),
   },

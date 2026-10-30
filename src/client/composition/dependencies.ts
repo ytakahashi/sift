@@ -1,3 +1,4 @@
+import type { KeyboardPlatform } from '../application/keyboard-shortcuts/keyboard-platform';
 import type {
   BlobContentReader,
   DiffReader,
@@ -10,6 +11,7 @@ import type {
 } from '../application/ports';
 
 export interface AppDependencies {
+  keyboardPlatform: KeyboardPlatform;
   blobContentReader: BlobContentReader;
   diffReader: DiffReader;
   fileContentReader: FileContentReader;
