@@ -8,10 +8,12 @@ import {
   httpRepositoryWriter,
 } from '../infrastructure/http/repositoryClient';
 import { httpWorkspaceActions } from '../infrastructure/http/workspaceActionsClient';
+import { detectPlatform } from '../infrastructure/platform/detectPlatform';
 import type { AppDependencies } from './dependencies';
 
 export function createClientDependencies(): AppDependencies {
   return {
+    keyboardPlatform: detectPlatform(navigator),
     blobContentReader: httpBlobContentReader,
     diffReader: httpDiffReader,
     fileContentReader: httpFileContentReader,

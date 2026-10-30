@@ -131,6 +131,11 @@ export const boundariesConfig = {
           },
           { from: [element('client-presentation')], allow: [domain] },
           {
+            // Presentation can consume application contracts, but not executable policies.
+            from: [element('client-presentation')],
+            allow: [{ ...dependency('client-application'), dependency: { kind: 'type' } }],
+          },
+          {
             from: [element('client-hooks')],
             allow: [dependency('client-application'), dependency('client-presentation'), domain],
           },

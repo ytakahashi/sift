@@ -127,7 +127,8 @@ logic and must stay free of runtime-specific APIs.
 - `infrastructure/` implements `application/` ports and may use browser APIs.
 - `presentation/` contains pure UI and interaction logic that is not React-specific, such as layout
   calculations, display formatting, UI-only selection helpers, and style/ARIA value helpers. Like
-  `application/`, it must stay free of React and browser runtime APIs.
+  `application/`, it must stay free of React and browser runtime APIs. It may import application
+  contracts using type-only imports; runtime dependencies on `application/` remain prohibited.
 - `hooks/<feature>/` contains React hooks for one feature area. A feature must not import from
   another feature; compose them in `pages/` or in a top-level composition hook placed directly under
   `hooks/`. Such a composition hook may import feature hooks, but is otherwise held to the same

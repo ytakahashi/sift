@@ -5,6 +5,7 @@ import type { AppDependencies } from '../composition/dependencies';
 import { RepositorySelectionPage } from './RepositorySelectionPage';
 
 const testDependencies: AppDependencies = {
+  keyboardPlatform: 'other',
   blobContentReader: {
     fetchBlobContent: vi.fn(),
   },
