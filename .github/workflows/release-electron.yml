@@ -48,15 +48,15 @@ jobs:
     steps:
       # On workflow_call `github.sha` is the caller's commit, i.e. the one `release.yml` tags.
       - name: Checkout target ref
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
         with:
           ref: ${{ inputs.tag || github.sha }}
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.0.10
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
@@ -130,7 +130,7 @@ jobs:
 
       # `release.yml` downloads this artifact by name to attach it to the Release.
       - name: Upload assets as workflow artifact
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@v7.0.2
         with:
           name: sift-macos
           path: dist/*.dmg
@@ -140,7 +140,7 @@ jobs:
       # Without `draft: true` the action publishes the draft Release after uploading.
       - name: Upload assets to GitHub Release
         if: ${{ inputs.tag && !inputs.dry-run }}
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: ${{ inputs.tag }}
           draft: true
