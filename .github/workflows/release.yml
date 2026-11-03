@@ -36,15 +36,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.0.10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -97,15 +97,15 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@v7.0.1
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@v6.0.10
 
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
@@ -151,7 +151,7 @@ jobs:
           git push origin "v$VERSION"
 
       - name: Download app assets
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v8.0.2
         with:
           name: sift-macos
           path: dist
@@ -159,7 +159,7 @@ jobs:
       # Without `draft: true` the action publishes the Release right away.
       - name: Create Release
         if: ${{ !inputs.dry-run }}
-        uses: softprops/action-gh-release@v3
+        uses: softprops/action-gh-release@v3.0.3
         with:
           tag_name: v${{ needs.prepare.outputs.version }}
           draft: true

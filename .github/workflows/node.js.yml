@@ -36,11 +36,11 @@ jobs:
       pnpm_config_runtime_on_fail: ${{ matrix.runtime-on-fail }}
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version: ${{ matrix.node-version }}
           node-version-file: ${{ matrix.node-version-file }}
@@ -61,11 +61,11 @@ jobs:
     timeout-minutes: 30
 
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@v7.0.1
 
-      - uses: pnpm/action-setup@v6
+      - uses: pnpm/action-setup@v6.0.10
 
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-node@v7.1.0
         with:
           node-version-file: package.json
           cache: pnpm
