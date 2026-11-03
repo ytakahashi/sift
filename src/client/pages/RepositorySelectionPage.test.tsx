@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, createEvent, fireEvent, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppDependencies } from '../composition/dependencies';
@@ -101,4 +101,47 @@ describe('RepositorySelectionPage', () => {
     // Then callback is fired
     expect(onSelectRepository).toHaveBeenCalledWith('demo-repo');
   });
+
+  it.each(['mac', 'other'] as const)(
+    'focuses the filter and suspends it while adding on %s',
+    async (platform) => {
+      // Given
+      const user = userEvent.setup();
+      render(
+        <RepositorySelectionPage
+          dependencies={{ ...testDependencies, keyboardPlatform: platform }}
+          onSelectRepository={vi.fn()}
+        />,
+      );
+      const input = await screen.findByRole<HTMLInputElement>('textbox', {
+        name: 'Filter repositories',
+      });
+      await user.type(input, 'demo');
+      input.blur();
+
+      // When: the produced slash needs Shift and comes from a different physical key.
+      fireEvent.keyDown(document, { key: '/', code: 'Digit7', shiftKey: true });
+
+      // Then
+      expect(document.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(4);
+
+      // When
+      await user.click(screen.getByRole('button', { name: 'Add Repository' }));
+      const blocked = createEvent.keyDown(document, { key: '/', cancelable: true });
+      fireEvent(document, blocked);
+
+      // Then
+      expect(document.activeElement).not.toBe(input);
+      expect(blocked.defaultPrevented).toBe(false);
+
+      // When
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+      fireEvent.keyDown(document, { key: '/' });
+
+      // Then
+      expect(document.activeElement).toBe(input);
+    },
+  );
 });

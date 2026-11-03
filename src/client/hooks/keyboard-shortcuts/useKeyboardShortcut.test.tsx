@@ -1,6 +1,7 @@
 import { cleanup, createEvent, fireEvent, render, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { KeyboardPlatform } from '../../application/keyboard-shortcuts/keyboard-platform';
+import type { KeyboardShortcut } from '../../presentation/keyboard-shortcuts/keyboardShortcut';
 import { keyboardShortcuts } from '../../presentation/keyboard-shortcuts/keyboardShortcuts';
 import { useKeyboardShortcut } from './useKeyboardShortcut';
 
@@ -89,7 +90,7 @@ describe('useKeyboardShortcut', () => {
       const modified = vi.fn();
       const bare = vi.fn();
       renderHook(() => useKeyboardShortcut(shortcut, 'mac', modified));
-      renderHook(() => useKeyboardShortcut({ code: 'Slash' }, 'mac', bare));
+      renderHook(() => useKeyboardShortcut(keyboardShortcuts.focusRepositoryFilter, 'mac', bare));
 
       // When
       dispatch(element);
@@ -200,7 +201,10 @@ describe('useKeyboardShortcut', () => {
   it.each([
     [keyboardShortcuts.toggleFileList, { altKey: false }],
     [keyboardShortcuts.toggleRepositorySidebar, {}],
-    [{ code: 'Slash' }, { code: 'Slash', metaKey: false, altKey: false }],
+    [
+      keyboardShortcuts.focusRepositoryFilter,
+      { code: 'Digit7', key: '/', shiftKey: true, metaKey: false, altKey: false },
+    ],
   ])(
     'suspends %j while a modal is mounted and resumes after dismissal',
     (definition, eventKeys) => {
@@ -226,4 +230,51 @@ describe('useKeyboardShortcut', () => {
       expect(handler).toHaveBeenCalledOnce();
     },
   );
+
+  it('updates registration between physical keys and produced characters', () => {
+    // Given
+    const handler = vi.fn();
+    const { rerender } = renderHook(
+      ({ definition }) => useKeyboardShortcut(definition, 'other', handler),
+      { initialProps: { definition: { code: 'Slash' } as KeyboardShortcut } },
+    );
+
+    // When
+    rerender({ definition: { key: '/' } });
+    const oldPhysicalKey = dispatch(document, {
+      code: 'Slash',
+      key: '?',
+      metaKey: false,
+      altKey: false,
+    });
+    const character = dispatch(document, {
+      code: 'Digit7',
+      key: '/',
+      shiftKey: true,
+      metaKey: false,
+      altKey: false,
+    });
+    rerender({ definition: { key: '?' } });
+    const oldCharacter = dispatch(document, {
+      code: 'Digit7',
+      key: '/',
+      shiftKey: true,
+      metaKey: false,
+      altKey: false,
+    });
+    const currentCharacter = dispatch(document, {
+      code: 'Slash',
+      key: '?',
+      shiftKey: true,
+      metaKey: false,
+      altKey: false,
+    });
+
+    // Then
+    expect(handler).toHaveBeenCalledTimes(2);
+    expect(oldPhysicalKey.defaultPrevented).toBe(false);
+    expect(character.defaultPrevented).toBe(true);
+    expect(oldCharacter.defaultPrevented).toBe(false);
+    expect(currentCharacter.defaultPrevented).toBe(true);
+  });
 });

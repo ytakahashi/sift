@@ -39,6 +39,7 @@ import {
   formatShortcut,
   toAriaKeyShortcuts,
 } from '../presentation/keyboard-shortcuts/keyboardShortcut';
+import { RepositoryFilterInputWithShortcut } from './RepositoryFilterInputWithShortcut';
 
 export interface RepositoryViewerPageProps {
   dependencies: AppDependencies;
@@ -524,6 +525,14 @@ function RepositoryWorkspace({
             loading={repositoryListLoading}
             onSelectRepository={onSelectRepository}
             repositories={repositoryList}
+            renderRepositoryFilter={(props) => (
+              <RepositoryFilterInputWithShortcut
+                {...props}
+                platform={platform}
+                // Notes does not expose aria-modal yet, so apply the same background guard as toggles.
+                shortcutEnabled={props.shortcutEnabled && !notesPanel.isOpen}
+              />
+            )}
           />
         )}
       </main>

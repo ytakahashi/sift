@@ -1,64 +1,28 @@
-import { useEffect, useRef, type ReactElement } from 'react';
+import type { ReactElement, Ref } from 'react';
 import { Search, X } from 'lucide-react';
 
 export interface RepositoryFilterInputProps {
   value: string;
   onChange: (value: string) => void;
-  /**
-   * Enables the document-level `/` shortcut that focuses this input.
-   * Only one mounted filter input should enable the shortcut at a time.
-   */
-  shortcutEnabled: boolean;
+  inputRef?: Ref<HTMLInputElement>;
   /** Additional class for layout differences between hosts. */
   className?: string;
 }
 
-function isEditableElement(target: EventTarget | null): boolean {
-  return (
-    target instanceof HTMLElement &&
-    (target.matches('input, textarea, select') || target.isContentEditable)
-  );
-}
+export type RepositoryFilterHostProps = Omit<RepositoryFilterInputProps, 'inputRef'> & {
+  /** Only one mounted filter may enable the document shortcut at a time. */
+  shortcutEnabled: boolean;
+};
+
+/** Hosts supply local availability; pages compose the keyboard behavior. */
+export type RepositoryFilterRenderer = (props: RepositoryFilterHostProps) => ReactElement;
 
 export function RepositoryFilterInput({
   className,
   onChange,
-  shortcutEnabled,
+  inputRef,
   value,
 }: RepositoryFilterInputProps): ReactElement {
-  const inputRef = useRef<HTMLInputElement>(null);
-
-  useEffect(() => {
-    if (!shortcutEnabled) {
-      return;
-    }
-
-    const handleKeyDown = (event: KeyboardEvent): void => {
-      // Preserve slash input in the filter itself and other editable controls.
-      if (
-        event.key !== '/' ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        isEditableElement(event.target)
-      ) {
-        return;
-      }
-
-      const input = inputRef.current;
-      if (!input) {
-        return;
-      }
-
-      event.preventDefault();
-      input.focus();
-      input.select();
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [shortcutEnabled]);
-
   return (
     <div
       aria-label="Repository filter"

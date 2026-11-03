@@ -8,7 +8,7 @@ import {
   matchesRepositoryFilter,
   normalizeRepositoryFilterQuery,
 } from '../../presentation/repository-filter/repository-filter';
-import { RepositoryFilterInput } from '../repository-filter/RepositoryFilterInput';
+import type { RepositoryFilterRenderer } from '../repository-filter/RepositoryFilterInput';
 
 export interface RepositorySidebarProps {
   configMissingError: string | null;
@@ -17,6 +17,7 @@ export interface RepositorySidebarProps {
   loading: boolean;
   onSelectRepository: (repoId: RepositoryId) => void;
   repositories: RepositoryList | null;
+  renderRepositoryFilter: RepositoryFilterRenderer;
 }
 
 function RepositorySidebarRow({
@@ -59,6 +60,7 @@ export function RepositorySidebar({
   loading,
   onSelectRepository,
   repositories,
+  renderRepositoryFilter,
 }: RepositorySidebarProps): ReactElement {
   const [filterQuery, setFilterQuery] = useState('');
   const items = repositories?.repositories ?? [];
@@ -71,14 +73,14 @@ export function RepositorySidebar({
   return (
     <aside aria-label="Repository list" className="repository-sidebar">
       <div className="repository-sidebar-header">Repositories</div>
-      {items.length > 0 ? (
-        <RepositoryFilterInput
-          className="repository-sidebar-filter"
-          onChange={setFilterQuery}
-          shortcutEnabled={true}
-          value={filterQuery}
-        />
-      ) : null}
+      {items.length > 0
+        ? renderRepositoryFilter({
+            className: 'repository-sidebar-filter',
+            onChange: setFilterQuery,
+            shortcutEnabled: true,
+            value: filterQuery,
+          })
+        : null}
       <div className="repository-sidebar-body scroll-area">
         {statusMessage ? <div className="repository-sidebar-error">{statusMessage}</div> : null}
         {loading && !statusMessage && items.length === 0 ? (

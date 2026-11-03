@@ -3,6 +3,7 @@ import userEvent from '@testing-library/user-event';
 import type { ComponentProps } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RepositoryList } from '../../../domain/repository/repository';
+import { RepositoryFilterInput } from '../repository-filter/RepositoryFilterInput';
 import { RepositorySelection } from './RepositorySelection';
 
 type RepositorySelectionComponentProps = ComponentProps<typeof RepositorySelection>;
@@ -12,6 +13,9 @@ function createRepositorySelectionProps(
   overrides: Partial<RepositorySelectionComponentProps> = {},
 ): RepositorySelectionComponentProps {
   return {
+    renderRepositoryFilter: ({ value, onChange, className }) => (
+      <RepositoryFilterInput value={value} onChange={onChange} className={className} />
+    ),
     addError: null,
     adding: false,
     configMissingError: null,
@@ -239,23 +243,30 @@ describe('RepositorySelection', () => {
     expect(pathInput).toHaveProperty('value', '/repo/other');
   });
 
-  it('does not activate the repository filter shortcut while the add form is open', async () => {
+  it('disables the repository filter shortcut while the add form is open', async () => {
     // Given
     const user = userEvent.setup();
-    renderRepositorySelection({
-      invalidRepositories: [],
-      repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
-    });
-    const filterInput = screen.getByRole('textbox', { name: 'Filter repositories' });
-    await user.click(screen.getByRole('button', { name: 'Add Repository' }));
-    const shortcutEvent = createEvent.keyDown(document, { cancelable: true, key: '/' });
+    const renderRepositoryFilter = vi.fn(({ value, onChange }) => (
+      <RepositoryFilterInput value={value} onChange={onChange} />
+    ));
+    renderRepositorySelection(
+      {
+        invalidRepositories: [],
+        repositories: [{ id: 'sift', name: 'Sift', path: '/repo/sift' }],
+      },
+      { renderRepositoryFilter },
+    );
+    expect(renderRepositoryFilter).toHaveBeenLastCalledWith(
+      expect.objectContaining({ shortcutEnabled: true }),
+    );
 
     // When
-    fireEvent(document, shortcutEvent);
+    await user.click(screen.getByRole('button', { name: 'Add Repository' }));
 
     // Then
-    expect(document.activeElement).not.toBe(filterInput);
-    expect(shortcutEvent.defaultPrevented).toBe(false);
+    expect(renderRepositoryFilter).toHaveBeenLastCalledWith(
+      expect.objectContaining({ shortcutEnabled: false }),
+    );
   });
 
   it('shows the config missing error from the fetch status handling', () => {

@@ -16,7 +16,7 @@ import {
   type DropPosition,
 } from '../../presentation/reorder/reorder';
 import { AppHeader } from '../app-header/AppHeader';
-import { RepositoryFilterInput } from '../repository-filter/RepositoryFilterInput';
+import type { RepositoryFilterRenderer } from '../repository-filter/RepositoryFilterInput';
 
 export interface RepositorySelectionProps {
   addError: string | null;
@@ -33,6 +33,7 @@ export interface RepositorySelectionProps {
   onRefresh: () => void;
   onSelectRepository: (repoId: RepositoryId) => void;
   repositories: RepositoryList | null;
+  renderRepositoryFilter: RepositoryFilterRenderer;
   saving: boolean;
   clearEditError: () => void;
 }
@@ -188,6 +189,7 @@ export function RepositorySelection({
   onRefresh,
   onSelectRepository,
   repositories,
+  renderRepositoryFilter,
   saving,
   clearEditError,
 }: RepositorySelectionProps): ReactElement {
@@ -395,14 +397,13 @@ export function RepositorySelection({
                   : `${itemCount} configured`}
             </span>
           </div>
-          {itemCount > 0 && (
-            <RepositoryFilterInput
-              onChange={setFilterQuery}
+          {itemCount > 0 &&
+            renderRepositoryFilter({
+              onChange: setFilterQuery,
               // Keep keyboard input within the add form instead of moving focus back to the filter.
-              shortcutEnabled={!isAddingRepository}
-              value={filterQuery}
-            />
-          )}
+              shortcutEnabled: !isAddingRepository,
+              value: filterQuery,
+            })}
           {visibleItemCount > 0 ? (
             <ul className="repository-list">
               {visibleItems.map((repository) => (
