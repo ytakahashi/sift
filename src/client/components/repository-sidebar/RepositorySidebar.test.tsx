@@ -2,6 +2,10 @@ import { cleanup, render, screen } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { RepositoryList } from '../../../domain/repository/repository';
+import {
+  RepositoryFilterInput,
+  type RepositoryFilterRenderer,
+} from '../repository-filter/RepositoryFilterInput';
 import { RepositorySidebar, type RepositorySidebarProps } from './RepositorySidebar';
 
 const repositories: RepositoryList = {
@@ -12,9 +16,14 @@ const repositories: RepositoryList = {
   ],
 };
 
+const renderRepositoryFilter: RepositoryFilterRenderer = ({ value, onChange, className }) => (
+  <RepositoryFilterInput value={value} onChange={onChange} className={className} />
+);
+
 function renderSidebar(overrides: Partial<RepositorySidebarProps> = {}): void {
   render(
     <RepositorySidebar
+      renderRepositoryFilter={renderRepositoryFilter}
       configMissingError={null}
       currentRepositoryId="sift"
       error={null}
@@ -100,6 +109,7 @@ describe('RepositorySidebar', () => {
     // Given / When
     const { rerender } = render(
       <RepositorySidebar
+        renderRepositoryFilter={renderRepositoryFilter}
         configMissingError={null}
         currentRepositoryId="sift"
         error={null}
@@ -116,6 +126,7 @@ describe('RepositorySidebar', () => {
     // When
     rerender(
       <RepositorySidebar
+        renderRepositoryFilter={renderRepositoryFilter}
         configMissingError={null}
         currentRepositoryId="sift"
         error="network failed"
@@ -132,6 +143,7 @@ describe('RepositorySidebar', () => {
     // When
     rerender(
       <RepositorySidebar
+        renderRepositoryFilter={renderRepositoryFilter}
         configMissingError={null}
         currentRepositoryId="sift"
         error={null}
@@ -215,6 +227,7 @@ describe('RepositorySidebar', () => {
     expect(body?.classList).toContain('scroll-area');
     expect(body?.querySelector('.repository-sidebar-list')).not.toBeNull();
     expect(body?.querySelector('.repository-sidebar-header')).toBeNull();
+    expect(sidebar.querySelector('.repository-sidebar-filter')).not.toBeNull();
     expect(body?.querySelector('.repository-sidebar-filter')).toBeNull();
   });
 });

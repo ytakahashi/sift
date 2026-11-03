@@ -25,6 +25,7 @@ describe('matchesShortcut', () => {
       // Given: Command belongs to macOS and Control belongs to other platforms
       const event = {
         code: 'KeyB',
+        key: 'b',
         metaKey: false,
         ctrlKey: false,
         altKey: false,
@@ -41,7 +42,7 @@ describe('matchesShortcut', () => {
   );
 
   for (const platform of platforms) {
-    const shortcuts: KeyboardShortcut[] = [
+    const shortcuts: (KeyboardShortcut & { code: string })[] = [
       keyboardShortcuts.toggleFileList,
       keyboardShortcuts.toggleRepositorySidebar,
       { code: 'Slash' },
@@ -49,10 +50,12 @@ describe('matchesShortcut', () => {
     ];
     for (const shortcut of shortcuts) {
       it(`requires exact modifiers for ${JSON.stringify(shortcut)} on ${platform}`, () => {
-        // Given: all combinations, including the other platform's primary modifier
+        // Given: all combinations, including the other platform's primary modifier.
+        // The produced character is unrelated because physical shortcuts must ignore it.
         for (let mask = 0; mask < 16; mask++) {
           const event = {
             code: shortcut.code,
+            key: '∫',
             metaKey: !!(mask & 1),
             ctrlKey: !!(mask & 2),
             altKey: !!(mask & 4),
@@ -70,6 +73,34 @@ describe('matchesShortcut', () => {
       });
     }
   }
+
+  it.each(platforms)('matches slash characters across layouts on %s', (platform) => {
+    // Given: slash may come from another physical key and may require Shift.
+    for (let mask = 0; mask < 16; mask++) {
+      const event = {
+        code: 'Digit7',
+        key: '/',
+        metaKey: !!(mask & 1),
+        ctrlKey: !!(mask & 2),
+        altKey: !!(mask & 4),
+        shiftKey: !!(mask & 8),
+      };
+
+      // When / Then: Shift is allowed, but other modifiers are still exact.
+      expect(matchesShortcut(event, keyboardShortcuts.focusRepositoryFilter, platform)).toBe(
+        (mask & 7) === 0,
+      );
+      expect(
+        matchesShortcut(
+          { ...event, code: 'Slash', key: '?' },
+          keyboardShortcuts.focusRepositoryFilter,
+          platform,
+        ),
+      ).toBe(false);
+      expect(matchesShortcut(event, { key: '/', shift: false }, platform)).toBe(mask === 0);
+      expect(matchesShortcut(event, { key: '/', shift: true }, platform)).toBe(mask === 8);
+    }
+  });
 });
 
 describe('shortcut formatting', () => {
@@ -86,6 +117,9 @@ describe('shortcut formatting', () => {
       'Control+Alt+Shift+B',
     ],
     ['mac', { code: 'Slash' }, '/', '/'],
+    ['mac', keyboardShortcuts.focusRepositoryFilter, '/', '/'],
+    ['other', keyboardShortcuts.focusRepositoryFilter, '/', '/'],
+    ['other', { key: '?', shift: true }, 'Shift+?', 'Shift+?'],
     ['other', { code: 'Digit1', mod: true }, 'Ctrl+1', 'Control+1'],
     ['other', { code: 'Escape' }, 'Escape', 'Escape'],
   ] satisfies [KeyboardPlatform, KeyboardShortcut, string, string][])(

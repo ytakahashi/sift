@@ -7,7 +7,7 @@ import {
 import { isEditableElement } from './isEditableElement';
 
 export function useKeyboardShortcut(
-  { code, mod = false, alt = false, shift = false }: KeyboardShortcut,
+  { code, key, mod = false, alt = false, shift }: KeyboardShortcut,
   platform: KeyboardPlatform,
   handler: () => void,
   { enabled = true }: { enabled?: boolean } = {},
@@ -21,7 +21,11 @@ export function useKeyboardShortcut(
       if (
         event.defaultPrevented ||
         event.isComposing ||
-        !matchesShortcut(event, { code, mod, alt, shift }, platform) ||
+        !matchesShortcut(
+          event,
+          { ...(key !== undefined ? { key } : { code }), mod, alt, shift },
+          platform,
+        ) ||
         (!mod && isEditableElement(event.target)) ||
         // ModalDialog is mounted only while open; background actions must stay suspended.
         document.querySelector('[aria-modal="true"]') !== null
@@ -30,11 +34,13 @@ export function useKeyboardShortcut(
       }
 
       // Consume held keys too, so repeated toggles and browser shortcuts cannot leak through.
+      // Exception: once an unmodified shortcut moves focus into an editable element, the check
+      // above leaves its repeats to that element, so holding the key types there.
       event.preventDefault();
       if (!event.repeat) onShortcut();
     };
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [code, mod, alt, shift, platform, enabled]);
+  }, [code, key, mod, alt, shift, platform, enabled]);
 }

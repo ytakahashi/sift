@@ -120,7 +120,9 @@ logic and must stay free of runtime-specific APIs.
 - `pages/` contains route-level React composition for complete screens. Pages may compose hooks from
   multiple feature areas and pass injected dependencies into hooks; runtime dependencies arrive
   through props from `main.tsx` or `composition/`. Pages are the preferred place for cross-feature
-  hook composition, which would otherwise violate the `hooks/<feature>/` boundaries.
+  hook composition, which would otherwise violate the `hooks/<feature>/` boundaries. When a component
+  needs UI connected to a shared hook, a small connector component also lives here and the page
+  passes it down through a render prop, because `components/<name>/` must not depend on those hooks.
 - `application/` defines client-side ports and pure application policies, independent of React and
   browser APIs.
 - `composition/` wires infrastructure implementations to application ports.

@@ -3,6 +3,7 @@ import type { RepositoryId } from '../../domain/repository/repository';
 import { RepositorySelection } from '../components/repository-selection/RepositorySelection';
 import { useRepositories } from '../hooks/repositories/useRepositories';
 import type { AppDependencies } from '../composition/dependencies';
+import { RepositoryFilterInputWithShortcut } from './RepositoryFilterInputWithShortcut';
 
 export interface RepositorySelectionPageProps {
   dependencies: AppDependencies;
@@ -41,6 +42,9 @@ export function RepositorySelectionPage({
       onRefresh={() => void refresh()}
       onSelectRepository={onSelectRepository}
       repositories={repositories}
+      renderRepositoryFilter={(props) => (
+        <RepositoryFilterInputWithShortcut {...props} platform={dependencies.keyboardPlatform} />
+      )}
       saving={saving}
       clearEditError={clearEditError}
     />

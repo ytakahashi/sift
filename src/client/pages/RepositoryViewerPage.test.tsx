@@ -729,6 +729,78 @@ describe('RepositoryViewerPage interactions', () => {
     },
   );
 
+  describe.each(['mac', 'other'] as const)('repository filter shortcut on %s', (platform) => {
+    function dispatchSlash(): KeyboardEvent {
+      const event = new KeyboardEvent('keydown', { key: '/', cancelable: true });
+      fireEvent(document, event);
+      return event;
+    }
+
+    it('focuses and selects the sidebar filter value', async () => {
+      // Given
+      const user = userEvent.setup();
+      render(<Page keyboardPlatform={platform} />);
+      await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+      const input = await screen.findByRole<HTMLInputElement>('textbox', {
+        name: 'Filter repositories',
+      });
+      await user.type(input, 'app');
+      input.blur();
+
+      // When
+      fireEvent.keyDown(document, { key: '/', code: 'Digit7', shiftKey: true });
+
+      // Then
+      expect(document.activeElement).toBe(input);
+      expect(input.selectionStart).toBe(0);
+      expect(input.selectionEnd).toBe(3);
+    });
+
+    it('ignores slash while the sidebar is closed', async () => {
+      // Given / When
+      const user = userEvent.setup();
+      render(<Page keyboardPlatform={platform} />);
+      const beforeOpening = dispatchSlash();
+
+      await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+      await screen.findByRole('textbox', { name: 'Filter repositories' });
+      await user.click(screen.getByRole('button', { name: 'Close repository sidebar' }));
+      const afterClosing = dispatchSlash();
+
+      // Then
+      expect(beforeOpening.defaultPrevented).toBe(false);
+      expect(afterClosing.defaultPrevented).toBe(false);
+    });
+
+    it.each([
+      // Notes has no aria-modal, so it relies on the page guard rather than the hook's check.
+      { overlay: 'Notes', openLabel: 'View Notes (0)', closeLabel: '×' },
+      { overlay: 'an aria-modal dialog', openLabel: 'Discard All', closeLabel: 'Cancel' },
+    ])('suspends under $overlay and resumes after closing', async ({ openLabel, closeLabel }) => {
+      // Given
+      const user = userEvent.setup();
+      render(<Page keyboardPlatform={platform} />);
+      await user.click(screen.getByRole('button', { name: 'Open repository sidebar' }));
+      const input = await screen.findByRole('textbox', { name: 'Filter repositories' });
+      await user.click(screen.getByRole('button', { name: openLabel }));
+
+      // When
+      const blocked = dispatchSlash();
+
+      // Then
+      expect(document.activeElement).not.toBe(input);
+      expect(blocked.defaultPrevented).toBe(false);
+
+      // When
+      await user.click(screen.getByRole('button', { name: closeLabel }));
+      input.blur();
+      dispatchSlash();
+
+      // Then
+      expect(document.activeElement).toBe(input);
+    });
+  });
+
   it('registers shortcuts once after switching repositories and remounting', () => {
     // Given: switching repositories remounts the workspace
     const { rerender, unmount } = render(<Page />);
