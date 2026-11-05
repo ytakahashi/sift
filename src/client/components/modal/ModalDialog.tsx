@@ -25,8 +25,24 @@ const FOCUSABLE_SELECTOR =
   'textarea:not([disabled]), [tabindex]:not([tabindex="-1"])';
 
 /**
+ * Dialogs stack in DOM order: the backdrop and the panel share one z-index, so a
+ * dialog mounted later (e.g. a confirmation opened from another dialog) covers
+ * the earlier one, and only that last dialog handles Escape and Tab.
+ */
+const DIALOG_Z_INDEX = 200;
+
+function isTopmostDialog(dialog: HTMLElement | null): boolean {
+  const dialogs = document.querySelectorAll('[aria-modal="true"]');
+  return dialog !== null && dialogs[dialogs.length - 1] === dialog;
+}
+
+/**
  * Traps focus, closes on Escape or backdrop click, and restores focus to the
  * element that was active before the dialog opened.
+ *
+ * Nested dialogs must be rendered after (not inside) the outer dialog: the
+ * panel's transform would otherwise become the containing block of the inner
+ * dialog's fixed positioning.
  *
  * initialFocusRef must point to an element inside the panel and remain the same
  * ref object across renders (as with useRef). A new ref on each render reruns
@@ -54,7 +70,10 @@ export function ModalDialog({
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent): void => {
+      if (!isTopmostDialog(dialogRef.current)) return;
       if (event.key === 'Escape') {
+        // Escape during IME composition cancels the conversion, not the dialog.
+        if (event.isComposing) return;
         onClose();
         return;
       }
@@ -85,7 +104,7 @@ export function ModalDialog({
           position: 'fixed',
           inset: 0,
           background: 'rgba(0,0,0,0.5)',
-          zIndex: 199,
+          zIndex: DIALOG_Z_INDEX,
         }}
       />
       <div
@@ -104,7 +123,7 @@ export function ModalDialog({
           boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
           display: 'flex',
           flexDirection: 'column',
-          zIndex: 200,
+          zIndex: DIALOG_Z_INDEX,
           ...panelStyle,
         }}
       >

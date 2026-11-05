@@ -122,6 +122,48 @@ describe('NotesListModal', () => {
     expect(screen.getByText('Your Notes (1)')).toBeDefined();
   });
 
+  it('opens as a modal dialog named by its header, focusing the close button', () => {
+    // Given / When
+    render(
+      <NotesListModal
+        notes={[createLineNote()]}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // Then: focus starts on Close, not in the note form, so nothing is typed by accident
+    const dialog = screen.getByRole('dialog', { name: 'Your Notes (1)' });
+    expect(dialog.getAttribute('aria-modal')).toBe('true');
+    expect(document.activeElement).toBe(screen.getByRole('button', { name: 'Close' }));
+  });
+
+  it('closes on Escape', () => {
+    // Given
+    const onClose = vi.fn();
+    render(
+      <NotesListModal
+        notes={[createLineNote()]}
+        onClose={onClose}
+        onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => true}
+        onAddNote={vi.fn(async () => {})}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // When
+    fireEvent.keyDown(document.activeElement ?? document, { key: 'Escape' });
+
+    // Then
+    expect(onClose).toHaveBeenCalledTimes(1);
+  });
+
   it('keeps the Copy action outside the scrollable notes area so it stays reachable', () => {
     // Given: enough notes to require the notes list to scroll on a short viewport
     const notes = Array.from({ length: 10 }, (_, index) =>
@@ -143,7 +185,7 @@ describe('NotesListModal', () => {
 
     // Then: only the notes list scrolls; the Copy action sits outside it and
     // is always visible regardless of scroll position
-    const panel = screen.getByTestId('notes-modal-panel');
+    const panel = screen.getByRole('dialog', { name: 'Your Notes (10)' });
     const scrollArea = screen.getByTestId('notes-modal-scroll-area');
     const copyButton = screen.getByRole('button', { name: 'Copy' });
     expect(panel.style.maxHeight).toBe('calc(100% - 60px)');
@@ -259,7 +301,21 @@ describe('NotesListModal', () => {
 
       // Then: nothing was requested and the dialog is gone
       expect(onDeleteStaleNotes).not.toHaveBeenCalled();
-      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Delete Stale Notes' })).toBeNull();
+    });
+
+    it('dismisses only the confirmation on Escape, keeping the list open', () => {
+      // Given: the confirmation is open on top of the list
+      const onClose = vi.fn();
+      renderModal({ onClose });
+      fireEvent.click(bulkDeleteButton());
+
+      // When
+      fireEvent.keyDown(document.activeElement ?? document, { key: 'Escape' });
+
+      // Then
+      expect(screen.queryByRole('dialog', { name: 'Delete Stale Notes' })).toBeNull();
+      expect(onClose).not.toHaveBeenCalled();
     });
 
     it('requests the deletion once when confirmed', () => {
@@ -269,11 +325,15 @@ describe('NotesListModal', () => {
       fireEvent.click(bulkDeleteButton());
 
       // When: the deletion is confirmed (the dialog's Delete, not a note's)
-      fireEvent.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+      fireEvent.click(
+        within(screen.getByRole('dialog', { name: 'Delete Stale Notes' })).getByRole('button', {
+          name: 'Delete',
+        }),
+      );
 
       // Then: one request goes out and the dialog closes
       expect(onDeleteStaleNotes).toHaveBeenCalledTimes(1);
-      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Delete Stale Notes' })).toBeNull();
     });
 
     it('disables both deletions while a notes mutation is in flight', () => {
@@ -308,7 +368,7 @@ describe('NotesListModal', () => {
       );
 
       // Then: there is nothing left to confirm, so the dialog closes
-      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(screen.queryByRole('dialog', { name: 'Delete Stale Notes' })).toBeNull();
     });
 
     it('counts every stale note in the confirmation', () => {

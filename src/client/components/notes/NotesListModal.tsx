@@ -1,4 +1,4 @@
-import { useState, type ReactElement } from 'react';
+import { useId, useRef, useState, type ReactElement } from 'react';
 import type { Note } from '../../../domain/notes/types';
 import {
   describeNoteStaleReason,
@@ -6,6 +6,7 @@ import {
   formatNotesForClipboard,
 } from '../../../domain/notes/format';
 import { isLiveNote } from '../../../domain/notes/note-staleness';
+import { ModalDialog } from '../modal/ModalDialog';
 import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
 import { DeleteStaleNotesConfirmModal } from './DeleteStaleNotesConfirmModal';
 import { FileNoteCreateForm } from './FileNoteCreateForm';
@@ -39,6 +40,10 @@ export function NotesListModal({
 }: NotesListModalProps): ReactElement {
   const { copied, copy } = useCopyFeedback();
   const [confirmingDeleteStale, setConfirmingDeleteStale] = useState(false);
+  // Focus the close button rather than the note form so opening the list does
+  // not drop the reader straight into typing.
+  const closeButtonRef = useRef<HTMLButtonElement>(null);
+  const titleId = useId();
   const liveNotes = notes.filter(isLiveNote);
   const staleNotes = notes.filter((note) => !isLiveNote(note));
   // The confirmation is about the notes that are stale right now. If the last
@@ -109,34 +114,19 @@ export function NotesListModal({
 
   return (
     <>
-      {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          right: 0,
-          bottom: 0,
-          zIndex: 99,
-        }}
-      />
-      {/* Modal panel */}
-      <div
-        data-testid="notes-modal-panel"
-        style={{
+      {/* Anchored below the header inside .app-main rather than centered. */}
+      <ModalDialog
+        titleId={titleId}
+        initialFocusRef={closeButtonRef}
+        onClose={onClose}
+        panelStyle={{
           position: 'absolute',
           top: '40px',
           right: '1rem',
+          left: 'auto',
+          transform: 'none',
           width: '500px',
           maxHeight: 'calc(100% - 60px)',
-          backgroundColor: '#161b22',
-          border: '1px solid #30363d',
-          borderRadius: '6px',
-          boxShadow: '0 8px 24px rgba(0,0,0,0.2)',
-          display: 'flex',
-          flexDirection: 'column',
-          zIndex: 100,
         }}
       >
         <div
@@ -148,9 +138,14 @@ export function NotesListModal({
             alignItems: 'center',
           }}
         >
-          <span style={{ fontWeight: 600, fontSize: '0.9rem' }}>Your Notes ({countLabel})</span>
+          <span id={titleId} style={{ fontWeight: 600, fontSize: '0.9rem' }}>
+            Your Notes ({countLabel})
+          </span>
           <button
+            ref={closeButtonRef}
+            aria-label="Close"
             onClick={onClose}
+            type="button"
             style={{
               background: 'transparent',
               color: '#8b949e',
@@ -229,7 +224,8 @@ export function NotesListModal({
             </button>
           </div>
         </div>
-      </div>
+      </ModalDialog>
+      {/* A sibling after the list dialog, so it stacks on top of it (see ModalDialog). */}
       {confirmingDeleteStale && (
         <DeleteStaleNotesConfirmModal
           staleCount={staleNotes.length}

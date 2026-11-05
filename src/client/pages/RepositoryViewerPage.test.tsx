@@ -682,16 +682,16 @@ describe('RepositoryViewerPage interactions', () => {
       'View Notes (0)',
       'mac',
       { metaKey: true },
-      () => screen.getByTestId('notes-modal-panel'),
-      '×',
+      () => screen.getByRole('dialog', { name: 'Your Notes (0)' }),
+      'Close',
     ],
     ['Discard All', 'mac', { metaKey: true }, () => screen.getByRole('dialog'), 'Cancel'],
     [
       'View Notes (0)',
       'other',
       { ctrlKey: true },
-      () => screen.getByTestId('notes-modal-panel'),
-      '×',
+      () => screen.getByRole('dialog', { name: 'Your Notes (0)' }),
+      'Close',
     ],
     ['Discard All', 'other', { ctrlKey: true }, () => screen.getByRole('dialog'), 'Cancel'],
   ] as const)(
@@ -773,9 +773,8 @@ describe('RepositoryViewerPage interactions', () => {
     });
 
     it.each([
-      // Notes has no aria-modal, so it relies on the page guard rather than the hook's check.
-      { overlay: 'Notes', openLabel: 'View Notes (0)', closeLabel: '×' },
-      { overlay: 'an aria-modal dialog', openLabel: 'Discard All', closeLabel: 'Cancel' },
+      { overlay: 'Notes', openLabel: 'View Notes (0)', closeLabel: 'Close' },
+      { overlay: 'Discard All', openLabel: 'Discard All', closeLabel: 'Cancel' },
     ])('suspends under $overlay and resumes after closing', async ({ openLabel, closeLabel }) => {
       // Given
       const user = userEvent.setup();
@@ -1116,10 +1115,12 @@ describe('RepositoryViewerPage Notes Interactions', () => {
 
     // Then: modal is visible
     expect(screen.getByText('Your Notes (1)')).toBeDefined();
-    expect(screen.getByTestId('notes-modal-panel').closest('.app-main')).not.toBeNull();
+    expect(
+      screen.getByRole('dialog', { name: 'Your Notes (1)' }).closest('.app-main'),
+    ).not.toBeNull();
 
     // When: close button clicked
-    await user.click(screen.getByRole('button', { name: '×' }));
+    await user.click(screen.getByRole('button', { name: 'Close' }));
 
     // Then: modal is hidden
     expect(screen.queryByText('Your Notes (1)')).toBeNull();
@@ -1395,7 +1396,11 @@ describe('RepositoryViewerPage Notes Interactions', () => {
 
       // When: the bulk action is confirmed
       await user.click(screen.getByRole('button', { name: 'Delete stale notes' }));
-      await user.click(within(screen.getByRole('dialog')).getByRole('button', { name: 'Delete' }));
+      await user.click(
+        within(screen.getByRole('dialog', { name: 'Delete Stale Notes' })).getByRole('button', {
+          name: 'Delete',
+        }),
+      );
 
       // Then: the page delegates to the hook, which owns the request and refetch
       expect(deleteStaleNotes).toHaveBeenCalledTimes(1);
