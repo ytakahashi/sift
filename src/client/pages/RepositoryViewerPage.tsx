@@ -276,15 +276,11 @@ function RepositoryWorkspace({
   });
   const toggleFileList = (): void => setIsFileListOpen((isOpen) => !isOpen);
   const platform = dependencies.keyboardPlatform;
-  // The Notes overlay does not use ModalDialog, so suspend its background shortcuts explicitly.
-  useKeyboardShortcut(keyboardShortcuts.toggleFileList, platform, toggleFileList, {
-    enabled: !notesPanel.isOpen,
-  });
+  useKeyboardShortcut(keyboardShortcuts.toggleFileList, platform, toggleFileList);
   useKeyboardShortcut(
     keyboardShortcuts.toggleRepositorySidebar,
     platform,
     onToggleRepositorySidebar,
-    { enabled: !notesPanel.isOpen },
   );
   const repositorySidebarToggleLabel = isRepositorySidebarOpen
     ? 'Close repository sidebar'
@@ -526,12 +522,7 @@ function RepositoryWorkspace({
             onSelectRepository={onSelectRepository}
             repositories={repositoryList}
             renderRepositoryFilter={(props) => (
-              <RepositoryFilterInputWithShortcut
-                {...props}
-                platform={platform}
-                // Notes does not expose aria-modal yet, so apply the same background guard as toggles.
-                shortcutEnabled={props.shortcutEnabled && !notesPanel.isOpen}
-              />
+              <RepositoryFilterInputWithShortcut {...props} platform={platform} />
             )}
           />
         )}
