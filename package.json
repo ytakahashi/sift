@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@clack/prompts": "1.8.1",
-    "@hono/node-server": "2.1.5",
+    "@hono/node-server": "2.1.6",
     "@modelcontextprotocol/server": "2.4.0",
     "chokidar": "6.0.0",
     "commander": "15.0.0",
