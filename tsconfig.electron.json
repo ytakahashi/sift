@@ -8,7 +8,6 @@
     "src/entrypoints/electron",
     "src/entrypoints/shared",
     "src/server",
-    "src/domain",
-    "src/local-config"
+    "src/domain"
   ]
 }

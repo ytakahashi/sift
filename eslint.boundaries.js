@@ -105,7 +105,6 @@ export const boundariesConfig = {
               dependency('client-presentation'),
               dependency('client-application'),
               dependency('client-composition'),
-              dependency('client-infrastructure'),
               domain,
             ],
           },
@@ -216,12 +215,7 @@ export const boundariesConfig = {
           { from: [element('entrypoint-shared')], allow: [domain] },
           {
             from: [element('entrypoint')],
-            allow: [
-              dependency('entrypoint-shared'),
-              dependency('server-root'),
-              dependency('server-infrastructure'),
-              domain,
-            ],
+            allow: [dependency('entrypoint-shared'), dependency('server-root'), domain],
           },
           {
             from: [element('entrypoint')],
