@@ -68,7 +68,7 @@ export function SyntaxHighlightedLine({ content, filePath }: Props): ReactElemen
     }
     try {
       return Prism.tokenize(content, Prism.languages[language]);
-    } catch {
+    } catch (_error: unknown) {
       return null;
     }
   }, [content, filePath]);

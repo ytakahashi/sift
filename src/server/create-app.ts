@@ -127,8 +127,11 @@ export function createApp(options: CreateAppOptions): Hono<Env> {
     }),
   );
 
-  // In production, static files can be served here via hono static middleware.
-  // Vite dev server intercepts requests before they hit this if the file exists.
+  // Registered last so it only catches unmatched API paths. The production
+  // server mounts this app ahead of its SPA fallback, which would otherwise
+  // answer unknown API paths with index.html and a 200, and API clients such as
+  // mcp/ would see an unparseable body instead of a 404.
+  app.all('/api/*', (c) => c.json({ error: 'Not Found' }, 404));
 
   return app;
 }

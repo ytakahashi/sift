@@ -32,7 +32,7 @@ export function parseAppRoute(pathname: string): AppRoute | null {
       repoId: decodeURIComponent(match[1]),
       type: 'repository',
     };
-  } catch {
+  } catch (_error: unknown) {
     return null;
   }
 }

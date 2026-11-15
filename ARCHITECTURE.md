@@ -75,8 +75,9 @@ express are bans on named modules, and live in `eslint.config.js` as `no-restric
 Some rules are documented here but **not** tool-enforced, because they are file-level, semantic, or
 not expressible as import restrictions at all:
 
-- the rules distinguishing `server/create-app.ts` from `server/index.ts` for callers that may
-  legitimately import both (`entrypoints/`)
+- the rules distinguishing the server composition files (`create-app.ts`, `server-runtime.ts`,
+  `index.ts`, `dev-entry.ts`) from one another, since they share the server root with each other
+  and with the utilities `mcp/` may import
 - whether a component reused across `components/<name>/` directories is presentation-focused
 - keeping browser runtime APIs out of `application/` and `presentation/`, since those are globals
   rather than imports
@@ -160,10 +161,17 @@ logic and must stay free of runtime-specific APIs.
   Node.js APIs, Git, and the filesystem. Config file I/O, schema parsing, path normalization, and
   the default config path live in `infrastructure/config/`.
 - `create-app.ts` is the route-level composition root. It wires route factories to service ports and
-  infrastructure implementations, and may import from all server layers except `index.ts`. It should
-  not own long-lived runtime lifecycle; pass runtime-owned resources in through `CreateAppOptions`.
-- `index.ts` is the runtime composition root. It owns server startup, static file serving, signal
-  cleanup, config watcher lifecycle, and watch manager lifecycle.
+  infrastructure implementations, and may import from all server layers except the runtime-side
+  files (`server-runtime.ts`, `index.ts`, `dev-entry.ts`). It should not own long-lived runtime
+  lifecycle; pass runtime-owned resources in through `CreateAppOptions`.
+- `server-runtime.ts` builds the API app together with the long-lived resources it needs (config
+  watcher, watch manager) and returns a `stop` that releases them. The caller of
+  `createServerRuntime` owns that lifecycle.
+- `index.ts` is the runtime composition root for the CLI and Electron. It owns server startup,
+  static file serving, signal cleanup, and stopping the runtime it created. Importing it must not
+  create a runtime.
+- `dev-entry.ts` is the entry module for the Vite dev server only. It creates a runtime at import
+  time and keeps it for the lifetime of the Vite process.
 
 ### Server Testing
 

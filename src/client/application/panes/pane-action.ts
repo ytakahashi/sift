@@ -40,7 +40,7 @@ export async function runOptimisticPaneAction<S>(
   try {
     await serverCall();
     return true;
-  } catch {
+  } catch (_error: unknown) {
     rollback(snapshot);
     return false;
   }

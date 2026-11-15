@@ -62,8 +62,9 @@ export const boundariesConfig = {
       { type: 'server-services', pattern: 'src/server/services', partialMatch: false },
       { type: 'server-watch', pattern: 'src/server/watch', partialMatch: false },
       { type: 'server-infrastructure', pattern: 'src/server/infrastructure', partialMatch: false },
-      // create-app.ts, index.ts, and utilities shared with mcp/ (health probe,
-      // port resolver).
+      // Composition roots (create-app.ts, server-runtime.ts, index.ts,
+      // dev-entry.ts) and utilities shared with mcp/ (health probe, port
+      // resolver).
       { type: 'server-root', pattern: 'src/server', partialMatch: false },
 
       // --- other layers -------------------------------------------------
