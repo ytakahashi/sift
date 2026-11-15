@@ -83,6 +83,16 @@ export default tseslint.config(
       ],
     },
   },
+  {
+    // Tooling scripts and configs that run directly on Node.js without a
+    // TypeScript build step.
+    extends: [js.configs.recommended],
+    files: ['**/*.{js,mjs}'],
+    languageOptions: {
+      ecmaVersion: 2022,
+      globals: globals.node,
+    },
+  },
   boundariesConfig,
   {
     // domain/ is pure business logic and server/contract/ is the HTTP wire
