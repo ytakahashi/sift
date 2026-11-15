@@ -7,7 +7,7 @@ export default defineConfig({
   plugins: [
     react(),
     devServer({
-      entry: 'src/server/index.ts',
+      entry: 'src/server/dev-entry.ts',
       exclude: [/^(?!\/api).*/],
       injectClientScript: false,
     }),

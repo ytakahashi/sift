@@ -140,6 +140,20 @@ describe('createApp', () => {
     await expect(response.json()).resolves.toEqual({ error: 'A valid blob ID is required.' });
   });
 
+  it('answers an unknown API path with a JSON 404', async () => {
+    // Given
+    const app = createApp({
+      repoWatchManager: { broadcastNotesChanged: vi.fn(), close: vi.fn(), subscribe: vi.fn() },
+    });
+
+    // When
+    const response = await app.request('/api/unknown', { headers: { host: 'localhost' } });
+
+    // Then
+    expect(response.status).toBe(404);
+    await expect(response.json()).resolves.toEqual({ error: 'Not Found' });
+  });
+
   it('rejects a browser-simple JSON action before resolving a repository', async () => {
     // Given: the request body is valid JSON sent as text/plain
     const readConfig = vi.fn();

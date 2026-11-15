@@ -34,7 +34,7 @@ function listIgnoredPaths(repoRoot: string): IgnoredPath[] {
         absolutePath: resolvePath(repoRoot, ignoredPath.replace(/[/]$/, '')),
         directory: /[/]$/.test(ignoredPath),
       }));
-  } catch {
+  } catch (_error: unknown) {
     // Ignore matcher setup should not crash the watcher. If Git cannot provide
     // ignored paths, fall back to watching more paths rather than missing
     // repository changes.

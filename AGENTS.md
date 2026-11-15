@@ -17,11 +17,6 @@ for `pnpm add`; keep it in mind when editing `package.json` by hand.
 
 ## Coding Style Guidelines
 
-### TypeScript
-
-- When intentionally discarding an error, bind it as `_error: unknown` rather than omitting the
-  binding entirely (`catch { ... }`).
-
 ### Code Comments
 
 - Add comments to explain user scenarios and design rationale when necessary to provide context for

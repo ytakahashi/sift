@@ -49,7 +49,7 @@ function getHeadRevisionSync(repoRoot: string): string {
     // Empty repositories do not have HEAD yet. Treat that as an empty revision
     // so auto refresh still works before the first commit.
     return runGitCommandSync(repoRoot, ['rev-parse', 'HEAD']);
-  } catch {
+  } catch (_error: unknown) {
     return '';
   }
 }
@@ -58,7 +58,7 @@ async function getHeadRevision(repoRoot: string): Promise<string> {
   try {
     // Keep the empty-repository behavior consistent with the sync path.
     return await runGitCommand(repoRoot, ['rev-parse', 'HEAD']);
-  } catch {
+  } catch (_error: unknown) {
     return '';
   }
 }
@@ -93,7 +93,7 @@ function buildPathMetadataSync(repoRoot: string, paths: string[]): string {
       try {
         const fileStat = statSync(path.join(repoRoot, filePath));
         return `${filePath}\t${fileStat.size}\t${fileStat.mtimeMs}`;
-      } catch {
+      } catch (_error: unknown) {
         return `${filePath}\tmissing`;
       }
     })
@@ -106,7 +106,7 @@ async function buildPathMetadata(repoRoot: string, paths: string[]): Promise<str
       try {
         const fileStat = await stat(path.join(repoRoot, filePath));
         return `${filePath}\t${fileStat.size}\t${fileStat.mtimeMs}`;
-      } catch {
+      } catch (_error: unknown) {
         return `${filePath}\tmissing`;
       }
     }),
@@ -260,7 +260,7 @@ export function createRepoWatcher(repoRoot: string, onChanged: () => void): Repo
         lastFingerprint = nextFingerprint;
         onChanged();
       }
-    } catch {
+    } catch (_error: unknown) {
       // Git can fail transiently during index updates or repository maintenance.
     } finally {
       checking = false;

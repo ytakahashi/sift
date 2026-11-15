@@ -67,6 +67,20 @@ export default tseslint.config(
           caughtErrorsIgnorePattern: '^_',
         },
       ],
+      // Catch bindings are always explicit and typed, so an intentionally
+      // discarded error reads as `catch (_error: unknown)`; combined with
+      // caughtErrorsIgnorePattern above, the `_` prefix marks the discard.
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'CatchClause[param=null]',
+          message: 'Bind the caught error (e.g. `catch (_error: unknown)`) instead of omitting it.',
+        },
+        {
+          selector: 'CatchClause > Identifier.param:not([typeAnnotation])',
+          message: 'Annotate the caught error as `unknown` (e.g. `catch (error: unknown)`).',
+        },
+      ],
     },
   },
   boundariesConfig,
@@ -127,7 +141,8 @@ export default tseslint.config(
   {
     // mcp/ is an HTTP client of an already-running server. It shares the server
     // root with utilities it legitimately needs (health probe, port resolver),
-    // so boundaries cannot separate them; ban the composition roots by name.
+    // so boundaries cannot separate them; ban the composition roots and the
+    // runtime factory by name.
     files: ['src/mcp/**/*.ts'],
     rules: {
       '@typescript-eslint/no-restricted-imports': [
@@ -135,7 +150,12 @@ export default tseslint.config(
         {
           patterns: [
             {
-              group: ['**/server/create-app', '**/server/index'],
+              group: [
+                '**/server/create-app',
+                '**/server/server-runtime',
+                '**/server/index',
+                '**/server/dev-entry',
+              ],
               message: 'mcp/ connects to an existing Sift server; it must not build or start one.',
             },
           ],

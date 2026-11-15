@@ -1,27 +1,17 @@
 import { createAdaptorServer } from '@hono/node-server';
 import { serveStatic } from '@hono/node-server/serve-static';
 import type { ServerType } from '@hono/node-server';
-import { createApp } from './create-app';
 import type { Env } from './routes/env';
 import { Hono } from 'hono';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { createRepoWatchManager } from './watch/repo-watch-manager';
-import { createRepoWatcher } from './infrastructure/watch/repo-watcher-impl';
-import { RepositoryConfigWatcher } from './infrastructure/config/repository-config-watcher';
-import { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
-import { validateRepositoryPath } from './infrastructure/repository-validator';
+import { createServerRuntime, type ServerRuntime } from './server-runtime';
 import { buildLocalServerUrl, LOOPBACK_HOST, resolvePort } from './fixed-port';
 import { checkExistingSiftServer } from './health-probe';
 
 export interface StartedServer {
   url: string;
   owned: boolean;
-  stop: () => Promise<void>;
-}
-
-interface ServerRuntime {
-  app: Hono<Env>;
   stop: () => Promise<void>;
 }
 
@@ -64,40 +54,6 @@ function listenOnPort(
     });
   });
 }
-
-function createServerRuntime(): ServerRuntime {
-  // createRepoWatcher is passed explicitly; repo-watch-manager no longer imports infra directly.
-  const repoWatchManager = createRepoWatchManager({ createWatcher: createRepoWatcher });
-  const configWatcher = new RepositoryConfigWatcher();
-  const validateRepository = validateRepositoryPath;
-  const app = new Hono<Env>();
-
-  app.route(
-    '/',
-    createApp({
-      repoWatchManager,
-      readConfig: () => configWatcher.readConfig(),
-      validateRepository,
-      repositoryConfigUpdater: createRepositoryConfigUpdater({
-        invalidateConfig: () => configWatcher.invalidate(),
-        validateRepository,
-      }),
-    }),
-  );
-
-  return {
-    app,
-    stop: async () => {
-      await repoWatchManager.close();
-      await configWatcher.stop();
-    },
-  };
-}
-
-// Shared instance for Vite Dev server when running via `vite` CLI
-const defaultRuntime = createServerRuntime();
-
-export default defaultRuntime.app;
 
 export { createRepositoryConfigUpdater } from './infrastructure/config/repository-config-updater-impl';
 export { createRegisteredRepositoryLister } from './infrastructure/config/repository-config-lister-impl';
