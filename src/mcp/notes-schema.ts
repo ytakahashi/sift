@@ -1,5 +1,11 @@
 import { z } from 'zod';
-import { NOTE_STALE_REASONS, type Note, type NoteStaleness } from '../domain/notes/types';
+import {
+  NOTE_STALE_REASONS,
+  RESPONSE_RESOLUTIONS,
+  REVIEW_THREAD_STATUSES,
+  type Note,
+  type NoteStaleness,
+} from '../domain/notes/types';
 
 export const listNotesInputSchema = z
   .object({
@@ -19,8 +25,30 @@ const stalenessSchema: z.ZodType<NoteStaleness> = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('stale'), reason: z.enum(NOTE_STALE_REASONS) }).strict(),
 ]);
 
+const authorSchema = z.strictObject({
+  role: z.enum(['user', 'reviewer', 'implementer']),
+  client: z.string().optional(),
+});
+
+const noteMetadataFields = {
+  author: authorSchema.optional(),
+  reviewId: z.string().optional(),
+  status: z.enum(REVIEW_THREAD_STATUSES).optional(),
+  replies: z
+    .array(
+      z.strictObject({
+        author: authorSchema,
+        body: z.string(),
+        round: z.number().int().min(0),
+        resolution: z.enum(RESPONSE_RESOLUTIONS).optional(),
+      }),
+    )
+    .optional(),
+};
+
 const lineNoteSchema = z
   .object({
+    ...noteMetadataFields,
     id: z.string(),
     kind: z.literal('line'),
     path: z.string(),
@@ -35,6 +63,7 @@ const lineNoteSchema = z
 
 const fileNoteSchema = z
   .object({
+    ...noteMetadataFields,
     id: z.string(),
     kind: z.literal('file'),
     path: z.string(),

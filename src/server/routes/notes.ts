@@ -6,11 +6,11 @@ import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNoteTarget } from '../../domain/notes/anchored-note';
 import { isNoteEligibleFile } from '../../domain/notes/note-eligibility';
 import { resolveLineNoteTarget } from '../../domain/notes/resolve-line-note-target';
-import type { NoteBucket } from '../../domain/notes/types';
+import type { NoteCreateTarget } from '../../domain/notes/types';
 import type { RepositoryId } from '../../domain/repository/repository';
 import type { Env } from './env';
 import type { FileGenerationProvider } from '../services/file-generation-provider';
-import type { NotesCurrentState, NotesStore } from '../services/notes-store';
+import type { NotesCurrentState, NotesStore, ReviewCommentDraft } from '../services/notes-store';
 import {
   NoteGenerationUnavailableError,
   NoteRequestValidationError,
@@ -23,6 +23,12 @@ import {
   type RepositoryIndexProvider,
 } from '../services/repository-index-provider';
 import { toNoteResponse } from './note-response';
+import {
+  parseReviewRequest,
+  ReviewCommentError,
+  reviewRequestSchema,
+  reviewResponseRequestSchema,
+} from './review-request';
 import { handleRouteError } from './route-error';
 
 export interface CreateNotesRoutesOptions {
@@ -37,22 +43,9 @@ export interface CreateNotesRoutesOptions {
 /** Current repository state shared between reconcile and POST target resolution. */
 interface RepoNotesContext extends NotesCurrentState {
   repoId: RepositoryId;
-  /** Present only when a POST file target had no corresponding diff entry. */
-  repositoryTarget?: {
-    path: string;
-    indexEntry: RepositoryIndexEntry | null;
-  };
+  /** Index entries for requested file targets outside the diff. */
+  repositoryTargets?: ReadonlyMap<string, RepositoryIndexEntry>;
 }
-
-type NoteCreateRequest =
-  | {
-      kind: 'line';
-      path: string;
-      startLine: number;
-      endLine: number;
-      bucket?: NoteBucket;
-    }
-  | { kind: 'file'; path: string };
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -107,7 +100,7 @@ function readRepositoryRelativeNotePath(value: unknown): string {
   return value;
 }
 
-function readCreateTarget(body: Record<string, unknown>): NoteCreateRequest {
+function readCreateTarget(body: Record<string, unknown>): NoteCreateTarget {
   const target = body.target;
   if (!isRecord(target)) {
     throw new NoteRequestValidationError('Note requires a target object.');
@@ -215,7 +208,7 @@ function requireConfirmedGeneration(
 
 function resolveCreateTarget(
   context: RepoNotesContext,
-  request: NoteCreateRequest,
+  request: NoteCreateTarget,
 ): { target: AnchoredNoteTarget; generation: ConfirmedFileGeneration; lineContents?: string[] } {
   if (request.kind === 'file') {
     const file = findEligibleFileByPath(context, request.path);
@@ -227,18 +220,14 @@ function resolveCreateTarget(
         );
       }
 
-      const repositoryTarget = context.repositoryTarget;
-      if (
-        repositoryTarget === undefined ||
-        repositoryTarget.path !== request.path ||
-        repositoryTarget.indexEntry === null
-      ) {
+      const indexEntry = context.repositoryTargets?.get(request.path);
+      if (!indexEntry) {
         throw new NoteTargetResolutionError(
           `"${request.path}" is neither tracked nor part of the current diff.`,
           'not-found',
         );
       }
-      if (isSubmoduleIndexEntry(repositoryTarget.indexEntry)) {
+      if (isSubmoduleIndexEntry(indexEntry)) {
         throw new NoteTargetResolutionError(
           `"${request.path}" is a submodule; notes cannot be attached to submodules.`,
           'ineligible',
@@ -318,6 +307,26 @@ function resolveCreateTarget(
   };
 }
 
+function prepareComment(
+  context: RepoNotesContext,
+  target: NoteCreateTarget,
+  body: string,
+): ReviewCommentDraft {
+  const resolved = resolveCreateTarget(context, target);
+  return {
+    draft: { path: target.path, target: resolved.target, body },
+    anchor: { generation: resolved.generation, lineContents: resolved.lineContents },
+  };
+}
+
+function validateComment<T>(index: number, validate: () => T): T {
+  try {
+    return validate();
+  } catch (error: unknown) {
+    throw new ReviewCommentError(index, error);
+  }
+}
+
 export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> {
   const notesRoutes = new Hono<Env>();
   const resolver = options.repositoryResolver;
@@ -329,7 +338,7 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
    */
   const loadRepoNotesContext = async (
     c: Context<Env>,
-    createRequest?: NoteCreateRequest,
+    createRequests: readonly NoteCreateTarget[] = [],
   ): Promise<RepoNotesContext> => {
     const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
     const diffProvider = options.createDiffProvider(repository.path);
@@ -339,16 +348,17 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
     ]);
 
     const diffFiles = [...workingFiles, ...stagedFiles];
-    let repositoryTarget: RepoNotesContext['repositoryTarget'];
-    if (
-      createRequest?.kind === 'file' &&
-      !diffFiles.some((file) => file.path === createRequest.path)
-    ) {
-      const indexEntry = await options
-        .createRepositoryIndexProvider(repository.path)
-        .getIndexEntry(createRequest.path);
-      repositoryTarget = { path: createRequest.path, indexEntry };
-    }
+    const diffPaths = new Set(diffFiles.map((file) => file.path));
+    const indexPaths = new Set(
+      createRequests
+        .filter((request) => request.kind === 'file' && !diffPaths.has(request.path))
+        .map((request) => request.path),
+    );
+    const repositoryTargets = indexPaths.size
+      ? await options
+          .createRepositoryIndexProvider(repository.path)
+          .getIndexEntries([...indexPaths])
+      : undefined;
 
     // Stored note paths must participate in every reconciliation path. A
     // missing generation leaves a live repository-scoped note live forever,
@@ -358,9 +368,9 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       ...new Set([
         ...diffFiles.filter(isNoteEligibleFile).map((file) => file.path),
         ...existingNotes.map((note) => note.path),
-        ...(repositoryTarget?.indexEntry && !isSubmoduleIndexEntry(repositoryTarget.indexEntry)
-          ? [repositoryTarget.path]
-          : []),
+        ...[...(repositoryTargets ?? [])].flatMap(([path, entry]) =>
+          isSubmoduleIndexEntry(entry) ? [] : [path],
+        ),
       ]),
     ];
     const generations = await options
@@ -372,7 +382,7 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       workingFiles,
       stagedFiles,
       generations,
-      ...(repositoryTarget ? { repositoryTarget } : {}),
+      ...(repositoryTargets ? { repositoryTargets } : {}),
     };
   };
 
@@ -385,9 +395,9 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
    */
   const reconcileRepo = async (
     c: Context<Env>,
-    createRequest?: NoteCreateRequest,
+    createRequests: readonly NoteCreateTarget[] = [],
   ): Promise<RepoNotesContext> => {
-    const context = await loadRepoNotesContext(c, createRequest);
+    const context = await loadRepoNotesContext(c, createRequests);
     const changed = await options.notesStore.reconcile(context.repoId, context);
     if (changed) {
       options.notifyNotesChanged(context.repoId);
@@ -397,9 +407,16 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
 
   notesRoutes.get('/repositories/:repoId/notes', async (c) => {
     try {
+      const reviewIds = new URL(c.req.url).searchParams.getAll('reviewId');
+      if (reviewIds.length > 1 || reviewIds[0]?.trim() === '') {
+        throw new NoteRequestValidationError('Expected a single non-empty reviewId.');
+      }
       const context = await reconcileRepo(c);
       const notes = await options.notesStore.list(context.repoId);
-      return c.json({ notes: notes.map(toNoteResponse) });
+      const selected = reviewIds.length
+        ? notes.filter((note) => note.reviewId === reviewIds[0])
+        : notes;
+      return c.json({ notes: selected.map(toNoteResponse) });
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }
@@ -410,16 +427,10 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
       const body = await readJsonBody(c);
       const noteBody = readNoteBody(body);
       const request = readCreateTarget(body);
-      const context = await reconcileRepo(c, request);
+      const context = await reconcileRepo(c, [request]);
 
-      const resolved = resolveCreateTarget(context, request);
-      const note = await options.notesStore.add(
-        context.repoId,
-        // Target resolution matches paths exactly, so the requested path is
-        // the resolved file's path.
-        { path: request.path, target: resolved.target, body: noteBody },
-        { generation: resolved.generation, lineContents: resolved.lineContents },
-      );
+      const { draft, anchor } = prepareComment(context, request, noteBody);
+      const note = await options.notesStore.add(context.repoId, draft, anchor);
       options.notifyNotesChanged(context.repoId);
       return c.json(toNoteResponse(note), 201);
     } catch (error: unknown) {
@@ -471,11 +482,71 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
         return c.json({ deletedCount: result.deletedCount });
       }
 
-      // The explicit clear-all skips reconcile: everything is removed anyway.
+      // Clearing all eligible notes does not depend on their staleness.
       const repository = await resolver.resolveRepository(c.req.param('repoId') as string);
       await options.notesStore.clear(repository.id);
       options.notifyNotesChanged(repository.id);
       return c.body(null, 204);
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
+    }
+  });
+
+  notesRoutes.get('/repositories/:repoId/review', async (c) => {
+    try {
+      const repository = await resolver.resolveRepository(c.req.param('repoId'));
+      const review = await options.notesStore.getReview(repository.id);
+      return c.json({ review: review ?? null });
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
+    }
+  });
+
+  notesRoutes.post('/repositories/:repoId/review/submit-review', async (c) => {
+    try {
+      const { comments, ...submission } = parseReviewRequest(
+        reviewRequestSchema,
+        await readJsonBody(c),
+      );
+      const requests = comments.map((comment, index) =>
+        validateComment(index, () => {
+          if (!isRecord(comment)) {
+            throw new NoteRequestValidationError('Expected a note request object.');
+          }
+          return { target: readCreateTarget(comment), body: readNoteBody(comment) };
+        }),
+      );
+
+      // Resolve against the same repository snapshot and leave the store untouched
+      // until every comment is ready. Staleness has no bearing on review transitions.
+      const context = requests.length
+        ? await loadRepoNotesContext(
+            c,
+            requests.map(({ target }) => target),
+          )
+        : undefined;
+      const drafts = context
+        ? requests.map(({ target, body }, index) =>
+            validateComment(index, () => prepareComment(context, target, body)),
+          )
+        : [];
+      const repoId =
+        context?.repoId ?? (await resolver.resolveRepository(c.req.param('repoId'))).id;
+      const session = await options.notesStore.submitReview(repoId, submission, drafts);
+      options.notifyNotesChanged(repoId);
+      return c.json(session);
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
+    }
+  });
+
+  notesRoutes.post('/repositories/:repoId/review/submit-response', async (c) => {
+    try {
+      const submission = parseReviewRequest(reviewResponseRequestSchema, await readJsonBody(c));
+      const repository = await resolver.resolveRepository(c.req.param('repoId'));
+      const session = await options.notesStore.submitResponse(repository.id, submission);
+      options.notifyNotesChanged(repository.id);
+      return c.json(session);
     } catch (error: unknown) {
       return handleRouteError(c, error);
     }

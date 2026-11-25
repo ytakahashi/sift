@@ -37,12 +37,38 @@ export type NoteStaleReason = (typeof NOTE_STALE_REASONS)[number];
  */
 export type NoteStaleness = { kind: 'live' } | { kind: 'stale'; reason: NoteStaleReason };
 
+export type NoteAuthor = {
+  role: 'user' | 'reviewer' | 'implementer';
+  /** Display name supplied by the caller. Review decisions use the role. */
+  client?: string;
+};
+
+export const REVIEW_THREAD_STATUSES = ['open', 'resolved'] as const;
+export const RESPONSE_RESOLUTIONS = ['fixed', 'declined', 'discuss'] as const;
+
+export type ReviewThreadStatus = (typeof REVIEW_THREAD_STATUSES)[number];
+export type ResponseResolution = (typeof RESPONSE_RESOLUTIONS)[number];
+
+export type NoteReply = {
+  author: NoteAuthor;
+  body: string;
+  round: number;
+  resolution?: ResponseResolution;
+};
+
+export interface NoteMetadata {
+  author?: NoteAuthor;
+  reviewId?: string;
+  status?: ReviewThreadStatus;
+  replies?: readonly NoteReply[];
+}
+
 /**
  * Public shape of a line note: addressed by repository-relative path and
  * inclusive line range, as HTTP clients and the UI naturally understand a
  * location. The server-internal fileId/hunkId anchor lives in AnchoredNote.
  */
-export type LineNote = {
+export type LineNote = NoteMetadata & {
   id: string;
   kind: 'line';
   /** Repository-relative current path. */
@@ -57,7 +83,7 @@ export type LineNote = {
   staleness: NoteStaleness;
 };
 
-export type FileNote = {
+export type FileNote = NoteMetadata & {
   id: string;
   kind: 'file';
   /** Repository-relative current path. */

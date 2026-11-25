@@ -14,6 +14,7 @@ export const ERROR_RESPONSE_CODES = [
   'NOTE_TARGET_AMBIGUOUS',
   'NOTE_GENERATION_UNAVAILABLE',
   'NOTE_NOT_FOUND',
+  'REVIEW_CONFLICT',
 ] as const;
 
 export type ErrorResponseCode = (typeof ERROR_RESPONSE_CODES)[number];

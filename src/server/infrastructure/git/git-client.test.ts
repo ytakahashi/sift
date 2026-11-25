@@ -243,6 +243,40 @@ describe('GitClient index content commands', () => {
     await expect(client.getIndexEntry('src/file.ts')).resolves.toBeNull();
   });
 
+  it('reads all requested index entries in one command and returns only exact stage-zero paths', async () => {
+    // Given: Git also returns a conflict stage and a descendant of the directory pathspec
+    const client = new GitClient('/repo/root');
+    const runGitCommand = vi
+      .spyOn(client, 'runGitCommand')
+      .mockResolvedValue(
+        [
+          '100644 aaaa1111 0\tsrc/[literal].ts',
+          '120000 bbbb2222 0\tsrc/link',
+          '100644 cccc3333 2\tsrc/conflicted.ts',
+          '100644 dddd4444 0\tsrc/dir/child.ts',
+        ].join('\0'),
+      );
+    const paths = ['src/[literal].ts', 'src/link', 'src/conflicted.ts', 'src/dir'];
+
+    // When
+    const entries = await client.getIndexEntries(paths);
+
+    // Then
+    expect(runGitCommand).toHaveBeenCalledExactlyOnceWith([
+      'ls-files',
+      '--stage',
+      '-z',
+      '--',
+      ...paths,
+    ]);
+    expect(entries).toEqual(
+      new Map([
+        ['src/[literal].ts', { mode: '100644', blobId: 'aaaa1111' }],
+        ['src/link', { mode: '120000', blobId: 'bbbb2222' }],
+      ]),
+    );
+  });
+
   it('requests full object ids in diff output', async () => {
     // Given
     const client = new GitClient('/repo/root');

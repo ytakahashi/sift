@@ -4,7 +4,7 @@ import type {
 } from '../../services/repository-index-provider';
 import { GitClient } from './git-client';
 
-type RepositoryIndexGit = Pick<GitClient, 'getIndexEntry'>;
+type RepositoryIndexGit = Pick<GitClient, 'getIndexEntries'>;
 
 export interface GitRepositoryIndexProviderOptions {
   git?: RepositoryIndexGit;
@@ -17,7 +17,9 @@ export class GitRepositoryIndexProvider implements RepositoryIndexProvider {
     this.git = options.git ?? new GitClient(repoRoot);
   }
 
-  async getIndexEntry(path: string): Promise<RepositoryIndexEntry | null> {
-    return await this.git.getIndexEntry(path);
+  async getIndexEntries(
+    paths: readonly string[],
+  ): Promise<ReadonlyMap<string, RepositoryIndexEntry>> {
+    return await this.git.getIndexEntries(paths);
   }
 }

@@ -8,7 +8,7 @@ export function isSubmoduleIndexEntry(entry: Pick<RepositoryIndexEntry, 'mode'>)
   return entry.mode === '160000';
 }
 
-/** Provides the stage-zero index entry for one repository-relative path. */
+/** Provides stage-zero index entries keyed by exact repository-relative path. */
 export interface RepositoryIndexProvider {
-  getIndexEntry(path: string): Promise<RepositoryIndexEntry | null>;
+  getIndexEntries(paths: readonly string[]): Promise<ReadonlyMap<string, RepositoryIndexEntry>>;
 }

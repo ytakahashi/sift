@@ -10,26 +10,26 @@ import type { Note } from '../../domain/notes/types';
  * instead of failing the request or leaking the internal fileId/hunkId.
  */
 export function toNoteResponse(note: AnchoredNote): Note {
-  if (note.target.kind === 'file') {
-    return {
-      id: note.id,
-      kind: 'file',
-      path: note.path,
-      body: note.body,
-      createdAt: note.createdAt,
-      staleness: note.staleness,
-    };
-  }
-
-  return {
+  const common = {
     id: note.id,
-    kind: 'line',
     path: note.path,
-    startLine: note.target.startNewLineNumber,
-    endLine: note.target.endNewLineNumber,
-    bucket: note.target.bucket,
     body: note.body,
     createdAt: note.createdAt,
     staleness: note.staleness,
+    ...(note.author !== undefined ? { author: note.author } : {}),
+    ...(note.reviewId !== undefined ? { reviewId: note.reviewId } : {}),
+    ...(note.status !== undefined ? { status: note.status } : {}),
+    ...(note.replies !== undefined ? { replies: note.replies } : {}),
+  };
+  if (note.target.kind === 'file') {
+    return { ...common, kind: 'file' };
+  }
+
+  return {
+    ...common,
+    kind: 'line',
+    startLine: note.target.startNewLineNumber,
+    endLine: note.target.endNewLineNumber,
+    bucket: note.target.bucket,
   };
 }

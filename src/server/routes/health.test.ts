@@ -17,7 +17,7 @@ describe('createHealthRoutes', () => {
     expect(await response.json()).toEqual({
       product: 'sift',
       version: '1.2.3',
-      capabilities: ['notes-v2'],
+      capabilities: ['notes-v3'],
     });
   });
 });
