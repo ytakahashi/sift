@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
+import { ReviewConflict } from '../../domain/notes/review-session';
 import type { Note, NoteStaleness } from '../../domain/notes/types';
 import type { Env } from './env';
 import { NoteNotFoundError } from '../services/notes-store';
@@ -87,9 +88,12 @@ describe('notesRoutes', () => {
     remove: Mock;
     clear: Mock;
     deleteStale: Mock;
+    getReview: Mock;
+    submitReview: Mock;
+    submitResponse: Mock;
   };
   let getWorktreeGenerations: Mock;
-  let getIndexEntry: Mock;
+  let getIndexEntries: Mock;
   let getFiles: Mock;
   let notifyNotesChanged: Mock;
   let app: Hono<Env>;
@@ -107,9 +111,12 @@ describe('notesRoutes', () => {
       remove: vi.fn().mockResolvedValue(undefined),
       clear: vi.fn().mockResolvedValue(undefined),
       deleteStale: vi.fn().mockResolvedValue({ deletedCount: 0, changed: false }),
+      getReview: vi.fn().mockResolvedValue(undefined),
+      submitReview: vi.fn(),
+      submitResponse: vi.fn(),
     };
     getWorktreeGenerations = vi.fn(async () => generations);
-    getIndexEntry = vi.fn().mockResolvedValue(null);
+    getIndexEntries = vi.fn().mockResolvedValue(new Map());
     getFiles = vi.fn(async (bucket: string) => (bucket === 'working' ? workingFiles : stagedFiles));
     notifyNotesChanged = vi.fn();
 
@@ -129,7 +136,7 @@ describe('notesRoutes', () => {
         notesStore,
         createDiffProvider: () => ({ getFiles }),
         createFileGenerationProvider: () => ({ getWorktreeGenerations }),
-        createRepositoryIndexProvider: () => ({ getIndexEntry }),
+        createRepositoryIndexProvider: () => ({ getIndexEntries }),
         notifyNotesChanged,
       }),
     );
@@ -142,6 +149,259 @@ describe('notesRoutes', () => {
       body: typeof body === 'string' ? body : JSON.stringify(body),
     });
   }
+
+  describe('review session API', () => {
+    const notesUrl = '/api/repositories/my-repo/notes';
+    const reviewUrl = '/api/repositories/my-repo/review';
+    const validComment = { target: { kind: 'file', path: 'a.ts' }, body: 'Add coverage.' };
+    const submission = { verdict: 'request_changes', comments: [validComment], threads: [] };
+
+    async function postReview(action: string, body: unknown): Promise<Response> {
+      return app.request(`${reviewUrl}/${action}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+    }
+
+    it('validates all comments before handing off the review', async () => {
+      // Given
+      const invalidTarget = { target: { kind: 'file', path: 'missing.ts' }, body: 'Untracked' };
+
+      // When
+      const response = await postReview('submit-review', {
+        ...submission,
+        comments: [validComment, invalidTarget],
+      });
+
+      // Then
+      expect(response.status).toBe(422);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_TARGET_NOT_FOUND',
+        commentIndex: 1,
+        error: expect.stringContaining('missing.ts'),
+      });
+      expect(notesStore.submitReview).not.toHaveBeenCalled();
+      expect(notesStore.reconcile).not.toHaveBeenCalled();
+      expect(notifyNotesChanged).not.toHaveBeenCalled();
+    });
+
+    it('reports the index of a malformed comment before loading Git data', async () => {
+      // When
+      const response = await postReview('submit-review', {
+        ...submission,
+        comments: [validComment, { ...validComment, body: '  ' }],
+      });
+
+      // Then
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_REQUEST_INVALID',
+        commentIndex: 1,
+        error: expect.stringContaining('non-empty string body'),
+      });
+      expect(getFiles).not.toHaveBeenCalled();
+      expect(notesStore.submitReview).not.toHaveBeenCalled();
+    });
+
+    it('prepares diff and repository comments in one batch per provider', async () => {
+      // Given
+      getIndexEntries.mockResolvedValue(
+        new Map([
+          ['tracked.ts', { mode: '100644', blobId: 'index-blob' }],
+          ['other.ts', { mode: '100644', blobId: 'other-blob' }],
+        ]),
+      );
+      generations.set('tracked.ts', FILE_GENERATION);
+      generations.set('other.ts', FILE_GENERATION);
+      const session = {
+        reviewId: 'review-1',
+        round: 1,
+        state: 'awaiting-response',
+        verdict: 'comment',
+      };
+      notesStore.submitReview.mockResolvedValue(session);
+
+      // When
+      const response = await postReview('submit-review', {
+        ...submission,
+        verdict: 'comment',
+        client: 'Test agent',
+        comments: [
+          validComment,
+          { target: { kind: 'file', path: 'tracked.ts' }, body: 'Tracked file' },
+          { target: { kind: 'file', path: 'other.ts' }, body: 'Other tracked file' },
+        ],
+      });
+
+      // Then
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(session);
+      expect(getIndexEntries).toHaveBeenCalledExactlyOnceWith(['tracked.ts', 'other.ts']);
+      expect(getWorktreeGenerations).toHaveBeenCalledExactlyOnceWith([
+        'a.ts',
+        'tracked.ts',
+        'other.ts',
+      ]);
+      expect(notesStore.submitReview).toHaveBeenCalledExactlyOnceWith(
+        'my-repo',
+        { verdict: 'comment', threads: [], client: 'Test agent' },
+        [
+          {
+            draft: {
+              path: 'a.ts',
+              target: { kind: 'file', fileId: 'file-a.ts', scope: 'diff' },
+              body: 'Add coverage.',
+            },
+            anchor: { generation: FILE_GENERATION },
+          },
+          {
+            draft: {
+              path: 'tracked.ts',
+              target: { kind: 'file', fileId: 'file-tracked.ts', scope: 'repository' },
+              body: 'Tracked file',
+            },
+            anchor: { generation: FILE_GENERATION },
+          },
+          {
+            draft: {
+              path: 'other.ts',
+              target: { kind: 'file', fileId: 'file-other.ts', scope: 'repository' },
+              body: 'Other tracked file',
+            },
+            anchor: { generation: FILE_GENERATION },
+          },
+        ],
+      );
+      expect(notifyNotesChanged).toHaveBeenCalledExactlyOnceWith('my-repo');
+    });
+
+    it('exposes the current session and dispatches responses without fetching diffs', async () => {
+      // Given
+      const session = {
+        reviewId: 'review-1',
+        round: 1,
+        state: 'awaiting-review',
+        verdict: 'request_changes',
+      };
+      notesStore.submitResponse.mockResolvedValue(session);
+      notesStore.getReview.mockResolvedValue(session);
+      const responseBody = {
+        reviewId: session.reviewId,
+        body: 'Changes made.',
+        replies: [{ noteId: 'thread', resolution: 'fixed', body: 'Added coverage.' }],
+      };
+
+      // When
+      const response = await postReview('submit-response', responseBody);
+      const snapshot = await app.request(reviewUrl);
+
+      // Then
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual(session);
+      await expect(snapshot.json()).resolves.toEqual({ review: session });
+      expect(notesStore.submitResponse).toHaveBeenCalledExactlyOnceWith('my-repo', responseBody);
+      expect(getFiles).not.toHaveBeenCalled();
+      expect(notifyNotesChanged).toHaveBeenCalledExactlyOnceWith('my-repo');
+    });
+
+    it('passes an explicit review ID and thread resolutions to the store', async () => {
+      // Given
+      const request = {
+        reviewId: 'paused-review',
+        verdict: 'approve',
+        threads: [{ noteId: 'thread', action: 'resolve' }],
+      };
+      notesStore.submitReview.mockResolvedValue({
+        reviewId: request.reviewId,
+        state: 'approved',
+        round: 2,
+      });
+
+      // When
+      const response = await postReview('submit-review', { ...request, comments: [] });
+
+      // Then
+      expect(response.status).toBe(200);
+      expect(notesStore.submitReview).toHaveBeenCalledExactlyOnceWith('my-repo', request, []);
+    });
+
+    it('returns missing thread IDs in a conflict response', async () => {
+      // Given
+      notesStore.submitResponse.mockRejectedValue(
+        new ReviewConflict('Reply required.', ['thread-1']),
+      );
+
+      // When
+      const response = await postReview('submit-response', { reviewId: 'review-1', replies: [] });
+
+      // Then
+      expect(response.status).toBe(409);
+      await expect(response.json()).resolves.toEqual({
+        code: 'REVIEW_CONFLICT',
+        error: 'Reply required.',
+        noteIds: ['thread-1'],
+      });
+      expect(notifyNotesChanged).not.toHaveBeenCalled();
+    });
+
+    it('passes the ID of the review to abandon to the store', async () => {
+      // Given
+      const request = { verdict: 'comment', abandonReviewId: 'waiting-review', threads: [] };
+      notesStore.submitReview.mockResolvedValue({
+        reviewId: 'next',
+        state: 'awaiting-response',
+        round: 1,
+      });
+
+      // When
+      const response = await postReview('submit-review', { ...request, comments: [] });
+
+      // Then
+      expect(response.status).toBe(200);
+      expect(notesStore.submitReview).toHaveBeenCalledExactlyOnceWith('my-repo', request, []);
+    });
+
+    it('requires the review ID on a response', async () => {
+      // When
+      const response = await postReview('submit-response', { replies: [] });
+
+      // Then
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_REQUEST_INVALID',
+        error: expect.stringContaining('reviewId'),
+      });
+      expect(notesStore.submitResponse).not.toHaveBeenCalled();
+    });
+
+    it('includes stale threads for a given review ID and preserves their metadata', async () => {
+      // Given
+      const staleness = { kind: 'stale', reason: 'file-out-of-diff' } as const;
+      const metadata = {
+        reviewId: 'review-1',
+        status: 'open',
+        author: { role: 'reviewer', client: 'Test agent' },
+        replies: [
+          { author: { role: 'implementer' }, body: 'Fixed', round: 1, resolution: 'fixed' },
+        ],
+      } as const;
+      notesStore.list.mockResolvedValue([
+        createStoredNote('standalone'),
+        { ...createStoredNote('thread', 'a.ts', staleness), ...metadata },
+        { ...createStoredNote('old-thread'), ...metadata, reviewId: 'review-0' },
+      ]);
+
+      // When
+      const response = await app.request(`${notesUrl}?reviewId=review-1`);
+
+      // Then
+      expect(response.status).toBe(200);
+      await expect(response.json()).resolves.toEqual({
+        notes: [{ ...createPublicFileNote('thread', 'a.ts', staleness), ...metadata }],
+      });
+    });
+  });
 
   describe('reconcile preprocessing', () => {
     it('reconciles with pane diffs and generations of note-eligible paths only', async () => {
@@ -320,7 +580,7 @@ describe('notesRoutes', () => {
         { generation: FILE_GENERATION, lineContents: ['alpha'] },
       );
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
-      expect(getIndexEntry).not.toHaveBeenCalled();
+      expect(getIndexEntries).not.toHaveBeenCalled();
     });
 
     it('resolves a multi-line range in one hunk and stores all line contents', async () => {
@@ -590,7 +850,7 @@ describe('notesRoutes', () => {
         },
         { generation: FILE_GENERATION, lineContents: undefined },
       );
-      expect(getIndexEntry).not.toHaveBeenCalled();
+      expect(getIndexEntries).not.toHaveBeenCalled();
     });
 
     it('creates a repository-scoped note for a tracked file outside the diff', async () => {
@@ -598,7 +858,9 @@ describe('notesRoutes', () => {
       workingFiles = [];
       stagedFiles = [];
       notesStore.list.mockResolvedValue([]);
-      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      getIndexEntries.mockResolvedValue(
+        new Map([['src/unchanged.ts', { mode: '100644', blobId: 'index-blob' }]]),
+      );
       generations = new Map([['src/unchanged.ts', FILE_GENERATION]]);
 
       // When: a file note targets the unchanged tracked file
@@ -609,8 +871,8 @@ describe('notesRoutes', () => {
 
       // Then: the target is anchored without requiring diff presence
       expect(response.status).toBe(201);
-      expect(getIndexEntry).toHaveBeenCalledTimes(1);
-      expect(getIndexEntry).toHaveBeenCalledWith('src/unchanged.ts');
+      expect(getIndexEntries).toHaveBeenCalledTimes(1);
+      expect(getIndexEntries).toHaveBeenCalledWith(['src/unchanged.ts']);
       expect(notesStore.add).toHaveBeenCalledWith(
         'my-repo',
         {
@@ -632,7 +894,9 @@ describe('notesRoutes', () => {
         createStoredNote('diff-note', 'a.ts'),
         createStoredNote('outside-note', 'src/existing.ts', LIVE, 'repository'),
       ]);
-      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      getIndexEntries.mockResolvedValue(
+        new Map([['src/new-target.ts', { mode: '100644', blobId: 'index-blob' }]]),
+      );
       generations = new Map([
         ['a.ts', FILE_GENERATION],
         ['src/existing.ts', FILE_GENERATION],
@@ -665,7 +929,7 @@ describe('notesRoutes', () => {
       // Then: the request is rejected
       expect(response.status).toBe(422);
       await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_TARGET_NOT_FOUND' });
-      expect(getIndexEntry).toHaveBeenCalledWith('unknown.ts');
+      expect(getIndexEntries).toHaveBeenCalledWith(['unknown.ts']);
       expect(notesStore.add).not.toHaveBeenCalled();
     });
 
@@ -674,7 +938,9 @@ describe('notesRoutes', () => {
       workingFiles = [];
       stagedFiles = [];
       notesStore.list.mockResolvedValue([]);
-      getIndexEntry.mockResolvedValue({ mode: '160000', blobId: 'commit-id' });
+      getIndexEntries.mockResolvedValue(
+        new Map([['vendor/lib', { mode: '160000', blobId: 'commit-id' }]]),
+      );
 
       // When: a file note targets it
       const response = await postNote({
@@ -703,7 +969,7 @@ describe('notesRoutes', () => {
 
       // Then: diff-backed eligibility rejects it without another Git subprocess
       expect(response.status).toBe(422);
-      expect(getIndexEntry).not.toHaveBeenCalled();
+      expect(getIndexEntries).not.toHaveBeenCalled();
       await expect(response.json()).resolves.toMatchObject({
         code: 'NOTE_TARGET_INELIGIBLE',
       });
@@ -714,7 +980,9 @@ describe('notesRoutes', () => {
       workingFiles = [];
       stagedFiles = [];
       notesStore.list.mockResolvedValue([]);
-      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      getIndexEntries.mockResolvedValue(
+        new Map([['src/deleted.ts', { mode: '100644', blobId: 'index-blob' }]]),
+      );
       generations = new Map([['src/deleted.ts', { kind: 'deleted' }]]);
 
       // When
@@ -749,7 +1017,9 @@ describe('notesRoutes', () => {
         workingFiles = [];
         stagedFiles = [];
         notesStore.list.mockResolvedValue([]);
-        getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+        getIndexEntries.mockResolvedValue(
+          new Map([[path, { mode: '100644', blobId: 'index-blob' }]]),
+        );
         generations = current;
 
         // When: a file note is created
@@ -766,7 +1036,7 @@ describe('notesRoutes', () => {
 
     it('returns 500 without reconciling or saving when index lookup fails', async () => {
       // Given: Git cannot inspect the outside-diff target
-      getIndexEntry.mockRejectedValue(new Error('git ls-files failed'));
+      getIndexEntries.mockRejectedValue(new Error('git ls-files failed'));
 
       // When
       const response = await postNote({
@@ -805,7 +1075,9 @@ describe('notesRoutes', () => {
       workingFiles = [];
       stagedFiles = [];
       notesStore.list.mockResolvedValue([]);
-      getIndexEntry.mockResolvedValue({ mode: '100644', blobId: 'index-blob' });
+      getIndexEntries.mockResolvedValue(
+        new Map([['src/directory', { mode: '100644', blobId: 'index-blob' }]]),
+      );
       generations = new Map([
         ['src/directory', { kind: 'ineligible', reason: 'not a regular file or symlink' }],
       ]);
@@ -927,7 +1199,7 @@ describe('notesRoutes', () => {
       expect(getFiles).not.toHaveBeenCalled();
       expect(notesStore.list).not.toHaveBeenCalled();
       expect(getWorktreeGenerations).not.toHaveBeenCalled();
-      expect(getIndexEntry).not.toHaveBeenCalled();
+      expect(getIndexEntries).not.toHaveBeenCalled();
       expect(notesStore.reconcile).not.toHaveBeenCalled();
       expect(notifyNotesChanged).not.toHaveBeenCalled();
     });

@@ -2,6 +2,16 @@ import { randomUUID } from 'node:crypto';
 import type { AnchoredNote } from '../../../domain/notes/anchored-note';
 import type { NoteReconcileRecord } from '../../../domain/notes/reconcile-notes';
 import { reconcileNotes } from '../../../domain/notes/reconcile-notes';
+import {
+  isProtectedReviewThread,
+  ReviewConflict,
+  submitResponse,
+  submitReview,
+  type ReviewResponseSubmission,
+  type ReviewSession,
+  type ReviewSubmission,
+} from '../../../domain/notes/review-session';
+import type { NoteMetadata } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type {
   DeleteStaleNotesResult,
@@ -9,8 +19,38 @@ import type {
   NoteDraft,
   NotesCurrentState,
   NotesStore,
+  ReviewCommentDraft,
 } from '../../services/notes-store';
 import { NoteNotFoundError } from '../../services/notes-store';
+
+function createRecord(
+  { draft, anchor }: ReviewCommentDraft,
+  metadata: NoteMetadata,
+): NoteReconcileRecord {
+  return {
+    note: {
+      path: draft.path,
+      target: draft.target,
+      body: draft.body,
+      ...metadata,
+      id: randomUUID(),
+      createdAt: Date.now(),
+      staleness: { kind: 'live' },
+    },
+    generation: anchor.generation,
+    lineContents: anchor.lineContents,
+  };
+}
+
+function applyThreadChanges(
+  records: readonly NoteReconcileRecord[],
+  changes: ReadonlyMap<string, Pick<NoteMetadata, 'status' | 'replies'>>,
+): NoteReconcileRecord[] {
+  return records.map((record) => {
+    const update = changes.get(record.note.id);
+    return update ? { ...record, note: { ...record.note, ...update } } : record;
+  });
+}
 
 /**
  * In-memory notes store, keyed by repository id.
@@ -26,6 +66,7 @@ import { NoteNotFoundError } from '../../services/notes-store';
  */
 export class InMemoryNotesStore implements NotesStore {
   private readonly records = new Map<RepositoryId, NoteReconcileRecord[]>();
+  private readonly reviews = new Map<RepositoryId, ReviewSession>();
 
   async reconcile(repoId: RepositoryId, current: NotesCurrentState): Promise<boolean> {
     const existing = this.records.get(repoId);
@@ -51,26 +92,51 @@ export class InMemoryNotesStore implements NotesStore {
   }
 
   async add(repoId: RepositoryId, draft: NoteDraft, anchor: NoteAnchor): Promise<AnchoredNote> {
-    // The draft is spread first so that the store's identity fields always
-    // win: NoteDraft omits them, but structural typing lets a caller pass a
-    // wider object (e.g. an existing AnchoredNote) that still carries them.
-    const note: AnchoredNote = {
-      ...draft,
-      id: randomUUID(),
-      createdAt: Date.now(),
-      // Creation only succeeds once the target resolves against the current
-      // repository state, so a new note always starts out matching it.
-      staleness: { kind: 'live' },
-    };
-    const record: NoteReconcileRecord = {
-      note,
-      generation: anchor.generation,
-      lineContents: anchor.lineContents,
-    };
-
+    const record = createRecord({ draft, anchor }, { author: { role: 'user' } });
     const existing = this.records.get(repoId) ?? [];
     this.records.set(repoId, [...existing, record]);
-    return note;
+    return record.note;
+  }
+
+  async getReview(repoId: RepositoryId): Promise<ReviewSession | undefined> {
+    return this.reviews.get(repoId);
+  }
+
+  async submitReview(
+    repoId: RepositoryId,
+    submission: ReviewSubmission,
+    comments: readonly ReviewCommentDraft[],
+  ): Promise<ReviewSession> {
+    const existing = this.records.get(repoId) ?? [];
+    const transition = submitReview(
+      this.reviews.get(repoId),
+      existing.map(({ note }) => note),
+      submission,
+      randomUUID(),
+    );
+    const records = [
+      ...applyThreadChanges(existing, transition.changes),
+      ...comments.map((comment) => createRecord(comment, transition.newThread)),
+    ];
+    // Validation, thread writes and the turn change share one synchronous operation.
+    this.records.set(repoId, records);
+    this.reviews.set(repoId, transition.session);
+    return transition.session;
+  }
+
+  async submitResponse(
+    repoId: RepositoryId,
+    submission: ReviewResponseSubmission,
+  ): Promise<ReviewSession> {
+    const existing = this.records.get(repoId) ?? [];
+    const transition = submitResponse(
+      this.reviews.get(repoId),
+      existing.map(({ note }) => note),
+      submission,
+    );
+    this.records.set(repoId, applyThreadChanges(existing, transition.changes));
+    this.reviews.set(repoId, transition.session);
+    return transition.session;
   }
 
   async updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<AnchoredNote> {
@@ -92,15 +158,29 @@ export class InMemoryNotesStore implements NotesStore {
 
   async remove(repoId: RepositoryId, noteId: string): Promise<void> {
     const existing = this.records.get(repoId) ?? [];
-    const remaining = existing.filter((record) => record.note.id !== noteId);
-    if (remaining.length === existing.length) {
+    const note = existing.find((record) => record.note.id === noteId)?.note;
+    if (note === undefined) {
       throw new NoteNotFoundError(`Note not found: ${noteId}`);
     }
-    this.records.set(repoId, remaining);
+    if (isProtectedReviewThread(note, this.reviews.get(repoId))) {
+      throw new ReviewConflict('Threads in a review that can continue cannot be deleted.');
+    }
+    this.records.set(
+      repoId,
+      existing.filter((record) => record.note.id !== noteId),
+    );
   }
 
   async clear(repoId: RepositoryId): Promise<void> {
-    this.records.delete(repoId);
+    const review = this.reviews.get(repoId);
+    const threads = (this.records.get(repoId) ?? []).filter(({ note }) =>
+      isProtectedReviewThread(note, review),
+    );
+    if (threads.length === 0) {
+      this.records.delete(repoId);
+    } else {
+      this.records.set(repoId, threads);
+    }
   }
 
   async deleteStale(
@@ -121,7 +201,10 @@ export class InMemoryNotesStore implements NotesStore {
       stagedFiles: current.stagedFiles,
       generations: current.generations,
     });
-    const retained = result.records.filter((record) => record.note.staleness.kind !== 'stale');
+    const review = this.reviews.get(repoId);
+    const retained = result.records.filter(
+      ({ note }) => isProtectedReviewThread(note, review) || note.staleness.kind !== 'stale',
+    );
     const deletedCount = result.records.length - retained.length;
 
     if (deletedCount === 0) {

@@ -1,5 +1,5 @@
 import { probeLocalServer, type HealthFetch } from '../server/health-probe';
-import { NOTES_V2_CAPABILITY } from '../server/contract/health-contract';
+import { NOTES_V3_CAPABILITY } from '../server/contract/health-contract';
 
 export type NotesApiCompatibility =
   | { kind: 'compatible' }
@@ -26,7 +26,7 @@ export async function checkNotesApiCompatibility(
     case 'other':
       return { kind: 'incompatible-product' };
     case 'sift':
-      return probe.capabilities.includes(NOTES_V2_CAPABILITY)
+      return probe.capabilities.includes(NOTES_V3_CAPABILITY)
         ? { kind: 'compatible' }
         : { kind: 'capability-missing' };
   }

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { ConfirmedFileGeneration, FileGeneration } from '../../../domain/diff/file-generation';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { AnchoredNote } from '../../../domain/notes/anchored-note';
+import { ReviewConflict, type ReviewSession } from '../../../domain/notes/review-session';
 import { NoteNotFoundError } from '../../services/notes-store';
 import { InMemoryNotesStore } from './in-memory-notes-store';
 
@@ -460,5 +461,167 @@ describe('InMemoryNotesStore', () => {
       await expect(store.list('repo-1')).resolves.toEqual([]);
       await expect(store.list('repo-2')).resolves.toHaveLength(1);
     });
+  });
+});
+
+describe('InMemoryNotesStore reviews', () => {
+  const comment = {
+    draft: {
+      path: 'a.ts',
+      target: { kind: 'file', fileId: 'file-a.ts', scope: 'diff' },
+      body: 'Review comment',
+    },
+    anchor: { generation: fileGeneration('blob-1') },
+  } as const;
+
+  it('replaces the waiting review and rejects late responses targeting it', async () => {
+    // Given: a review with an open thread is still awaiting a response
+    const store = new InMemoryNotesStore();
+    const repoId = 'repo-1';
+    const waiting = await store.submitReview(repoId, { verdict: 'comment', threads: [] }, [
+      comment,
+    ]);
+    const [thread] = await store.list(repoId);
+    const replacement = {
+      verdict: 'comment',
+      abandonReviewId: waiting.reviewId,
+      threads: [],
+    } as const;
+
+    // When / Then: an invalid replacement leaves the previous review active
+    await expect(
+      store.submitReview(
+        repoId,
+        {
+          ...replacement,
+          threads: [{ noteId: thread.id, action: 'resolve' }],
+        },
+        [],
+      ),
+    ).rejects.toBeInstanceOf(ReviewConflict);
+    await expect(store.getReview(repoId)).resolves.toEqual(waiting);
+
+    // When: the replacement has no open threads, so even an empty response could advance it
+    const next = await store.submitReview(repoId, replacement, []);
+
+    // Then
+    expect(next).toMatchObject({ state: 'awaiting-response', round: 1 });
+    expect(next.reviewId).not.toBe(waiting.reviewId);
+    await expect(store.submitReview(repoId, replacement, [])).rejects.toBeInstanceOf(
+      ReviewConflict,
+    );
+    await expect(
+      store.submitResponse(repoId, { reviewId: waiting.reviewId, replies: [] }),
+    ).rejects.toBeInstanceOf(ReviewConflict);
+    await expect(store.getReview(repoId)).resolves.toEqual(next);
+    await expect(store.list(repoId)).resolves.toMatchObject([{ id: thread.id, status: 'open' }]);
+    await expect(store.remove(repoId, thread.id)).resolves.toBeUndefined();
+    await expect(
+      store.submitResponse(repoId, { reviewId: next.reviewId, replies: [] }),
+    ).resolves.toMatchObject({ state: 'awaiting-review' });
+  });
+
+  it('commits only one concurrent submission and scopes the session to its repository', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+
+    // When
+    const submit = (): Promise<ReviewSession> =>
+      store.submitReview('repo-1', { verdict: 'comment', threads: [] }, [comment]);
+    const [first, second] = await Promise.allSettled([submit(), submit()]);
+
+    // Then
+    expect(first).toMatchObject({ status: 'fulfilled' });
+    expect(second).toMatchObject({ status: 'rejected', reason: expect.any(ReviewConflict) });
+    const session = await store.getReview('repo-1');
+    await expect(store.list('repo-1')).resolves.toMatchObject([
+      { reviewId: session?.reviewId, status: 'open', author: { role: 'reviewer' }, replies: [] },
+    ]);
+    await expect(store.getReview('repo-2')).resolves.toBeUndefined();
+    await expect(store.list('repo-2')).resolves.toEqual([]);
+  });
+
+  it('retains stale review threads through deletion and completes the review on them', async () => {
+    // Given: the file has left the diff, making both notes stale
+    const store = new InMemoryNotesStore();
+    const session = await store.submitReview('repo-1', { verdict: 'comment', threads: [] }, [
+      comment,
+    ]);
+    const [thread] = await store.list('repo-1');
+    await addFileNote(store, 'repo-1', 'a.ts');
+
+    // When: all three deletion paths are used
+    await expect(store.remove('repo-1', thread.id)).rejects.toBeInstanceOf(ReviewConflict);
+    await expect(
+      store.deleteStale('repo-1', { workingFiles: [], stagedFiles: [], generations: new Map() }),
+    ).resolves.toEqual({ deletedCount: 1, changed: true });
+    await addFileNote(store, 'repo-1', 'a.ts');
+    await store.clear('repo-1');
+
+    // Then: the thread remains stale and still requires a response
+    await expect(store.list('repo-1')).resolves.toMatchObject([
+      { id: thread.id, staleness: { kind: 'stale' }, status: 'open' },
+    ]);
+    await expect(
+      store.submitResponse('repo-1', { reviewId: session.reviewId, replies: [] }),
+    ).rejects.toMatchObject({
+      noteIds: [thread.id],
+    });
+    await expect(store.getReview('repo-1')).resolves.toEqual(session);
+
+    // When: the implementer replies and the reviewer resolves it
+    await store.submitResponse('repo-1', {
+      reviewId: session.reviewId,
+      replies: [{ noteId: thread.id, resolution: 'fixed', body: 'Removed the obsolete file.' }],
+    });
+    const approved = await store.submitReview(
+      'repo-1',
+      {
+        verdict: 'approve',
+        threads: [{ noteId: thread.id, action: 'resolve' }],
+      },
+      [],
+    );
+
+    // Then: the same session is approved and its reply remains available
+    expect(approved).toMatchObject({ reviewId: session.reviewId, state: 'approved', round: 1 });
+    await expect(store.list('repo-1')).resolves.toMatchObject([
+      {
+        id: thread.id,
+        status: 'resolved',
+        replies: [{ resolution: 'fixed', author: { role: 'implementer' } }],
+      },
+    ]);
+
+    // When / Then: the approved thread can be individually deleted
+    await store.remove('repo-1', thread.id);
+    await expect(store.list('repo-1')).resolves.toEqual([]);
+  });
+
+  it('protects paused threads until a new review replaces the paused review', async () => {
+    // Given: the third review submission pauses before handing over its new threads
+    const store = new InMemoryNotesStore();
+    const repoId = 'repo-1';
+    const review = { verdict: 'comment', threads: [] } as const;
+    const initial = await store.submitReview(repoId, review, []);
+    await store.submitResponse(repoId, { reviewId: initial.reviewId, replies: [] });
+    await store.submitReview(repoId, review, []);
+    await store.submitResponse(repoId, { reviewId: initial.reviewId, replies: [] });
+    await store.submitReview(repoId, review, [comment, comment]);
+    const paused = await store.list(repoId);
+    const current = { workingFiles: [], stagedFiles: [], generations: new Map() };
+
+    // When / Then: the current paused review can still resume
+    await expect(store.remove(repoId, paused[0].id)).rejects.toBeInstanceOf(ReviewConflict);
+    await store.clear(repoId);
+    await expect(store.deleteStale(repoId, current)).resolves.toMatchObject({ deletedCount: 0 });
+    await expect(store.list(repoId)).resolves.toMatchObject(paused.map(({ id }) => ({ id })));
+
+    // When: the reviewer starts a new review
+    const next = await store.submitReview(repoId, review, [comment]);
+
+    // Then: stale deletion removes only threads belonging to the replaced review
+    await expect(store.deleteStale(repoId, current)).resolves.toMatchObject({ deletedCount: 2 });
+    await expect(store.list(repoId)).resolves.toMatchObject([{ reviewId: next.reviewId }]);
   });
 });

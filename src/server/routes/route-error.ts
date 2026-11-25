@@ -14,6 +14,8 @@ import {
 } from '../services/repository-resolver';
 import type { ErrorResponseCode } from '../contract/error-codes';
 import { DirectoryBrowseError } from '../services/directory-browser';
+import { ReviewConflict } from '../../domain/notes/review-session';
+import { ReviewCommentError } from './review-request';
 
 function noteTargetResolutionCode(kind: NoteTargetResolutionError['kind']): ErrorResponseCode {
   switch (kind) {
@@ -34,6 +36,16 @@ function noteTargetResolutionCode(kind: NoteTargetResolutionError['kind']): Erro
 }
 
 export function handleRouteError(c: Context<Env>, error: unknown): Response {
+  const details =
+    error instanceof ReviewCommentError
+      ? { error: error.message, commentIndex: error.index }
+      : { error: error instanceof Error ? error.message : String(error) };
+  if (error instanceof ReviewCommentError) {
+    error = error.cause;
+  }
+  if (error instanceof ReviewConflict) {
+    return c.json({ ...details, code: 'REVIEW_CONFLICT', noteIds: error.noteIds }, 409);
+  }
   if (error instanceof DirectoryBrowseError) {
     return c.json({ error: error.message }, error.statusCode);
   }
@@ -55,14 +67,14 @@ export function handleRouteError(c: Context<Env>, error: unknown): Response {
     return c.json({ error: error.message, code: 'NOTE_NOT_FOUND' }, 404);
   }
   if (error instanceof NoteRequestValidationError) {
-    return c.json({ error: error.message, code: 'NOTE_REQUEST_INVALID' }, 400);
+    return c.json({ ...details, code: 'NOTE_REQUEST_INVALID' }, 400);
   }
   if (error instanceof NoteTargetResolutionError) {
-    return c.json({ error: error.message, code: noteTargetResolutionCode(error.kind) }, 422);
+    return c.json({ ...details, code: noteTargetResolutionCode(error.kind) }, 422);
   }
   if (error instanceof NoteGenerationUnavailableError) {
-    return c.json({ error: error.message, code: 'NOTE_GENERATION_UNAVAILABLE' }, 503);
+    return c.json({ ...details, code: 'NOTE_GENERATION_UNAVAILABLE' }, 503);
   }
 
-  return c.json({ error: error instanceof Error ? error.message : String(error) }, 500);
+  return c.json(details, 500);
 }

@@ -94,6 +94,8 @@ function describeKnownErrorCode(code: ErrorResponseCode, message: string): strin
       return `${message} Check the repository's registration state.`;
     case 'NOTE_NOT_FOUND':
       return `${message} The note id is unknown to the server, so it was either already deleted or the id is stale. Call list_notes for the current ids and retry.`;
+    case 'REVIEW_CONFLICT':
+      return message;
     default: {
       // Compile-time exhaustiveness check: adding a new ErrorResponseCode
       // without a case here fails the build instead of silently returning

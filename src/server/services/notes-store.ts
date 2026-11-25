@@ -1,6 +1,11 @@
 import type { ConfirmedFileGeneration, FileGeneration } from '../../domain/diff/file-generation';
 import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
+import type {
+  ReviewResponseSubmission,
+  ReviewSession,
+  ReviewSubmission,
+} from '../../domain/notes/review-session';
 import type { RepositoryId } from '../../domain/repository/repository';
 
 /** The requested note does not exist. */
@@ -65,7 +70,12 @@ export interface NoteAnchor {
  * The parts of a note the caller supplies. The store owns identity (id,
  * createdAt) and the initial staleness, which is derived rather than chosen.
  */
-export type NoteDraft = Omit<AnchoredNote, 'id' | 'createdAt' | 'staleness'>;
+export type NoteDraft = Pick<AnchoredNote, 'path' | 'target' | 'body'>;
+
+export interface ReviewCommentDraft {
+  draft: NoteDraft;
+  anchor: NoteAnchor;
+}
 
 /** The repository state stored notes are validated against. */
 export interface NotesCurrentState {
@@ -97,10 +107,22 @@ export interface NotesStore {
   add(repoId: RepositoryId, draft: NoteDraft, anchor: NoteAnchor): Promise<AnchoredNote>;
   updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<AnchoredNote>;
   remove(repoId: RepositoryId, noteId: string): Promise<void>;
+  /** Clears notes except for threads in the current active or paused review. */
   clear(repoId: RepositoryId): Promise<void>;
+  getReview(repoId: RepositoryId): Promise<ReviewSession | undefined>;
+  /** Validates the current turn and commits the session and its threads atomically. */
+  submitReview(
+    repoId: RepositoryId,
+    submission: ReviewSubmission,
+    comments: readonly ReviewCommentDraft[],
+  ): Promise<ReviewSession>;
+  submitResponse(
+    repoId: RepositoryId,
+    submission: ReviewResponseSubmission,
+  ): Promise<ReviewSession>;
   /**
-   * Reconciles against `current` and removes exactly the notes that are stale
-   * afterwards, keeping (and storing) the reconciled live ones. Staleness is
+   * Reconciles against `current` and removes stale notes, retaining threads in
+   * the current active or paused review. Staleness is
    * derived from the current state rather than stored, so restoring a file can
    * bring a note back to live; deciding and deleting must therefore happen
    * against one and the same state.

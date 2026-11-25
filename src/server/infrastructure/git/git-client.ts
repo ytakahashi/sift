@@ -1,5 +1,6 @@
 import { execFile, spawn } from 'node:child_process';
 import { promisify } from 'node:util';
+import type { RepositoryIndexEntry } from '../../services/repository-index-provider';
 
 const execFileAsync = promisify(execFile);
 
@@ -99,21 +100,30 @@ export class GitClient {
     return (await this.runGitCommand(['rev-parse', '--short', 'HEAD'])).trim();
   }
 
-  async getIndexEntry(path: string): Promise<{ mode: string; blobId: string } | null> {
-    const output = await this.runGitCommand(['ls-files', '--stage', '-z', '--', path]);
+  async getIndexEntry(path: string): Promise<RepositoryIndexEntry | null> {
+    const entries = await this.getIndexEntries([path]);
+    return entries.get(path) ?? null;
+  }
 
+  async getIndexEntries(
+    paths: readonly string[],
+  ): Promise<ReadonlyMap<string, RepositoryIndexEntry>> {
+    const requestedPaths = new Set(paths);
+    const entries = new Map<string, RepositoryIndexEntry>();
+    if (requestedPaths.size === 0) {
+      return entries;
+    }
+
+    const output = await this.runGitCommand(['ls-files', '--stage', '-z', '--', ...requestedPaths]);
     for (const record of output.split('\0')) {
-      if (record === '') {
-        continue;
-      }
-
       const match = record.match(/^(\d{6}) ([0-9a-f]+) ([0-3])\t([\s\S]*)$/);
-      if (match?.[3] === '0' && match[4] === path) {
-        return { mode: match[1], blobId: match[2] };
+      // Git can also return descendants of a requested directory or unmerged stages.
+      if (match?.[3] === '0' && requestedPaths.has(match[4])) {
+        entries.set(match[4], { mode: match[1], blobId: match[2] });
       }
     }
 
-    return null;
+    return entries;
   }
 
   async getBlobSize(blobId: string): Promise<number> {

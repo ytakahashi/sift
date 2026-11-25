@@ -2,12 +2,12 @@ import { describe, expect, it, vi } from 'vitest';
 import { checkNotesApiCompatibility } from './notes-compatibility';
 
 describe('checkNotesApiCompatibility', () => {
-  it('reports compatible when the Sift server advertises notes-v2', async () => {
+  it('reports compatible when the Sift server advertises notes-v3', async () => {
     // Given
     const fetchHealth = vi.fn().mockResolvedValue({
       json: vi
         .fn()
-        .mockResolvedValue({ product: 'sift', version: '1.2.3', capabilities: ['notes-v2'] }),
+        .mockResolvedValue({ product: 'sift', version: '1.2.3', capabilities: ['notes-v3'] }),
       ok: true,
     });
 
@@ -18,10 +18,12 @@ describe('checkNotesApiCompatibility', () => {
     expect(result).toEqual({ kind: 'compatible' });
   });
 
-  it('reports capability-missing for a Sift server without notes-v2', async () => {
+  it('reports capability-missing for a Sift server that advertises only notes-v2', async () => {
     // Given
     const fetchHealth = vi.fn().mockResolvedValue({
-      json: vi.fn().mockResolvedValue({ product: 'sift', version: '0.9.0', capabilities: [] }),
+      json: vi
+        .fn()
+        .mockResolvedValue({ product: 'sift', version: '1.2.3', capabilities: ['notes-v2'] }),
       ok: true,
     });
 

@@ -1,4 +1,4 @@
-import type { NoteBucket, NoteStaleness } from './types';
+import type { NoteBucket, NoteMetadata, NoteStaleness } from './types';
 
 /**
  * Server-internal representation of a note's target. Line notes keep the
@@ -32,7 +32,7 @@ export type AnchoredFileNoteTarget = {
 
 export type AnchoredNoteTarget = AnchoredLineNoteTarget | AnchoredFileNoteTarget;
 
-export type AnchoredNote = {
+export type AnchoredNote = NoteMetadata & {
   id: string;
   /**
    * Repository-relative path of the target file, recorded at creation.
