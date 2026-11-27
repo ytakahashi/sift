@@ -66,7 +66,10 @@ describe('sift mcp (real stdio child process)', () => {
         'add_note',
         'delete_note',
         'list_notes',
+        'submit_response',
+        'submit_review',
         'update_note',
+        'wait_for_turn',
       ]);
 
       const listNotes = tools.find((tool) => tool.name === 'list_notes')!;
@@ -135,7 +138,10 @@ describe('sift mcp (real stdio child process)', () => {
         'add_note',
         'delete_note',
         'list_notes',
+        'submit_response',
+        'submit_review',
         'update_note',
+        'wait_for_turn',
       ]);
     } finally {
       await client.close().catch(() => {});

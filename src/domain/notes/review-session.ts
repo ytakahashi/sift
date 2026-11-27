@@ -3,14 +3,16 @@ import type { NoteAuthor, NoteMetadata, NoteReply, ResponseResolution } from './
 export const REVIEW_VERDICTS = ['request_changes', 'comment', 'approve'] as const;
 export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
 
-export type ReviewState =
-  | 'awaiting-response'
-  | 'awaiting-review'
-  | 'approved'
-  /** The reviewer reached the handoff limit. The current review can still be approved or extended. */
-  | 'needs-user'
-  /** Terminal state set when participant tracking detects a disconnect. */
-  | 'peer-gone';
+export const REVIEW_STATES = [
+  'awaiting-response',
+  'awaiting-review',
+  'approved',
+  // A paused review can still be approved or extended.
+  'needs-user',
+  // Participant tracking sets this terminal state when a peer disconnects.
+  'peer-gone',
+] as const;
+export type ReviewState = (typeof REVIEW_STATES)[number];
 
 export interface ReviewSession {
   reviewId: string;

@@ -6,9 +6,13 @@ import {
   type Note,
   type NoteStaleness,
 } from '../domain/notes/types';
+import { nonEmptyIdSchema } from './review-schema';
 
 export const listNotesInputSchema = z
   .object({
+    reviewId: nonEmptyIdSchema
+      .optional()
+      .describe('Return every thread for this review, including stale and resolved threads.'),
     includeStale: z
       .boolean()
       .optional()
@@ -83,7 +87,7 @@ export const noteSchema: z.ZodType<Note> = z.discriminatedUnion('kind', [
   fileNoteSchema,
 ]);
 
-/** Shape of the `GET /notes` response body. Always carries every stored note. */
+/** Shape of `GET /notes`. The server includes stale notes in the requested scope. */
 export const notesListResponseSchema: z.ZodType<{ notes: Note[] }> = z
   .object({
     notes: z.array(noteSchema),

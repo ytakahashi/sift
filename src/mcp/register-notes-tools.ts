@@ -1,6 +1,5 @@
 import type { CallToolResult, McpServer } from '@modelcontextprotocol/server';
 import type { NoteCreateTarget } from '../domain/notes/types';
-import type { ResolvedRepository } from '../domain/repository/repository';
 import { addNoteInputSchema, addNoteOutputSchema } from './add-note-schema';
 import { deleteNoteInputSchema, deleteNoteOutputSchema } from './delete-note-schema';
 import type {
@@ -9,32 +8,20 @@ import type {
   GetNotesResult,
   UpdateNoteResult,
 } from './notes-http-client';
-import type { NotesApiCompatibility } from './notes-compatibility';
 import { isLiveNote } from '../domain/notes/note-staleness';
 import { listNotesInputSchema, listNotesOutputSchema } from './notes-schema';
 import { updateNoteInputSchema, updateNoteOutputSchema } from './update-note-schema';
-import type { RepoRootResolver } from './repo-target';
+import type { ResolveToolTarget } from './tool-target';
+import { errorResult, httpErrorResult, successResult } from './notes-tool-results';
 import {
-  describeCapabilityMissing,
-  describeIncompatibleProduct,
   describeInvalidResponse,
   describeKnownError,
-  describePortResolutionFailure,
-  describeRepoRootResolutionFailure,
-  describeRepositoryLookupFailure,
   describeUnreachable,
-  describeUnregisteredRepository,
   UNCERTAIN_ADD_NOTE_MESSAGE,
 } from './notes-tool-guidance';
 
 export interface RegisterNotesToolsOptions {
-  /** The `--repo`/cwd candidate path `repoRootResolver` resolves, for error messages only. */
-  repoPath: string;
-  repoRootResolver: RepoRootResolver;
-  findRegisteredRepositoryByPath: (path: string) => Promise<ResolvedRepository | null>;
-  resolvePort: () => number;
-  checkNotesApiCompatibility: (port: number) => Promise<NotesApiCompatibility>;
-  getNotes: (port: number, repoId: string) => Promise<GetNotesResult>;
+  getNotes: (port: number, repoId: string, reviewId?: string) => Promise<GetNotesResult>;
   createNote: (
     port: number,
     repoId: string,
@@ -50,81 +37,11 @@ export interface RegisterNotesToolsOptions {
   deleteNote: (port: number, repoId: string, noteId: string) => Promise<DeleteNoteResult>;
 }
 
-function errorResult(message: string): CallToolResult {
-  return { content: [{ type: 'text', text: message }], isError: true };
-}
-
-function successResult(structuredContent: Record<string, unknown>): CallToolResult {
-  return {
-    content: [{ type: 'text', text: JSON.stringify(structuredContent) }],
-    structuredContent,
-  };
-}
-
-function describeIncompatibility(
-  compat: Exclude<NotesApiCompatibility, { kind: 'compatible' }>,
-): string {
-  switch (compat.kind) {
-    case 'unreachable':
-      return describeUnreachable();
-    case 'incompatible-product':
-      return describeIncompatibleProduct();
-    case 'capability-missing':
-      return describeCapabilityMissing();
-  }
-}
-
-type Preflight = { ok: true; repoId: string; port: number } | { ok: false; result: CallToolResult };
-
-/**
- * Shared pre-call sequence for every tool: resolve the git root (lazily,
- * cached after the first success), look up the repoId fresh on every call
- * (never cached; a `sift add` after this process started must take effect
- * without a restart), and probe server compatibility before ever touching
- * the Notes API.
- */
-async function preflight(options: RegisterNotesToolsOptions): Promise<Preflight> {
-  let repoRoot: string;
-  try {
-    repoRoot = options.repoRootResolver.resolve();
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      result: errorResult(describeRepoRootResolutionFailure(options.repoPath, error)),
-    };
-  }
-
-  let registered: ResolvedRepository | null;
-  try {
-    registered = await options.findRegisteredRepositoryByPath(repoRoot);
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      result: errorResult(describeRepositoryLookupFailure(error)),
-    };
-  }
-  if (!registered) {
-    return { ok: false, result: errorResult(describeUnregisteredRepository(repoRoot)) };
-  }
-
-  let port: number;
-  try {
-    port = options.resolvePort();
-  } catch (error: unknown) {
-    return {
-      ok: false,
-      result: errorResult(describePortResolutionFailure(error)),
-    };
-  }
-  const compat = await options.checkNotesApiCompatibility(port);
-  if (compat.kind !== 'compatible') {
-    return { ok: false, result: errorResult(describeIncompatibility(compat)) };
-  }
-
-  return { ok: true, repoId: registered.id, port };
-}
-
-export function registerNotesTools(server: McpServer, options: RegisterNotesToolsOptions): void {
+export function registerNotesTools(
+  server: McpServer,
+  options: RegisterNotesToolsOptions,
+  resolveTarget: ResolveToolTarget,
+): void {
   server.registerTool(
     'list_notes',
     {
@@ -133,29 +50,33 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
         'creation-time anchors still apply to the current repository state are returned. Live ' +
         'file notes may target tracked files outside the current diff. Notes whose targets have ' +
         'since changed are marked stale and left out, with "staleCount" reporting how many. ' +
-        'Call this right after editing a file to see which notes went stale, which usually means ' +
-        'they are addressed. Pass includeStale: true to see them with the reason they no longer ' +
-        'apply. The returned ids are what update_note and delete_note take.',
+        'Pass includeStale: true to see them with the reason they no longer apply. ' +
+        'Pass reviewId to get every thread in that review, including stale and resolved threads. ' +
+        'Staleness describes the anchor; review thread status describes resolution. ' +
+        'Use the returned note IDs with update_note and delete_note.',
       inputSchema: listNotesInputSchema,
       outputSchema: listNotesOutputSchema,
     },
     async (args): Promise<CallToolResult> => {
-      const pre = await preflight(options);
+      const pre = await resolveTarget();
       if (!pre.ok) {
         return pre.result;
       }
 
-      const result = await options.getNotes(pre.port, pre.repoId);
+      const result = await options.getNotes(pre.port, pre.repoId, args.reviewId);
       switch (result.kind) {
         case 'success': {
           const staleCount = result.notes.filter((note) => !isLiveNote(note)).length;
           return successResult({
-            notes: args.includeStale ? result.notes : result.notes.filter(isLiveNote),
+            notes:
+              args.reviewId !== undefined || args.includeStale
+                ? result.notes
+                : result.notes.filter(isLiveNote),
             staleCount,
           });
         }
         case 'http-error':
-          return errorResult(describeKnownError(result.code, result.message, result.status));
+          return httpErrorResult(result);
         case 'invalid-response':
         case 'invalid-error-response':
           return errorResult(describeInvalidResponse());
@@ -169,16 +90,17 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
     'add_note',
     {
       description:
-        "Add a review comment to a whole file or a specific diff line range. kind: 'file' accepts " +
+        "Add a standalone note to a whole file or a specific diff line range. kind: 'file' accepts " +
         'a tracked file even when it is outside the current diff, or a diff-visible file. kind: ' +
         "'line' must fit within one current diff hunk. If the same line range exists in both the " +
-        'working and staged panes, the call fails and asks for "bucket" to be specified.',
+        'working and staged panes, the call fails and asks for "bucket" to be specified. ' +
+        'To open a thread in a review session, include it in submit_review.',
       inputSchema: addNoteInputSchema,
       outputSchema: addNoteOutputSchema,
       annotations: { idempotentHint: false },
     },
     async (args): Promise<CallToolResult> => {
-      const pre = await preflight(options);
+      const pre = await resolveTarget();
       if (!pre.ok) {
         return pre.result;
       }
@@ -214,7 +136,7 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
       annotations: { idempotentHint: true },
     },
     async (args): Promise<CallToolResult> => {
-      const pre = await preflight(options);
+      const pre = await resolveTarget();
       if (!pre.ok) {
         return pre.result;
       }
@@ -242,13 +164,14 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
         'noteId from list_notes: ids only live as long as the Sift server process, and a note ' +
         'that is already gone reports NOTE_NOT_FOUND. Only delete notes you wrote yourself; a ' +
         'note may have been written by the person reviewing the diff, and deletion cannot be ' +
-        'undone.',
+        'undone. Threads in the current active or paused review are protected. Use submit_review ' +
+        'with action "resolve" to close a thread in that review.',
       inputSchema: deleteNoteInputSchema,
       outputSchema: deleteNoteOutputSchema,
       annotations: { idempotentHint: true, destructiveHint: true },
     },
     async (args): Promise<CallToolResult> => {
-      const pre = await preflight(options);
+      const pre = await resolveTarget();
       if (!pre.ok) {
         return pre.result;
       }
@@ -259,7 +182,7 @@ export function registerNotesTools(server: McpServer, options: RegisterNotesTool
           // The 204 carries no body, so the outcome is restated from the request.
           return successResult({ deleted: true, noteId: args.noteId });
         case 'http-error':
-          return errorResult(describeKnownError(result.code, result.message, result.status));
+          return httpErrorResult(result);
         case 'invalid-response':
         case 'invalid-error-response':
           return errorResult(describeInvalidResponse());

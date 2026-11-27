@@ -91,8 +91,16 @@ export class InMemoryNotesStore implements NotesStore {
     return (this.records.get(repoId) ?? []).map((record) => record.note);
   }
 
-  async add(repoId: RepositoryId, draft: NoteDraft, anchor: NoteAnchor): Promise<AnchoredNote> {
-    const record = createRecord({ draft, anchor }, { author: { role: 'user' } });
+  async add(
+    repoId: RepositoryId,
+    draft: NoteDraft,
+    anchor: NoteAnchor,
+    source: 'user' | 'mcp' = 'user',
+  ): Promise<AnchoredNote> {
+    const record = createRecord(
+      { draft, anchor },
+      source === 'user' ? { author: { role: 'user' } } : {},
+    );
     const existing = this.records.get(repoId) ?? [];
     this.records.set(repoId, [...existing, record]);
     return record.note;

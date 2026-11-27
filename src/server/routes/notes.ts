@@ -425,12 +425,16 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
   notesRoutes.post('/repositories/:repoId/notes', async (c) => {
     try {
       const body = await readJsonBody(c);
+      const { source = 'user' } = body;
+      if (source !== 'user' && source !== 'mcp') {
+        throw new NoteRequestValidationError('Note source must be "user" or "mcp".');
+      }
       const noteBody = readNoteBody(body);
       const request = readCreateTarget(body);
       const context = await reconcileRepo(c, [request]);
 
       const { draft, anchor } = prepareComment(context, request, noteBody);
-      const note = await options.notesStore.add(context.repoId, draft, anchor);
+      const note = await options.notesStore.add(context.repoId, draft, anchor, source);
       options.notifyNotesChanged(context.repoId);
       return c.json(toNoteResponse(note), 201);
     } catch (error: unknown) {

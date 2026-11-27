@@ -104,7 +104,12 @@ export interface NotesStore {
    */
   reconcile(repoId: RepositoryId, current: NotesCurrentState): Promise<boolean>;
   list(repoId: RepositoryId): Promise<AnchoredNote[]>;
-  add(repoId: RepositoryId, draft: NoteDraft, anchor: NoteAnchor): Promise<AnchoredNote>;
+  add(
+    repoId: RepositoryId,
+    draft: NoteDraft,
+    anchor: NoteAnchor,
+    source?: 'user' | 'mcp',
+  ): Promise<AnchoredNote>;
   updateBody(repoId: RepositoryId, noteId: string, body: string): Promise<AnchoredNote>;
   remove(repoId: RepositoryId, noteId: string): Promise<void>;
   /** Clears notes except for threads in the current active or paused review. */

@@ -1,17 +1,19 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { StdioServerHandle } from '@modelcontextprotocol/server/stdio';
 import { describe, expect, it, vi } from 'vitest';
-import type { RegisterNotesToolsOptions } from './register-notes-tools';
+import type { ResolveToolTarget } from './tool-target';
 
-const { mcpServerCtor, registerNotesToolsMock, serveStdioMock } = vi.hoisted(() => ({
-  mcpServerCtor: vi.fn(),
-  registerNotesToolsMock: vi.fn(),
-  serveStdioMock: vi.fn(),
-}));
+const { mcpServerCtor, registerNotesToolsMock, registerReviewToolsMock, serveStdioMock } =
+  vi.hoisted(() => ({
+    mcpServerCtor: vi.fn(),
+    registerNotesToolsMock: vi.fn(),
+    registerReviewToolsMock: vi.fn(),
+    serveStdioMock: vi.fn(),
+  }));
 
 vi.mock('@modelcontextprotocol/server', () => ({
-  McpServer: vi.fn().mockImplementation(function (serverInfo: unknown) {
-    mcpServerCtor(serverInfo);
+  McpServer: vi.fn().mockImplementation(function (serverInfo: unknown, options: unknown) {
+    mcpServerCtor(serverInfo, options);
     // A fresh object per construction, so tests can tell instances apart.
     return { serverInfo };
   }),
@@ -21,11 +23,12 @@ vi.mock('@modelcontextprotocol/server/stdio', () => ({
   serveStdio: serveStdioMock,
 }));
 
-// Tool registration itself is covered by register-notes-tools.test.ts; here it
-// is stubbed so the options handed to it (notably the per-instance resolver)
-// can be inspected directly.
 vi.mock('./register-notes-tools', () => ({
   registerNotesTools: registerNotesToolsMock,
+}));
+
+vi.mock('./register-review-tools', () => ({
+  registerReviewTools: registerReviewToolsMock,
 }));
 
 const { startMcpServer } = await import('./start-mcp-server');
@@ -50,7 +53,11 @@ function startAndCaptureFactory(repoPath: string): {
   serveStdioMock.mockReturnValue(handle);
   const resolveRepoRoot = vi.fn().mockReturnValue('/repo/sift');
 
-  startMcpServer({ repoPath, resolveRepoRoot, findRegisteredRepositoryByPath: vi.fn() });
+  startMcpServer({
+    repoPath,
+    resolveRepoRoot,
+    findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
+  });
 
   const [factory, serveStdioOptions] = serveStdioMock.mock.calls.at(-1) as [
     ServerFactory,
@@ -59,8 +66,8 @@ function startAndCaptureFactory(repoPath: string): {
   return { resolveRepoRoot, factory, serveStdioOptions };
 }
 
-function lastRegisterOptions(): RegisterNotesToolsOptions {
-  return registerNotesToolsMock.mock.calls.at(-1)![1] as RegisterNotesToolsOptions;
+function lastResolveTarget(): ResolveToolTarget {
+  return registerNotesToolsMock.mock.calls.at(-1)![2] as ResolveToolTarget;
 }
 
 describe('startMcpServer', () => {
@@ -81,7 +88,7 @@ describe('startMcpServer', () => {
     expect(returned).toBe(handle);
   });
 
-  it('builds an McpServer with the app name/version and registers the Notes tools', () => {
+  it('builds an McpServer with the app name/version and registers Notes and Review tools with the same target resolver', () => {
     // Given
     const { factory, resolveRepoRoot } = startAndCaptureFactory('/repo/sift');
 
@@ -89,10 +96,19 @@ describe('startMcpServer', () => {
     const server = factory();
 
     // Then
-    expect(mcpServerCtor).toHaveBeenCalledWith({ name: 'sift', version: APP_INFO.version });
+    expect(mcpServerCtor).toHaveBeenCalledWith(
+      { name: 'sift', version: APP_INFO.version },
+      expect.objectContaining({ instructions: expect.stringContaining('wait_for_turn') }),
+    );
     expect(registerNotesToolsMock).toHaveBeenCalledWith(
       server,
-      expect.objectContaining({ repoPath: '/repo/sift' }),
+      expect.objectContaining({ getNotes: expect.any(Function) }),
+      lastResolveTarget(),
+    );
+    expect(registerReviewToolsMock).toHaveBeenCalledWith(
+      server,
+      expect.objectContaining({ getReview: expect.any(Function) }),
+      lastResolveTarget(),
     );
     // Building an instance must stay side-effect free: `serveStdio` discards
     // the instance it built for a `server/discover` probe when the client then
@@ -107,32 +123,33 @@ describe('startMcpServer', () => {
     // When
     // A probe-then-fallback opening builds two instances from the one factory.
     const probeServer = factory();
-    const probeOptions = lastRegisterOptions();
+    const probeResolveTarget = lastResolveTarget();
     const pinnedServer = factory();
-    const pinnedOptions = lastRegisterOptions();
+    const pinnedResolveTarget = lastResolveTarget();
 
     // Then
     expect(pinnedServer).not.toBe(probeServer);
-    expect(pinnedOptions.repoRootResolver).not.toBe(probeOptions.repoRootResolver);
+    expect(pinnedResolveTarget).not.toBe(probeResolveTarget);
   });
 
-  it('resolves the repo root lazily, and caches it per instance', () => {
+  it('resolves the repo root lazily, and caches it per instance', async () => {
     // Given
     const { factory, resolveRepoRoot } = startAndCaptureFactory('/repo/sift/nested');
 
     // When
     factory();
-    const firstResolver = lastRegisterOptions().repoRootResolver;
+    const firstResolver = lastResolveTarget();
     factory();
-    const secondResolver = lastRegisterOptions().repoRootResolver;
+    const secondResolver = lastResolveTarget();
 
     // Then
     expect(resolveRepoRoot).not.toHaveBeenCalled();
-    expect(firstResolver.resolve()).toBe('/repo/sift');
+    await firstResolver();
+    await firstResolver();
     expect(resolveRepoRoot).toHaveBeenCalledExactlyOnceWith('/repo/sift/nested');
     // The second instance caches independently, so it resolves on its own
     // rather than reusing the first instance's cached root.
-    expect(secondResolver.resolve()).toBe('/repo/sift');
+    await secondResolver();
     expect(resolveRepoRoot).toHaveBeenCalledTimes(2);
   });
 

@@ -3,24 +3,27 @@ import type { Note, NoteCreateTarget } from '../domain/notes/types';
 import { noteBodySchema } from './note-body-schema';
 import { noteSchema } from './notes-schema';
 
-const lineTargetInputSchema = z
+const lineTargetSchema = z
   .object({
     kind: z.literal('line'),
     path: z.string().min(1),
     startLine: z.number().int().min(1),
     endLine: z.number().int().min(1),
     bucket: z.enum(['working', 'staged']).optional(),
-    body: noteBodySchema,
   })
   .strict();
 
-const fileTargetInputSchema = z
+const fileTargetSchema = z
   .object({
     kind: z.literal('file'),
     path: z.string().min(1),
-    body: noteBodySchema,
   })
   .strict();
+
+export const noteCreateTargetSchema = z.discriminatedUnion('kind', [
+  lineTargetSchema,
+  fileTargetSchema,
+]);
 
 /**
  * Flat `add_note` arguments: `NoteCreateTarget` and `body` combined into one
@@ -28,7 +31,10 @@ const fileTargetInputSchema = z
  * for a model to call correctly.
  */
 export const addNoteInputSchema: z.ZodType<NoteCreateTarget & { body: string }> =
-  z.discriminatedUnion('kind', [lineTargetInputSchema, fileTargetInputSchema]);
+  z.discriminatedUnion('kind', [
+    lineTargetSchema.extend({ body: noteBodySchema }),
+    fileTargetSchema.extend({ body: noteBodySchema }),
+  ]);
 
 export const addNoteOutputSchema: z.ZodType<{ note: Note }> = z
   .object({ note: noteSchema })

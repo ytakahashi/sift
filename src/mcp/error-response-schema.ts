@@ -13,6 +13,9 @@ export const errorResponseSchema = z
   .object({
     error: z.string(),
     code: z.string().optional(),
+    noteIds: z.array(z.string()).optional(),
+    // Strict parsing accepts this server field. The error text already includes the index.
+    commentIndex: z.number().int().min(0).optional(),
   })
   .strict();
 
