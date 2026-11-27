@@ -5,6 +5,7 @@ import type { ResolvedRepository } from '../domain/repository/repository';
 import type { RegisterNotesToolsOptions } from './register-notes-tools';
 import { registerNotesTools } from './register-notes-tools';
 import { UNCERTAIN_ADD_NOTE_MESSAGE } from './notes-tool-guidance';
+import { createToolTargetResolver, type ToolTargetOptions } from './tool-target';
 
 type ToolCallback = (args?: unknown) => Promise<CallToolResult>;
 
@@ -36,9 +37,9 @@ function staleNote(id: string): Note {
   };
 }
 
-function createOptions(
-  overrides: Partial<RegisterNotesToolsOptions> = {},
-): RegisterNotesToolsOptions {
+type TestOptions = RegisterNotesToolsOptions & ToolTargetOptions;
+
+function createOptions(overrides: Partial<TestOptions> = {}): TestOptions {
   return {
     repoPath: '/repo/sift',
     repoRootResolver: { resolve: vi.fn().mockReturnValue('/repo/sift') },
@@ -65,10 +66,10 @@ describe('registerNotesTools', () => {
         },
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -83,10 +84,10 @@ describe('registerNotesTools', () => {
         findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -103,10 +104,10 @@ describe('registerNotesTools', () => {
         findRegisteredRepositoryByPath: vi.fn().mockRejectedValue(new Error('invalid JSON')),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -125,10 +126,10 @@ describe('registerNotesTools', () => {
         }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -153,10 +154,10 @@ describe('registerNotesTools', () => {
           checkNotesApiCompatibility: vi.fn().mockResolvedValue({ kind }),
         });
         const { server, tools } = createFakeServer();
-        registerNotesTools(server, options);
+        registerNotesTools(server, options, createToolTargetResolver(options));
 
         // When
-        const result = await tools.get('list_notes')!();
+        const result = await tools.get('list_notes')!({});
 
         // Then
         expect(result.isError).toBe(true);
@@ -170,7 +171,7 @@ describe('registerNotesTools', () => {
         findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('add_note')!({ kind: 'file', path: 'a.ts', body: 'x' });
@@ -189,7 +190,7 @@ describe('registerNotesTools', () => {
         findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get(toolName)!(args);
@@ -201,6 +202,22 @@ describe('registerNotesTools', () => {
   });
 
   describe('list_notes', () => {
+    it('returns stale threads when a review ID is supplied', async () => {
+      // Given
+      const notes = [{ ...staleNote('n1'), reviewId: 'r1', status: 'open' }];
+      const getNotes = vi.fn().mockResolvedValue({ kind: 'success', notes });
+      const options = createOptions({ getNotes });
+      const { server, tools } = createFakeServer();
+      registerNotesTools(server, options, createToolTargetResolver(options));
+
+      // When
+      const result = await tools.get('list_notes')!({ reviewId: 'r1', includeStale: false });
+
+      // Then
+      expect(getNotes).toHaveBeenCalledWith(49321, 'sift-repo', 'r1');
+      expect(result.structuredContent).toEqual({ notes, staleCount: 1 });
+    });
+
     it('returns notes as both content and structuredContent on success', async () => {
       // Given
       const notes = [liveNote('n1')];
@@ -208,14 +225,14 @@ describe('registerNotesTools', () => {
         getNotes: vi.fn().mockResolvedValue({ kind: 'success', notes }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('list_notes')!({});
 
       // Then
       const payload = { notes, staleCount: 0 };
-      expect(options.getNotes).toHaveBeenCalledWith(49321, 'sift-repo');
+      expect(options.getNotes).toHaveBeenCalledWith(49321, 'sift-repo', undefined);
       expect(result.isError).toBeUndefined();
       expect(result.structuredContent).toEqual(payload);
       expect(result.content).toEqual([{ type: 'text', text: JSON.stringify(payload) }]);
@@ -229,7 +246,7 @@ describe('registerNotesTools', () => {
           .mockResolvedValue({ kind: 'success', notes: [liveNote('n1'), staleNote('n2')] }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When: the tool is called without arguments
       const result = await tools.get('list_notes')!({});
@@ -245,7 +262,7 @@ describe('registerNotesTools', () => {
         getNotes: vi.fn().mockResolvedValue({ kind: 'success', notes }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When: the caller opts in
       const result = await tools.get('list_notes')!({ includeStale: true });
@@ -265,10 +282,10 @@ describe('registerNotesTools', () => {
         }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -284,10 +301,10 @@ describe('registerNotesTools', () => {
         getNotes: vi.fn().mockResolvedValue({ kind: 'invalid-response' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -299,10 +316,10 @@ describe('registerNotesTools', () => {
         getNotes: vi.fn().mockResolvedValue({ kind: 'invalid-error-response' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -317,10 +334,10 @@ describe('registerNotesTools', () => {
         getNotes: vi.fn().mockResolvedValue({ kind: 'network-error' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
-      const result = await tools.get('list_notes')!();
+      const result = await tools.get('list_notes')!({});
 
       // Then
       expect(result.isError).toBe(true);
@@ -344,7 +361,7 @@ describe('registerNotesTools', () => {
         createNote: vi.fn().mockResolvedValue({ kind: 'success', note }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('add_note')!({
@@ -377,7 +394,7 @@ describe('registerNotesTools', () => {
         }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('add_note')!({ kind: 'file', path: 'a.ts', body: 'x' });
@@ -395,7 +412,7 @@ describe('registerNotesTools', () => {
         createNote: vi.fn().mockResolvedValue({ kind: 'uncertain' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('add_note')!({ kind: 'file', path: 'a.ts', body: 'x' });
@@ -411,7 +428,7 @@ describe('registerNotesTools', () => {
         createNote: vi.fn().mockResolvedValue({ kind: 'invalid-error-response' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('add_note')!({ kind: 'file', path: 'a.ts', body: 'x' });
@@ -432,7 +449,7 @@ describe('registerNotesTools', () => {
         updateNote: vi.fn().mockResolvedValue({ kind: 'success', note }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
@@ -454,7 +471,7 @@ describe('registerNotesTools', () => {
         }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
@@ -472,7 +489,7 @@ describe('registerNotesTools', () => {
         // Given
         const options = createOptions({ updateNote: vi.fn().mockResolvedValue({ kind }) });
         const { server, tools } = createFakeServer();
-        registerNotesTools(server, options);
+        registerNotesTools(server, options, createToolTargetResolver(options));
 
         // When
         const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
@@ -491,7 +508,7 @@ describe('registerNotesTools', () => {
         updateNote: vi.fn().mockResolvedValue({ kind: 'network-error' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('update_note')!({ noteId: 'n1', body: 'revised' });
@@ -511,7 +528,7 @@ describe('registerNotesTools', () => {
         deleteNote: vi.fn().mockResolvedValue({ kind: 'success' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('delete_note')!({ noteId: 'n1' });
@@ -533,7 +550,7 @@ describe('registerNotesTools', () => {
         }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('delete_note')!({ noteId: 'n1' });
@@ -552,7 +569,7 @@ describe('registerNotesTools', () => {
         // Given
         const options = createOptions({ deleteNote: vi.fn().mockResolvedValue({ kind }) });
         const { server, tools } = createFakeServer();
-        registerNotesTools(server, options);
+        registerNotesTools(server, options, createToolTargetResolver(options));
 
         // When
         const result = await tools.get('delete_note')!({ noteId: 'n1' });
@@ -571,7 +588,7 @@ describe('registerNotesTools', () => {
         deleteNote: vi.fn().mockResolvedValue({ kind: 'network-error' }),
       });
       const { server, tools } = createFakeServer();
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // When
       const result = await tools.get('delete_note')!({ noteId: 'n1' });
@@ -592,13 +609,14 @@ describe('registerNotesTools', () => {
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const listNotesCall = registerTool.mock.calls.find(([name]) => name === 'list_notes');
       const config = listNotesCall?.[1] as { description?: string };
       expect(config.description).toContain('current repository state');
       expect(config.description).toContain('outside the current diff');
+      expect(config.description).toContain('note IDs with update_note and delete_note');
     });
 
     it('describes the distinct file and line target scopes for add_note', () => {
@@ -608,7 +626,7 @@ describe('registerNotesTools', () => {
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const addNoteCall = registerTool.mock.calls.find(([name]) => name === 'add_note');
@@ -625,7 +643,7 @@ describe('registerNotesTools', () => {
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const addNoteCall = registerTool.mock.calls.find(([name]) => name === 'add_note');
@@ -639,7 +657,7 @@ describe('registerNotesTools', () => {
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const updateNoteCall = registerTool.mock.calls.find(([name]) => name === 'update_note');
@@ -653,7 +671,7 @@ describe('registerNotesTools', () => {
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const deleteNoteCall = registerTool.mock.calls.find(([name]) => name === 'delete_note');
@@ -669,7 +687,7 @@ describe('registerNotesTools', () => {
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const listNotesCall = registerTool.mock.calls.find(([name]) => name === 'list_notes');
@@ -677,14 +695,14 @@ describe('registerNotesTools', () => {
       expect(config.annotations?.readOnlyHint).toBeUndefined();
     });
 
-    it('declares a strict empty input schema for list_notes', () => {
+    it('declares a strict input schema for list_notes with optional filters', () => {
       // Given
       const options = createOptions();
       const registerTool = vi.fn();
       const server = { registerTool } as unknown as McpServer;
 
       // When
-      registerNotesTools(server, options);
+      registerNotesTools(server, options, createToolTargetResolver(options));
 
       // Then
       const listNotesCall = registerTool.mock.calls.find(([name]) => name === 'list_notes');

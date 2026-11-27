@@ -578,6 +578,7 @@ describe('notesRoutes', () => {
           body: 'needs a guard',
         },
         { generation: FILE_GENERATION, lineContents: ['alpha'] },
+        'user',
       );
       expect(notifyNotesChanged).toHaveBeenCalledWith('my-repo');
       expect(getIndexEntries).not.toHaveBeenCalled();
@@ -619,6 +620,7 @@ describe('notesRoutes', () => {
           body: 'review this block',
         },
         { generation: FILE_GENERATION, lineContents: ['first', 'second', 'third'] },
+        'user',
       );
     });
 
@@ -832,6 +834,18 @@ describe('notesRoutes', () => {
   });
 
   describe('POST /notes (file note)', () => {
+    it('passes the standalone MCP note source to the store', async () => {
+      // Given
+      const target = { kind: 'file', path: 'a.ts' };
+
+      // When
+      const response = await postNote({ target, body: 'from MCP', source: 'mcp' });
+
+      // Then
+      expect(response.status).toBe(201);
+      expect(notesStore.add.mock.calls[0][3]).toBe('mcp');
+    });
+
     it('creates a pane-agnostic file note', async () => {
       // When: a file note is created
       const response = await postNote({
@@ -849,6 +863,7 @@ describe('notesRoutes', () => {
           body: 'about this file',
         },
         { generation: FILE_GENERATION, lineContents: undefined },
+        'user',
       );
       expect(getIndexEntries).not.toHaveBeenCalled();
     });
@@ -885,6 +900,7 @@ describe('notesRoutes', () => {
           body: 'update this caller too',
         },
         { generation: FILE_GENERATION, lineContents: undefined },
+        'user',
       );
     });
 

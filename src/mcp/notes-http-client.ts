@@ -1,6 +1,6 @@
 import type { Note, NoteCreateTarget } from '../domain/notes/types';
 import { buildLocalServerUrl } from '../server/fixed-port';
-import { errorResponseSchema } from './error-response-schema';
+import { fetchJson, parseErrorResponse, type HttpJsonResult } from './http-json-client';
 import { noteSchema, notesListResponseSchema } from './notes-schema';
 
 function notesUrl(port: number, repoId: string): string {
@@ -11,77 +11,17 @@ function noteUrl(port: number, repoId: string, noteId: string): string {
   return `${notesUrl(port, repoId)}/${encodeURIComponent(noteId)}`;
 }
 
-type ParsedErrorResponse =
-  { kind: 'valid'; status: number; code?: string; message: string } | { kind: 'invalid' };
-
-async function parseErrorResponse(response: Response): Promise<ParsedErrorResponse> {
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch (_error: unknown) {
-    return { kind: 'invalid' };
-  }
-
-  const parsed = errorResponseSchema.safeParse(body);
-  return parsed.success
-    ? {
-        kind: 'valid',
-        status: response.status,
-        code: parsed.data.code,
-        message: parsed.data.error,
-      }
-    : { kind: 'invalid' };
-}
-
-export type GetNotesResult =
-  | { kind: 'success'; notes: Note[] }
-  | { kind: 'http-error'; status: number; code?: string; message: string }
-  | { kind: 'invalid-response' }
-  | { kind: 'invalid-error-response' }
-  | { kind: 'network-error' };
+export type GetNotesResult = HttpJsonResult<{ notes: Note[] }>;
 
 export async function getNotes(
   port: number,
   repoId: string,
+  reviewId?: string,
   fetchImpl: typeof fetch = fetch,
 ): Promise<GetNotesResult> {
-  let response: Response;
-  try {
-    response = await fetchImpl(notesUrl(port, repoId));
-  } catch (_error: unknown) {
-    return { kind: 'network-error' };
-  }
-
-  // The GET contract is 200; any other 2xx (e.g. 204) doesn't match it and its
-  // body shape is unknown, so it is treated the same as a malformed response
-  // rather than assumed to carry notes.
-  if (response.status !== 200) {
-    if (response.ok) {
-      return { kind: 'invalid-response' };
-    }
-    const parsedError = await parseErrorResponse(response);
-    if (parsedError.kind === 'invalid') {
-      return { kind: 'invalid-error-response' };
-    }
-    return {
-      kind: 'http-error',
-      status: parsedError.status,
-      code: parsedError.code,
-      message: parsedError.message,
-    };
-  }
-
-  let body: unknown;
-  try {
-    body = await response.json();
-  } catch (_error: unknown) {
-    return { kind: 'invalid-response' };
-  }
-
-  const parsed = notesListResponseSchema.safeParse(body);
-  return parsed.success
-    ? { kind: 'success', notes: parsed.data.notes }
-    : { kind: 'invalid-response' };
+  const url = notesUrl(port, repoId);
+  const query = reviewId === undefined ? '' : `?${new URLSearchParams({ reviewId })}`;
+  return fetchJson(() => fetchImpl(url + query), notesListResponseSchema);
 }
 
 /**
@@ -109,7 +49,7 @@ export async function createNote(
     response = await fetchImpl(notesUrl(port, repoId), {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ target, body }),
+      body: JSON.stringify({ target, body, source: 'mcp' }),
     });
   } catch (_error: unknown) {
     // The request was already dispatched; a network failure at this point
@@ -161,7 +101,7 @@ export async function createNote(
  */
 export type UpdateNoteResult =
   | { kind: 'success'; note: Note }
-  | { kind: 'http-error'; status: number; code?: string; message: string }
+  | Extract<HttpJsonResult<object>, { kind: 'http-error' }>
   | { kind: 'invalid-response' }
   | { kind: 'invalid-error-response' }
   | { kind: 'network-error' };
@@ -195,12 +135,7 @@ export async function updateNote(
     if (parsedError.kind === 'invalid') {
       return { kind: 'invalid-error-response' };
     }
-    return {
-      kind: 'http-error',
-      status: parsedError.status,
-      code: parsedError.code,
-      message: parsedError.message,
-    };
+    return { ...parsedError, kind: 'http-error' };
   }
 
   let responseBody: unknown;
@@ -220,7 +155,7 @@ export async function updateNote(
  */
 export type DeleteNoteResult =
   | { kind: 'success' }
-  | { kind: 'http-error'; status: number; code?: string; message: string }
+  | Extract<HttpJsonResult<object>, { kind: 'http-error' }>
   | { kind: 'invalid-response' }
   | { kind: 'invalid-error-response' }
   | { kind: 'network-error' };
@@ -248,12 +183,7 @@ export async function deleteNote(
     if (parsedError.kind === 'invalid') {
       return { kind: 'invalid-error-response' };
     }
-    return {
-      kind: 'http-error',
-      status: parsedError.status,
-      code: parsedError.code,
-      message: parsedError.message,
-    };
+    return { ...parsedError, kind: 'http-error' };
   }
 
   return { kind: 'success' };

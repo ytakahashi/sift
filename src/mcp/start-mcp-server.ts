@@ -6,7 +6,10 @@ import { resolvePort } from '../server/fixed-port';
 import { checkNotesApiCompatibility } from './notes-compatibility';
 import { createNote, deleteNote, getNotes, updateNote } from './notes-http-client';
 import { registerNotesTools } from './register-notes-tools';
+import { registerReviewTools } from './register-review-tools';
 import { createRepoRootResolver } from './repo-target';
+import { getReview, submitResponse, submitReview } from './review-http-client';
+import { createToolTargetResolver } from './tool-target';
 
 export interface StartMcpServerOptions {
   /** `--repo <path>` value, or `process.cwd()` when not given. */
@@ -37,19 +40,24 @@ export type McpServerHandle = StdioServerHandle;
  * side effects so that a discarded instance leaves nothing behind.
  */
 function createNotesServer(options: StartMcpServerOptions): McpServer {
-  const server = new McpServer({ name: APP_INFO.productName, version: APP_INFO.version });
+  const server = new McpServer(
+    { name: APP_INFO.productName, version: APP_INFO.version },
+    {
+      instructions:
+        'Use submit_review to start a review, then each agent checks wait_for_turn, reads threads ' +
+        'with list_notes and the reviewId, addresses them, and hands off with submit_response or submit_review.',
+    },
+  );
 
-  registerNotesTools(server, {
+  const resolveTarget = createToolTargetResolver({
     repoPath: options.repoPath,
     repoRootResolver: createRepoRootResolver(options.repoPath, options.resolveRepoRoot),
     findRegisteredRepositoryByPath: options.findRegisteredRepositoryByPath,
     resolvePort,
     checkNotesApiCompatibility,
-    getNotes,
-    createNote,
-    updateNote,
-    deleteNote,
   });
+  registerNotesTools(server, { getNotes, createNote, updateNote, deleteNote }, resolveTarget);
+  registerReviewTools(server, { getReview, submitReview, submitResponse }, resolveTarget);
 
   return server;
 }

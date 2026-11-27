@@ -30,12 +30,25 @@ function unparseableResponse(status: number): Response {
 }
 
 describe('getNotes', () => {
+  it('encodes the review ID as a single query parameter', async () => {
+    // Given
+    const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { notes: [] }));
+
+    // When
+    await getNotes(49321, 'sift-repo', 'review/1&other', fetchImpl);
+
+    // Then
+    expect(fetchImpl).toHaveBeenCalledWith(
+      'http://127.0.0.1:49321/api/repositories/sift-repo/notes?reviewId=review%2F1%26other',
+    );
+  });
+
   it('returns success with the parsed notes on 200', async () => {
     // Given
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { notes: [lineNote] }));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(fetchImpl).toHaveBeenCalledWith(
@@ -49,7 +62,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(200, { notes: [{ bad: true }] }));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({ kind: 'invalid-response' });
@@ -60,7 +73,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockResolvedValue(unparseableResponse(200));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({ kind: 'invalid-response' });
@@ -73,7 +86,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(204, { notes: [lineNote] }));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({ kind: 'invalid-response' });
@@ -88,7 +101,7 @@ describe('getNotes', () => {
       );
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({
@@ -104,7 +117,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: 'invariant violated' }));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({
@@ -120,7 +133,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockResolvedValue(unparseableResponse(502));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({ kind: 'invalid-error-response' });
@@ -131,7 +144,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(502, { unexpected: 'shape' }));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({ kind: 'invalid-error-response' });
@@ -142,7 +155,7 @@ describe('getNotes', () => {
     const fetchImpl = vi.fn().mockRejectedValue(new Error('connection refused'));
 
     // When
-    const result = await getNotes(49321, 'sift-repo', fetchImpl);
+    const result = await getNotes(49321, 'sift-repo', undefined, fetchImpl);
 
     // Then
     expect(result).toEqual({ kind: 'network-error' });
@@ -165,7 +178,7 @@ describe('createNote', () => {
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ target, body: 'a note' }),
+        body: JSON.stringify({ target, body: 'a note', source: 'mcp' }),
       },
     );
     expect(result).toEqual({ kind: 'success', note: lineNote });

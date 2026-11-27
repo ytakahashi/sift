@@ -125,6 +125,24 @@ describe('InMemoryNotesStore', () => {
     expect(note.createdAt).toBeGreaterThan(0);
     expect(note.body).toBe('the body');
     expect(note.path).toBe('a.ts');
+    expect(note.author).toEqual({ role: 'user' });
+    await expect(store.list('repo-1')).resolves.toEqual([note]);
+  });
+
+  it('leaves the author unset for a standalone MCP note', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+
+    // When
+    const note = await store.add(
+      'repo-1',
+      { path: 'a.ts', target: { kind: 'file', fileId: 'file-a.ts', scope: 'diff' }, body: 'note' },
+      { generation: fileGeneration('blob-1') },
+      'mcp',
+    );
+
+    // Then
+    expect(note).not.toHaveProperty('author');
     await expect(store.list('repo-1')).resolves.toEqual([note]);
   });
 
