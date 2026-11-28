@@ -18,6 +18,7 @@ function createNote(id: string): Note {
 
 interface GatewayMock extends NotesGateway {
   fetchNotes: Mock<NotesGateway['fetchNotes']>;
+  fetchReview: Mock<NotesGateway['fetchReview']>;
   addNote: Mock<NotesGateway['addNote']>;
   updateNote: Mock<NotesGateway['updateNote']>;
   deleteNote: Mock<NotesGateway['deleteNote']>;
@@ -28,6 +29,7 @@ interface GatewayMock extends NotesGateway {
 function createGateway(): GatewayMock {
   return {
     fetchNotes: vi.fn(async () => [createNote('n1')]),
+    fetchReview: vi.fn(async () => null),
     addNote: vi.fn(async () => createNote('created')),
     updateNote: vi.fn(async () => createNote('updated')),
     deleteNote: vi.fn(async () => {}),
@@ -233,6 +235,8 @@ describe('useNotes', () => {
     const { result } = renderHook(() => useNotes(gateway, 'my-app'));
     await waitFor(() => expect(result.current.notes).toHaveLength(1));
     gateway.fetchNotes.mockResolvedValue([]);
+    const review = { reviewId: 'r1', round: 1, verdict: 'comment', state: 'peer-gone' } as const;
+    gateway.fetchReview.mockResolvedValue(review);
 
     // When: an external change triggers a refetch
     await act(async () => {
@@ -241,5 +245,19 @@ describe('useNotes', () => {
 
     // Then: the reconciled (now empty) list is shown
     expect(result.current.notes).toEqual([]);
+    expect(result.current.review).toEqual(review);
+  });
+
+  it('loads notes when the review endpoint fails', async () => {
+    // Given
+    gateway.fetchReview.mockRejectedValue(new NotesActionError('Review unavailable', 503));
+
+    // When
+    const { result } = renderHook(() => useNotes(gateway, 'my-app'));
+
+    // Then
+    await waitFor(() => expect(result.current.notes).toEqual([createNote('n1')]));
+    expect(result.current.review).toBeNull();
+    expect(result.current.error).toBe('Review unavailable');
   });
 });

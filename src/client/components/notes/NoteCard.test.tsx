@@ -71,6 +71,68 @@ describe('NoteCard', () => {
     expect(screen.queryByRole('button', { name: 'Edit' })).toBeNull();
   });
 
+  it('shows replies and collapses a resolved thread by default', async () => {
+    // Given
+    const user = userEvent.setup();
+    const note = createNote({
+      reviewId: 'r1',
+      status: 'resolved',
+      author: { role: 'reviewer', client: 'claude-code' },
+      replies: [
+        {
+          author: { role: 'implementer', client: 'codex' },
+          body: 'Updated the guard.',
+          round: 1,
+          resolution: 'fixed',
+        },
+        { author: { role: 'reviewer' }, body: 'Verified the change.', round: 1 },
+      ],
+    });
+    render(<NoteCard note={note} contextLabel="Line 10" />);
+    const summary = screen.getByText(/Resolved/, { selector: 'summary' });
+    const details = summary.closest('details');
+    expect(details?.open).toBe(false);
+
+    // When
+    await user.click(summary);
+
+    // Then
+    expect(details?.open).toBe(true);
+    expect(screen.getByText('reviewer (claude-code)')).toBeDefined();
+    expect(screen.getByText('implementer (codex) · fixed')).toBeDefined();
+    expect(screen.getByText('Updated the guard.')).toBeDefined();
+    expect(screen.getByText('Verified the change.')).toBeDefined();
+  });
+
+  it('blocks deleting the current review thread until the review ends', async () => {
+    // Given
+    const user = userEvent.setup();
+    const note = createNote({ reviewId: 'r1', status: 'open' });
+    const review = { reviewId: 'r1', round: 2, verdict: 'comment', state: 'needs-user' } as const;
+    const onDelete = vi.fn();
+    const { rerender } = render(<NoteCard note={note} review={review} onDelete={onDelete} />);
+    const button = screen.getByRole('button', {
+      name: 'Delete',
+      description: 'Protected by the current review.',
+    });
+
+    // When
+    await user.click(button);
+
+    // Then
+    expect(button).toHaveProperty('disabled', true);
+    expect(onDelete).not.toHaveBeenCalled();
+
+    // When
+    rerender(
+      <NoteCard note={note} review={{ ...review, state: 'peer-gone' }} onDelete={onDelete} />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    // Then
+    expect(onDelete).toHaveBeenCalledExactlyOnceWith(note.id);
+  });
+
   it('keeps the optional context label in view and edit modes', async () => {
     // Given: a labeled line note card
     const user = userEvent.setup();

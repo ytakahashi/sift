@@ -1,12 +1,15 @@
 import type { ReactElement } from 'react';
+import type { ReviewSession } from '../../../domain/notes/review-session';
 import type { Note } from '../../../domain/notes/types';
 import { describeNoteStaleReason, formatNoteForClipboard } from '../../../domain/notes/format';
 import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
 import { NoteActionButton } from './NoteActionButton';
+import { NoteDeleteButton } from './NoteDeleteButton';
 import { useCopyFeedback } from './useCopyFeedback';
 
 interface NoteViewerProps {
   note: Note;
+  review?: ReviewSession | null;
   contextLabel?: string;
   onEdit: () => void;
   onDelete?: (id: string) => void | Promise<void>;
@@ -16,6 +19,7 @@ interface NoteViewerProps {
 
 export function NoteViewer({
   note,
+  review,
   contextLabel,
   onEdit,
   onDelete,
@@ -75,10 +79,10 @@ export function NoteViewer({
             variant="muted"
           />
         </div>
-        <NoteActionButton
-          label="Delete"
+        <NoteDeleteButton
+          note={note}
+          review={review}
           onClick={() => void onDelete?.(note.id)}
-          variant="danger"
           disabled={deleteDisabled}
         />
       </div>

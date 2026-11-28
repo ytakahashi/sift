@@ -1,10 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type { ReviewSession } from '../../../domain/notes/review-session';
 import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type { NotesGateway } from '../../application/ports';
 
 export interface UseNotesResult {
   notes: Note[];
+  review: ReviewSession | null;
   /**
    * Editor-bound mutations (add/update) reject on failure so the editor can
    * keep the draft and show the server message inline; they never write the
@@ -19,7 +21,7 @@ export interface UseNotesResult {
   deleteNote: (noteId: string) => Promise<void>;
   clearNotes: () => Promise<void>;
   deleteStaleNotes: () => Promise<void>;
-  /** Re-reads the server-side (reconciled) notes; used by SSE and diff refresh. */
+  /** Re-reads reconciled notes and the current review after SSE and diff refresh. */
   refetchNotes: () => Promise<void>;
   mutating: boolean;
   error: string | null;
@@ -33,6 +35,7 @@ export interface UseNotesResult {
  */
 export function useNotes(notesGateway: NotesGateway, repoId: RepositoryId): UseNotesResult {
   const [notes, setNotes] = useState<Note[]>([]);
+  const [review, setReview] = useState<ReviewSession | null>(null);
   const [mutating, setMutating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // Drops out-of-order fetch results (overlapping refetches from SSE bursts).
@@ -40,18 +43,26 @@ export function useNotes(notesGateway: NotesGateway, repoId: RepositoryId): UseN
 
   const refetchNotes = useCallback(async (): Promise<void> => {
     const seq = ++fetchSeqRef.current;
-    try {
-      const fetched = await notesGateway.fetchNotes(repoId);
-      if (fetchSeqRef.current === seq) {
-        setNotes(fetched);
-        // A successful sync clears the banner: keeping a stale failure
-        // message up after recovery would misreport the current state.
-        setError(null);
-      }
-    } catch (fetchError: unknown) {
-      if (fetchSeqRef.current === seq) {
-        setError(fetchError instanceof Error ? fetchError.message : String(fetchError));
-      }
+    const [notesResult, reviewResult] = await Promise.allSettled([
+      notesGateway.fetchNotes(repoId),
+      notesGateway.fetchReview(repoId),
+    ]);
+    if (fetchSeqRef.current !== seq) {
+      return;
+    }
+    if (notesResult.status === 'fulfilled') {
+      setNotes(notesResult.value);
+    }
+    if (reviewResult.status === 'fulfilled') {
+      setReview(reviewResult.value);
+    }
+    // One endpoint can fail while the other still has a fresh result.
+    const failure = [notesResult, reviewResult].find((result) => result.status === 'rejected');
+    if (failure) {
+      const reason: unknown = failure.reason;
+      setError(reason instanceof Error ? reason.message : String(reason));
+    } else {
+      setError(null);
     }
   }, [notesGateway, repoId]);
 
@@ -136,6 +147,7 @@ export function useNotes(notesGateway: NotesGateway, repoId: RepositoryId): UseN
 
   return {
     notes,
+    review,
     addNote,
     updateNote,
     deleteNote,

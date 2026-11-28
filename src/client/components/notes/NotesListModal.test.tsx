@@ -50,6 +50,7 @@ describe('NotesListModal', () => {
     // When: the modal is rendered
     render(
       <NotesListModal
+        review={null}
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -66,6 +67,33 @@ describe('NotesListModal', () => {
     expect(screen.queryByText('src/file.ts#L10')).toBeNull();
   });
 
+  it('shows the current review above the notes even when the review has no threads', () => {
+    // Given / When
+    render(
+      <NotesListModal
+        review={{
+          reviewId: 'r1',
+          round: 2,
+          verdict: 'request_changes',
+          state: 'awaiting-response',
+        }}
+        notes={[]}
+        onClose={vi.fn()}
+        onDeleteNote={vi.fn()}
+        onDeleteStaleNotes={vi.fn()}
+        canSelectLocation={() => false}
+        onAddNote={vi.fn(async () => {})}
+        onSelectLocation={vi.fn()}
+      />,
+    );
+
+    // Then
+    expect(screen.getByRole('status').textContent).toBe(
+      'Review · Round 2 · Last verdict: Changes requested · Awaiting response',
+    );
+    expect(screen.getByText('No notes yet.')).toBeDefined();
+  });
+
   it('groups stale notes under their own heading, after the notes that still apply', () => {
     // Given: a mix of notes that do and do not still match the diff
     const notes = [
@@ -80,6 +108,7 @@ describe('NotesListModal', () => {
     // When: the modal is rendered
     const { container } = render(
       <NotesListModal
+        review={null}
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -108,6 +137,7 @@ describe('NotesListModal', () => {
     // Given: only notes that still apply
     render(
       <NotesListModal
+        review={null}
         notes={[createLineNote()]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -126,6 +156,7 @@ describe('NotesListModal', () => {
     // Given / When
     render(
       <NotesListModal
+        review={null}
         notes={[createLineNote()]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -147,6 +178,7 @@ describe('NotesListModal', () => {
     const onClose = vi.fn();
     render(
       <NotesListModal
+        review={null}
         notes={[createLineNote()]}
         onClose={onClose}
         onDeleteNote={vi.fn()}
@@ -173,6 +205,7 @@ describe('NotesListModal', () => {
     // When: the modal is rendered
     render(
       <NotesListModal
+        review={null}
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -206,6 +239,7 @@ describe('NotesListModal', () => {
     const notes = [createLineNote({ startLine: 10, endLine: 12 }), createFileNote()];
     render(
       <NotesListModal
+        review={null}
         notes={notes}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -239,6 +273,7 @@ describe('NotesListModal', () => {
     ): ReturnType<typeof render> {
       return render(
         <NotesListModal
+          review={null}
           notes={[createLineNote(), staleNote]}
           onClose={vi.fn()}
           onDeleteNote={vi.fn()}
@@ -265,6 +300,7 @@ describe('NotesListModal', () => {
       // When: a note goes stale
       rerender(
         <NotesListModal
+          review={null}
           notes={[createLineNote(), staleNote]}
           onClose={vi.fn()}
           onDeleteNote={vi.fn()}
@@ -290,9 +326,7 @@ describe('NotesListModal', () => {
       // Then: a confirmation asks first, naming what goes and what stays
       expect(screen.getByText('Delete 1 stale note?')).toBeDefined();
       expect(
-        screen.getByText(
-          'Only notes that are still stale will be deleted. Live notes will remain.',
-        ),
+        screen.getByText('Only stale notes without review protection will be deleted.'),
       ).toBeDefined();
       expect(onDeleteStaleNotes).not.toHaveBeenCalled();
 
@@ -357,6 +391,7 @@ describe('NotesListModal', () => {
       // When: a refetch shows that note back as live (file restored elsewhere)
       rerender(
         <NotesListModal
+          review={null}
           notes={[createLineNote()]}
           onClose={vi.fn()}
           onDeleteNote={vi.fn()}
@@ -389,6 +424,54 @@ describe('NotesListModal', () => {
       // Then: the wording matches the number currently displayed
       expect(screen.getByText('Delete 2 stale notes?')).toBeDefined();
     });
+
+    it('excludes protected stale threads from deletion and dismisses confirmation when only protected threads remain', () => {
+      // Given
+      const review = {
+        reviewId: 'r1',
+        round: 2,
+        verdict: 'request_changes',
+        state: 'awaiting-review',
+      } as const;
+      const protectedNote = {
+        ...staleNote,
+        id: 'protected',
+        reviewId: review.reviewId,
+        status: 'open',
+      } as const;
+      const onDeleteNote = vi.fn();
+      const props = {
+        review,
+        onClose: vi.fn(),
+        onDeleteNote,
+        onDeleteStaleNotes: vi.fn(),
+        canSelectLocation: () => false,
+        onAddNote: vi.fn(async () => {}),
+        onSelectLocation: vi.fn(),
+      };
+      const { rerender } = render(<NotesListModal {...props} notes={[protectedNote, staleNote]} />);
+
+      // When
+      const [protectedDelete, deletableDelete] = screen.getAllByRole('button', { name: 'Delete' });
+      fireEvent.click(protectedDelete);
+      fireEvent.click(bulkDeleteButton());
+
+      // Then
+      expect(protectedDelete).toHaveProperty('disabled', true);
+      expect(protectedDelete.title).toBe('Protected by the current review.');
+      expect(onDeleteNote).not.toHaveBeenCalled();
+      expect(deletableDelete).toHaveProperty('disabled', false);
+      expect(screen.getByText('Stale (1 deletable · 1 protected)')).toBeDefined();
+      expect(screen.getByText('Delete 1 stale note?')).toBeDefined();
+
+      // When: the deletable note is removed while confirmation is open
+      rerender(<NotesListModal {...props} notes={[protectedNote]} />);
+
+      // Then
+      expect(screen.getByText('Stale (0 deletable · 1 protected)')).toBeDefined();
+      expect(screen.queryByRole('dialog', { name: 'Delete Stale Notes' })).toBeNull();
+      expect(screen.queryByRole('button', { name: 'Delete stale notes' })).toBeNull();
+    });
   });
 
   it('calls onSelectLocation with the note when its location is clicked', () => {
@@ -397,6 +480,7 @@ describe('NotesListModal', () => {
     const onSelectLocation = vi.fn();
     render(
       <NotesListModal
+        review={null}
         notes={[note]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -419,6 +503,7 @@ describe('NotesListModal', () => {
     const note = createFileNote({ path: 'src/unchanged.ts' });
     render(
       <NotesListModal
+        review={null}
         notes={[note]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}
@@ -438,6 +523,7 @@ describe('NotesListModal', () => {
     // Given / When: the first note has not been created yet
     render(
       <NotesListModal
+        review={null}
         notes={[]}
         onClose={vi.fn()}
         onDeleteNote={vi.fn()}

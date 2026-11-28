@@ -1,4 +1,10 @@
 import { useId, useRef, useState, type ReactElement } from 'react';
+import {
+  isProtectedReviewThread,
+  type ReviewSession,
+  type ReviewState,
+  type ReviewVerdict,
+} from '../../../domain/notes/review-session';
 import type { Note } from '../../../domain/notes/types';
 import {
   describeNoteStaleReason,
@@ -11,13 +17,16 @@ import { CopyFeedbackTooltip } from './CopyFeedbackTooltip';
 import { DeleteStaleNotesConfirmModal } from './DeleteStaleNotesConfirmModal';
 import { FileNoteCreateForm } from './FileNoteCreateForm';
 import { NoteActionButton } from './NoteActionButton';
+import { NoteDeleteButton } from './NoteDeleteButton';
+import { NoteThread } from './NoteThread';
 import { useCopyFeedback } from './useCopyFeedback';
 
 interface NotesListModalProps {
   notes: Note[];
+  review: ReviewSession | null;
   onClose: () => void;
   onDeleteNote: (id: string) => void | Promise<void>;
-  /** Deletes every note the server still considers stale, in one request. */
+  /** Deletes stale notes eligible for removal in one request. */
   onDeleteStaleNotes: () => void;
   /** Jumps to the note's file/pane in the main diff pane. */
   onSelectLocation: (note: Note) => void;
@@ -28,8 +37,23 @@ interface NotesListModalProps {
   mutationDisabled?: boolean;
 }
 
+const REVIEW_STATUS_LABELS: Record<ReviewState, string> = {
+  'awaiting-response': 'Awaiting response',
+  'awaiting-review': 'Awaiting review',
+  approved: 'Complete',
+  'needs-user': 'Needs user input',
+  'peer-gone': 'Peer disconnected',
+};
+
+const REVIEW_VERDICT_LABELS: Record<ReviewVerdict, string> = {
+  request_changes: 'Changes requested',
+  comment: 'Comment',
+  approve: 'Approved',
+};
+
 export function NotesListModal({
   notes,
+  review,
   onClose,
   onDeleteNote,
   onDeleteStaleNotes,
@@ -46,10 +70,12 @@ export function NotesListModal({
   const titleId = useId();
   const liveNotes = notes.filter(isLiveNote);
   const staleNotes = notes.filter((note) => !isLiveNote(note));
-  // The confirmation is about the notes that are stale right now. If the last
-  // one recovers (file restored) or another client deletes it while the dialog
-  // is open, there is nothing left to confirm.
-  if (confirmingDeleteStale && staleNotes.length === 0) {
+  const deletableStaleCount = staleNotes.filter(
+    (note) => !isProtectedReviewThread(note, review ?? undefined),
+  ).length;
+  const protectedStaleCount = staleNotes.length - deletableStaleCount;
+  // Notes or review state can change while the confirmation is open.
+  if (confirmingDeleteStale && deletableStaleCount === 0) {
     setConfirmingDeleteStale(false);
   }
   // Lead with the count that represents outstanding work. The stale count is
@@ -86,27 +112,29 @@ export function NotesListModal({
         <div
           style={{
             backgroundColor: '#0d1117',
-            border: `1px solid ${stale ? '#484f58' : '#3fb950'}`,
+            border: `1px solid ${stale || note.status === 'resolved' ? '#484f58' : '#3fb950'}`,
             borderRadius: '4px',
             padding: '0.5rem',
           }}
         >
-          {note.staleness.kind === 'stale' && (
-            <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: '0.35rem' }}>
-              {describeNoteStaleReason(note.staleness.reason)}
+          <NoteThread note={note}>
+            {note.staleness.kind === 'stale' && (
+              <div style={{ color: '#8b949e', fontSize: '0.72rem', marginBottom: '0.35rem' }}>
+                {describeNoteStaleReason(note.staleness.reason)}
+              </div>
+            )}
+            <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9', fontSize: '0.85rem' }}>
+              {note.body}
             </div>
-          )}
-          <div style={{ whiteSpace: 'pre-wrap', color: '#c9d1d9', fontSize: '0.85rem' }}>
-            {note.body}
-          </div>
-          <div style={{ marginTop: '0.5rem' }}>
-            <NoteActionButton
-              label="Delete"
-              onClick={() => void onDeleteNote(note.id)}
-              variant="danger"
-              disabled={mutationDisabled}
-            />
-          </div>
+            <div style={{ marginTop: '0.5rem' }}>
+              <NoteDeleteButton
+                note={note}
+                review={review}
+                onClick={() => void onDeleteNote(note.id)}
+                disabled={mutationDisabled}
+              />
+            </div>
+          </NoteThread>
         </div>
       </div>
     );
@@ -158,6 +186,12 @@ export function NotesListModal({
             &times;
           </button>
         </div>
+        {review && (
+          <div className="notes-review-status" role="status">
+            Review · Round {review.round} · Last verdict: {REVIEW_VERDICT_LABELS[review.verdict]} ·{' '}
+            {REVIEW_STATUS_LABELS[review.state]}
+          </div>
+        )}
         <div
           className="scroll-area"
           data-testid="notes-modal-scroll-area"
@@ -191,13 +225,21 @@ export function NotesListModal({
                   alignItems: 'center',
                 }}
               >
-                <span>Stale ({staleNotes.length})</span>
-                <NoteActionButton
-                  label="Delete stale notes"
-                  onClick={() => setConfirmingDeleteStale(true)}
-                  variant="danger"
-                  disabled={mutationDisabled}
-                />
+                <span>
+                  Stale (
+                  {protectedStaleCount > 0
+                    ? `${deletableStaleCount} deletable · ${protectedStaleCount} protected`
+                    : deletableStaleCount}
+                  )
+                </span>
+                {deletableStaleCount > 0 && (
+                  <NoteActionButton
+                    label="Delete stale notes"
+                    onClick={() => setConfirmingDeleteStale(true)}
+                    variant="danger"
+                    disabled={mutationDisabled}
+                  />
+                )}
               </div>
               {staleNotes.map(renderNote)}
             </>
@@ -228,7 +270,7 @@ export function NotesListModal({
       {/* A sibling after the list dialog, so it stacks on top of it (see ModalDialog). */}
       {confirmingDeleteStale && (
         <DeleteStaleNotesConfirmModal
-          staleCount={staleNotes.length}
+          staleCount={deletableStaleCount}
           disabled={mutationDisabled}
           onCancel={() => setConfirmingDeleteStale(false)}
           onConfirm={() => {

@@ -57,6 +57,7 @@ const testDependencies: AppDependencies = {
   },
   notesGateway: {
     fetchNotes: vi.fn(async () => []),
+    fetchReview: vi.fn(async () => null),
     addNote: vi.fn(),
     updateNote: vi.fn(),
     deleteNote: vi.fn(async () => {}),
