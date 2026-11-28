@@ -1,3 +1,4 @@
+import type { ReviewSession } from '../../../domain/notes/review-session';
 import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import { NotesActionError, type NotesGateway } from '../../application/ports';
@@ -33,6 +34,15 @@ export const httpNotesGateway: NotesGateway = {
     const res = await requireOk(await fetch(notesUrl(repoId)), 'Failed to fetch notes');
     const body = (await res.json()) as { notes: Note[] };
     return body.notes;
+  },
+
+  async fetchReview(repoId: RepositoryId): Promise<ReviewSession | null> {
+    const res = await requireOk(
+      await fetch(`/api/repositories/${encodeURIComponent(repoId)}/review`),
+      'Failed to fetch review',
+    );
+    const body = (await res.json()) as { review: ReviewSession | null };
+    return body.review;
   },
 
   async addNote(repoId: RepositoryId, target: NoteCreateTarget, body: string): Promise<Note> {

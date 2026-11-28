@@ -1,8 +1,11 @@
-import type { ReactElement } from 'react';
+import type { ComponentProps, ReactElement } from 'react';
 
 type Variant = 'link' | 'muted' | 'danger';
 
-interface NoteActionButtonProps {
+interface NoteActionButtonProps extends Pick<
+  ComponentProps<'button'>,
+  'aria-describedby' | 'title'
+> {
   label: string;
   onClick: () => void;
   variant: Variant;
@@ -22,9 +25,11 @@ export function NoteActionButton({
   onClick,
   variant,
   disabled = false,
+  ...description
 }: NoteActionButtonProps): ReactElement {
   return (
     <button
+      {...description}
       disabled={disabled}
       onClick={onClick}
       style={{

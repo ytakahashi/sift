@@ -184,6 +184,7 @@ function RepositoryWorkspace({
   }, [onRepositoryResolved, repoId, repository]);
   const {
     notes,
+    review,
     addNote,
     updateNote,
     deleteNote,
@@ -336,6 +337,7 @@ function RepositoryWorkspace({
         {notesPanel.isOpen && (
           <NotesListModal
             notes={notes}
+            review={review}
             onClose={notesPanel.close}
             onDeleteNote={deleteNote}
             onDeleteStaleNotes={() => void deleteStaleNotes()}
@@ -500,6 +502,7 @@ function RepositoryWorkspace({
                 onStageHunk={(id) => stageHunk(selectedFile.path, id)}
                 onUnstageHunk={(id) => unstageHunk(selectedFile.path, id)}
                 notes={notesPanel.selectedFileNotes}
+                review={review}
                 onAddNote={addNote}
                 onUpdateNote={updateNote}
                 onDeleteNote={deleteNote}

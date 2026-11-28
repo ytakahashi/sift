@@ -31,6 +31,7 @@ export function UnifiedDiffViewer({
   onStageHunk,
   onUnstageHunk,
   notes = [],
+  review,
   onAddNote,
   onUpdateNote,
   onDeleteNote,
@@ -181,6 +182,7 @@ export function UnifiedDiffViewer({
           <NoteCard
             key={note.id}
             note={note}
+            review={review}
             onUpdate={onUpdateNote}
             onDelete={onDeleteNote}
             deleteDisabled={notesDeleteDisabled}
@@ -190,6 +192,7 @@ export function UnifiedDiffViewer({
           <NoteCard
             key={note.id}
             note={note}
+            review={review}
             // A stale line note is no longer rendered next to its lines, so it
             // has to say which range it was written against.
             contextLabel={
@@ -311,6 +314,7 @@ export function UnifiedDiffViewer({
             path: file.path,
             bucket: paneMode,
             lineNotes: paneLineNotes,
+            review,
             onAddNote,
             onUpdateNote,
             onDeleteNote,
@@ -523,6 +527,7 @@ export function UnifiedDiffViewer({
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.2rem' }}>
                           <NoteCard
                             note={note}
+                            review={review}
                             contextLabel={
                               note.kind === 'line'
                                 ? formatLineRange(note.startLine, note.endLine)

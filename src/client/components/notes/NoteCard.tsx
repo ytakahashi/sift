@@ -1,11 +1,14 @@
 import { useEffect, useState, type ReactElement } from 'react';
 import { isLiveNote } from '../../../domain/notes/note-staleness';
+import type { ReviewSession } from '../../../domain/notes/review-session';
 import type { Note } from '../../../domain/notes/types';
 import { NoteEditor } from './NoteEditor';
 import { NoteViewer } from './NoteViewer';
+import { NoteThread } from './NoteThread';
 
 interface NoteCardProps {
   note: Note;
+  review?: ReviewSession | null;
   contextLabel?: string;
   onUpdate?: (id: string, body: string) => Promise<void>;
   onDelete?: (id: string) => void | Promise<void>;
@@ -21,6 +24,7 @@ interface NoteCardProps {
 
 export function NoteCard({
   note,
+  review,
   contextLabel,
   onUpdate,
   onDelete,
@@ -50,9 +54,8 @@ export function NoteCard({
       style={{
         padding: '0.5rem',
         backgroundColor: '#161b22',
-        // Stale notes drop the "active review comment" green so they read as
-        // background at a glance, without hiding them.
-        border: `1px solid ${isLiveNote(note) ? '#3fb950' : '#484f58'}`,
+        // Reserve the green border for live notes with outstanding feedback.
+        border: `1px solid ${isLiveNote(note) && note.status !== 'resolved' ? '#3fb950' : '#484f58'}`,
         borderRadius: '4px',
       }}
     >
@@ -64,13 +67,16 @@ export function NoteCard({
           onCancel={() => setIsEditing(false)}
         />
       ) : (
-        <NoteViewer
-          note={note}
-          contextLabel={contextLabel}
-          onEdit={() => setIsEditing(true)}
-          onDelete={onDelete}
-          deleteDisabled={deleteDisabled}
-        />
+        <NoteThread note={note} contextLabel={contextLabel}>
+          <NoteViewer
+            note={note}
+            review={review}
+            contextLabel={contextLabel}
+            onEdit={() => setIsEditing(true)}
+            onDelete={onDelete}
+            deleteDisabled={deleteDisabled}
+          />
+        </NoteThread>
       )}
     </div>
   );

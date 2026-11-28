@@ -112,6 +112,7 @@ const testDependencies: AppDependencies = {
   },
   notesGateway: {
     fetchNotes: vi.fn(async () => []),
+    fetchReview: vi.fn(async () => null),
     addNote: vi.fn(),
     updateNote: vi.fn(),
     deleteNote: vi.fn(async () => {}),
@@ -187,6 +188,7 @@ describe('RepositoryViewerPage interactions', () => {
 
     vi.mocked(useDiffData).mockImplementation(() => diffState);
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [],
       addNote: vi.fn(),
       updateNote: vi.fn(),
@@ -1030,6 +1032,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
   it('renders the Notes button when there are no notes', () => {
     // Given: an empty notes list
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [],
       addNote: vi.fn(),
       updateNote: vi.fn(),
@@ -1052,6 +1055,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
     // Given: no notes exist yet
     const addNote = vi.fn(async () => {});
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [],
       addNote,
       updateNote: vi.fn(),
@@ -1081,6 +1085,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
   it('toggles the NotesListModal on button click', async () => {
     // Given: one note is available
     vi.mocked(useNotes).mockReturnValue({
+      review: { reviewId: 'r1', round: 1, verdict: 'comment', state: 'awaiting-review' },
       notes: [
         {
           id: 'n1',
@@ -1115,6 +1120,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
 
     // Then: modal is visible
     expect(screen.getByText('Your Notes (1)')).toBeDefined();
+    expect(screen.getByText(/Round 1.*Awaiting review/)).toBeDefined();
     expect(
       screen.getByRole('dialog', { name: 'Your Notes (1)' }).closest('.app-main'),
     ).not.toBeNull();
@@ -1139,6 +1145,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
       refresh,
     });
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [
         {
           id: 'n1',
@@ -1177,6 +1184,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
   it('does not render a location button for a note outside the current diff', async () => {
     // Given: the note targets a tracked file that is absent from both panes
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [
         {
           id: 'outside',
@@ -1210,6 +1218,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
   it('keeps the modal open when all notes are deleted', async () => {
     // Given: one note is available
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [
         {
           id: 'n1',
@@ -1244,6 +1253,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
 
     // When: all notes are deleted
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [],
       addNote: vi.fn(),
       updateNote: vi.fn(),
@@ -1266,6 +1276,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
   it('resets the Notes modal and its draft when the repository changes', async () => {
     // Given: an empty Notes modal with an unfinished draft in repository A
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [],
       addNote: vi.fn(),
       updateNote: vi.fn(),
@@ -1299,6 +1310,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
   it('copies notes to clipboard and shows tooltip', async () => {
     // Given: one note is available
     vi.mocked(useNotes).mockReturnValue({
+      review: null,
       notes: [
         {
           id: 'n1',
@@ -1375,6 +1387,7 @@ describe('RepositoryViewerPage Notes Interactions', () => {
 
     function mockNotes(notes: Note[], mutating = false): void {
       vi.mocked(useNotes).mockReturnValue({
+        review: null,
         notes,
         addNote: vi.fn(),
         updateNote: vi.fn(),

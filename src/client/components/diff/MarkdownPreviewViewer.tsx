@@ -22,6 +22,7 @@ import {
 import type { DiffHunk } from '../../../domain/diff/types';
 import type { LineNote, NoteBucket, NoteCreateTarget } from '../../../domain/notes/types';
 import { formatLineRange } from '../../presentation/notes/line-range';
+import type { ReviewSession } from '../../../domain/notes/review-session';
 import { NoteCard } from '../notes/NoteCard';
 import { NoteEditor } from '../notes/NoteEditor';
 import { createMarkdownProcessor, parseMarkdownBlocks } from './markdown-block-parser';
@@ -36,6 +37,7 @@ export interface MarkdownPreviewNoteSupport {
   bucket: NoteBucket;
   /** Live line notes already scoped to the pane being previewed. */
   lineNotes: LineNote[];
+  review?: ReviewSession | null;
   onAddNote?: (target: NoteCreateTarget, body: string) => Promise<void>;
   onUpdateNote?: (id: string, body: string) => Promise<void>;
   onDeleteNote?: (id: string) => Promise<void>;
@@ -152,6 +154,7 @@ function MarkdownPreviewContent({
     <NoteCard
       key={note.id}
       note={note}
+      review={noteSupport?.review}
       // A block spans more lines than the note itself, so the card has to state
       // the range it was written against.
       contextLabel={formatLineRange(note.startLine, note.endLine)}

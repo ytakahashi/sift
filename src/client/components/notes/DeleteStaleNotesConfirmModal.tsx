@@ -3,9 +3,8 @@ import { ConfirmActionModal } from '../confirm-action/ConfirmActionModal';
 
 interface DeleteStaleNotesConfirmModalProps {
   /**
-   * Stale notes shown right now. It is what the reader sees, not a promise:
-   * the server re-derives staleness when the request arrives, so the wording
-   * says which notes go rather than guaranteeing this many will.
+   * Currently deletable stale notes. The server rechecks eligibility when
+   * the request arrives, so the actual number removed can differ.
    */
   staleCount: number;
   onCancel: () => void;
@@ -25,7 +24,7 @@ export function DeleteStaleNotesConfirmModal({
       title="Delete Stale Notes"
       message={`Delete ${staleCount} stale ${staleCount === 1 ? 'note' : 'notes'}?`}
       details={[
-        'Only notes that are still stale will be deleted. Live notes will remain.',
+        'Only stale notes without review protection will be deleted.',
         'This action cannot be undone.',
       ]}
       confirmLabel="Delete"

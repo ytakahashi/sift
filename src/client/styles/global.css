@@ -1331,3 +1331,64 @@ button.app-brand-home {
     opacity: 1;
   }
 }
+
+.notes-review-status {
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  color: #8b949e;
+  font-size: 0.75rem;
+}
+
+.note-thread-resolved > summary {
+  color: #8b949e;
+  font-size: 0.8rem;
+  cursor: pointer;
+  list-style-position: inside;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.note-thread-resolved[open] > summary {
+  margin-bottom: 0.4rem;
+}
+
+.note-thread-resolved[open] .note-thread-preview {
+  display: none;
+}
+
+.note-thread-author {
+  margin-bottom: 0.25rem;
+  color: #8b949e;
+  font-size: 0.75rem;
+  overflow-wrap: anywhere;
+}
+
+.note-thread-replies {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0;
+  margin: 0.5rem 0 0;
+  list-style: none;
+}
+
+.note-thread-reply {
+  padding: 0.25rem 0 0.25rem 0.5rem;
+  border-inline-start: 2px solid var(--border-color);
+}
+
+.note-thread-reply-body {
+  color: var(--text-color);
+  font-size: 0.85rem;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.note-delete-protected {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem;
+  color: #8b949e;
+  font-size: 0.75rem;
+}

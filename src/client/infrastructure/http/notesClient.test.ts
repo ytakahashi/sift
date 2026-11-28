@@ -50,6 +50,19 @@ describe('httpNotesGateway', () => {
     expect(notes).toEqual([NOTE]);
   });
 
+  it('reads the review snapshot from the repository review endpoint', async () => {
+    // Given
+    const review = { reviewId: 'r1', round: 0, state: 'approved', verdict: 'approve' };
+    const fetchMock = stubFetchOk({ review });
+
+    // When
+    const result = await httpNotesGateway.fetchReview('my app');
+
+    // Then
+    expect(fetchMock).toHaveBeenCalledWith('/api/repositories/my%20app/review');
+    expect(result).toEqual(review);
+  });
+
   it('creates a note with the path-addressed target', async () => {
     // Given
     const fetchMock = stubFetchOk(NOTE, 201);

@@ -1,4 +1,5 @@
 import type { RepositoryDiff } from '../../domain/diff/types';
+import type { ReviewSession } from '../../domain/notes/review-session';
 import type { Note, NoteCreateTarget } from '../../domain/notes/types';
 import type {
   RepositoryId,
@@ -119,6 +120,7 @@ export interface WorkspaceActions {
 
 export interface NotesGateway {
   fetchNotes(repoId: RepositoryId): Promise<Note[]>;
+  fetchReview(repoId: RepositoryId): Promise<ReviewSession | null>;
   addNote(repoId: RepositoryId, target: NoteCreateTarget, body: string): Promise<Note>;
   updateNote(repoId: RepositoryId, noteId: string, body: string): Promise<Note>;
   deleteNote(repoId: RepositoryId, noteId: string): Promise<void>;

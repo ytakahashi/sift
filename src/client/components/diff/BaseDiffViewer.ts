@@ -1,4 +1,5 @@
 import type { DiffFile } from '../../../domain/diff/types';
+import type { ReviewSession } from '../../../domain/notes/review-session';
 import type { Note, NoteCreateTarget } from '../../../domain/notes/types';
 import type { RepositoryId } from '../../../domain/repository/repository';
 import type { BlobContentReader, FileContentReader } from '../../application/ports';
@@ -13,6 +14,7 @@ export interface BaseDiffViewerProps {
   onStageHunk?: (hunkId: string) => void;
   onUnstageHunk?: (hunkId: string) => void;
   notes?: Note[];
+  review?: ReviewSession | null;
   /**
    * Notes are created by path + inclusive line range; fileId/hunkId/bucket
    * resolution happens on the server so UI- and agent-created notes share one
