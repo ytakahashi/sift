@@ -15,7 +15,7 @@ vi.mock('@modelcontextprotocol/server', () => ({
   McpServer: vi.fn().mockImplementation(function (serverInfo: unknown, options: unknown) {
     mcpServerCtor(serverInfo, options);
     // A fresh object per construction, so tests can tell instances apart.
-    return { serverInfo };
+    return { serverInfo, server: {} };
   }),
 }));
 
@@ -107,7 +107,10 @@ describe('startMcpServer', () => {
     );
     expect(registerReviewToolsMock).toHaveBeenCalledWith(
       server,
-      expect.objectContaining({ getReview: expect.any(Function) }),
+      expect.objectContaining({
+        waitForReview: expect.any(Function),
+        connect: expect.any(Function),
+      }),
       lastResolveTarget(),
     );
     // Building an instance must stay side-effect free: `serveStdio` discards

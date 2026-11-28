@@ -8,7 +8,8 @@ import { createNote, deleteNote, getNotes, updateNote } from './notes-http-clien
 import { registerNotesTools } from './register-notes-tools';
 import { registerReviewTools } from './register-review-tools';
 import { createRepoRootResolver } from './repo-target';
-import { getReview, submitResponse, submitReview } from './review-http-client';
+import { submitResponse, submitReview, waitForReview } from './review-http-client';
+import { createReviewPresence } from './review-presence';
 import { createToolTargetResolver } from './tool-target';
 
 export interface StartMcpServerOptions {
@@ -57,7 +58,13 @@ function createNotesServer(options: StartMcpServerOptions): McpServer {
     checkNotesApiCompatibility,
   });
   registerNotesTools(server, { getNotes, createNote, updateNote, deleteNote }, resolveTarget);
-  registerReviewTools(server, { getReview, submitReview, submitResponse }, resolveTarget);
+  const presence = createReviewPresence();
+  server.server.onclose = () => presence.close();
+  registerReviewTools(
+    server,
+    { waitForReview, submitReview, submitResponse, connect: presence.connect },
+    resolveTarget,
+  );
 
   return server;
 }

@@ -11,7 +11,7 @@ import type { ResolveToolTarget } from './tool-target';
 
 type ToolCallback = (
   args?: unknown,
-  ctx?: { mcpReq: { envelope?: Record<string, unknown> } },
+  ctx?: { mcpReq: { envelope?: Record<string, unknown>; signal?: AbortSignal } },
 ) => Promise<CallToolResult>;
 
 function createFakeServer(client?: string): {
@@ -20,7 +20,9 @@ function createFakeServer(client?: string): {
 } {
   const tools = new Map<string, ToolCallback>();
   const registerTool = vi.fn((name: string, _config: unknown, cb: ToolCallback) => {
-    tools.set(name, cb);
+    tools.set(name, (args, ctx) =>
+      cb(args, { mcpReq: { signal: new AbortController().signal, ...ctx?.mcpReq } }),
+    );
   });
   return {
     server: {
@@ -38,7 +40,13 @@ const resolveTarget: ResolveToolTarget = async () => ({
 });
 
 function createOptions(overrides: Partial<ReviewToolClients> = {}): ReviewToolClients {
-  return { getReview: vi.fn(), submitReview: vi.fn(), submitResponse: vi.fn(), ...overrides };
+  return {
+    connect: vi.fn().mockResolvedValue({ kind: 'connected', participantId: 'participant' }),
+    waitForReview: vi.fn(),
+    submitReview: vi.fn(),
+    submitResponse: vi.fn(),
+    ...overrides,
+  };
 }
 
 describe('registerReviewTools', () => {
@@ -49,7 +57,7 @@ describe('registerReviewTools', () => {
     const [serverTransport, clientTransport] = InMemoryTransport.createLinkedPair();
     const submitReview = vi.fn();
     const options = createOptions({
-      getReview: vi.fn().mockResolvedValue({ kind: 'success', review: null }),
+      waitForReview: vi.fn().mockResolvedValue({ kind: 'success', review: null }),
       submitReview,
     });
     registerReviewTools(server, options, resolveTarget);
@@ -124,10 +132,15 @@ describe('registerReviewTools', () => {
     const result = await tools.get('submit_review')!(args, { mcpReq: {} });
 
     // Then
-    expect(submitReview).toHaveBeenCalledWith(49321, 'sift-repo', {
-      ...args,
-      client: 'legacy-client',
-    });
+    expect(submitReview).toHaveBeenCalledWith(
+      49321,
+      'sift-repo',
+      {
+        ...args,
+        client: 'legacy-client',
+      },
+      'participant',
+    );
     expect(result.structuredContent).toEqual({
       reviewId: 'r1',
       round: 1,
@@ -156,11 +169,16 @@ describe('registerReviewTools', () => {
     );
 
     // Then
-    expect(submitResponse).toHaveBeenCalledWith(49321, 'sift-repo', {
-      reviewId: 'r1',
-      replies: [],
-      client: 'modern-client',
-    });
+    expect(submitResponse).toHaveBeenCalledWith(
+      49321,
+      'sift-repo',
+      {
+        reviewId: 'r1',
+        replies: [],
+        client: 'modern-client',
+      },
+      'participant',
+    );
     expect(result.isError).toBe(true);
     expect(result.content).toEqual([
       { type: 'text', text: 'Each open thread needs an implementer reply. Note IDs: n1, n2.' },
@@ -231,14 +249,14 @@ describe('registerReviewTools', () => {
 
   it('returns repository guidance when the turn lookup is rejected', async () => {
     // Given
-    const getReview = vi.fn().mockResolvedValue({
+    const waitForReview = vi.fn().mockResolvedValue({
       kind: 'http-error',
       status: 404,
       code: 'REPOSITORY_NOT_FOUND',
       message: 'Repository not found.',
     });
     const { server, tools } = createFakeServer();
-    registerReviewTools(server, createOptions({ getReview }), resolveTarget);
+    registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
 
     // When
     const result = await tools.get('wait_for_turn')!({ role: 'implementer' });
@@ -250,6 +268,122 @@ describe('registerReviewTools', () => {
     ]);
   });
 
+  it.each([
+    { fullPolls: 13, gapMs: 0, remainingMs: 15_000 },
+    { fullPolls: 12, gapMs: 59_000, remainingMs: 1_000 },
+  ])(
+    'honors the existing deadline after a $gapMs ms gap',
+    async ({ fullPolls, gapMs, remainingMs }) => {
+      vi.useFakeTimers({ toFake: ['performance'] });
+      try {
+        // Given: each poll waits the full duration it was asked to wait
+        const waitForReview = vi.fn<ReviewToolClients['waitForReview']>(
+          async (_port, _repoId, { waitMs }) => {
+            vi.advanceTimersByTime(waitMs);
+            return { kind: 'success', review: null };
+          },
+        );
+        const { server, tools } = createFakeServer();
+        registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
+        const checkTurn = (): Promise<CallToolResult> =>
+          tools.get('wait_for_turn')!({ role: 'implementer' });
+
+        // When
+        for (let poll = 0; poll < fullPolls; poll++) {
+          await expect(checkTurn()).resolves.toMatchObject({
+            structuredContent: { status: 'waiting' },
+          });
+        }
+        vi.advanceTimersByTime(gapMs);
+        const timeout = await checkTurn();
+        await checkTurn();
+
+        // Then
+        expect(timeout.structuredContent).toEqual({ status: 'timeout' });
+        expect(waitForReview.mock.calls.map(([, , request]) => request.waitMs)).toEqual([
+          ...Array<number>(fullPolls).fill(45_000),
+          remainingMs,
+          45_000,
+        ]);
+      } finally {
+        vi.useRealTimers();
+      }
+    },
+  );
+
+  it('starts a fresh wait when the caller resumes after a long gap', async () => {
+    vi.useFakeTimers({ toFake: ['performance'] });
+    try {
+      // Given
+      const waitForReview = vi.fn().mockResolvedValue({ kind: 'success', review: null });
+      const { server, tools } = createFakeServer();
+      registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
+      const checkTurn = (): Promise<CallToolResult> =>
+        tools.get('wait_for_turn')!({ role: 'implementer' });
+      await checkTurn();
+      vi.advanceTimersByTime(10 * 60_000 + 1);
+
+      // When
+      const resumed = await checkTurn();
+
+      // Then
+      expect(resumed.structuredContent).toEqual({ status: 'waiting', waitingFor: 'reviewer' });
+      expect(waitForReview.mock.calls.map(([, , request]) => request.waitMs)).toEqual([
+        45_000, 45_000,
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it.each([
+    [{ kind: 'rejected', status: 404 }, 'same Sift version'],
+    [
+      {
+        kind: 'rejected',
+        status: 409,
+        code: 'REVIEW_CONFLICT',
+        message: 'This review participant already has an open connection.',
+      },
+      'already has an open connection. Wait briefly and retry.',
+    ],
+    [{ kind: 'unreachable' }, 'Check that the local Sift server is running'],
+  ])(
+    'reports actionable guidance when the participant connection fails (%j)',
+    async (failure, guidance) => {
+      // Given
+      const connect = vi.fn().mockResolvedValue(failure);
+      const options = createOptions({ connect });
+      const { server, tools } = createFakeServer();
+      registerReviewTools(server, options, resolveTarget);
+
+      // When
+      const result = await tools.get('wait_for_turn')!({ role: 'implementer' });
+
+      // Then
+      expect(result.isError).toBe(true);
+      expect(JSON.stringify(result.content)).toContain(guidance);
+      expect(options.waitForReview).not.toHaveBeenCalled();
+    },
+  );
+
+  it('reports peer-gone if a review ended during the first poll that observed it', async () => {
+    // Given
+    const waitForReview = vi.fn().mockResolvedValue({
+      kind: 'success',
+      review: { reviewId: 'r1', round: 1, state: 'peer-gone', verdict: 'comment' },
+      observedReviewId: 'r1',
+    });
+    const { server, tools } = createFakeServer();
+    registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
+
+    // When
+    const result = await tools.get('wait_for_turn')!({ role: 'reviewer' });
+
+    // Then
+    expect(result.structuredContent).toEqual({ status: 'peer-gone' });
+  });
+
   it('reports peer-gone to the reviewer that submitted the review', async () => {
     // Given
     const review = { reviewId: 'r1', round: 1, verdict: 'request_changes' };
@@ -258,12 +392,12 @@ describe('registerReviewTools', () => {
       ...review,
       state: 'awaiting-response',
     });
-    const getReview = vi.fn().mockResolvedValue({
+    const waitForReview = vi.fn().mockResolvedValue({
       kind: 'success',
       review: { ...review, state: 'peer-gone' },
     });
     const { server, tools } = createFakeServer();
-    registerReviewTools(server, createOptions({ submitReview, getReview }), resolveTarget);
+    registerReviewTools(server, createOptions({ submitReview, waitForReview }), resolveTarget);
     await tools.get('submit_review')!(
       { verdict: review.verdict, comments: [], threads: [] },
       { mcpReq: {} },
@@ -280,7 +414,7 @@ describe('registerReviewTools', () => {
     'guides a new reviewer to start a review when the previous review is %s',
     async (state) => {
       // Given
-      const getReview = vi.fn().mockResolvedValue({
+      const waitForReview = vi.fn().mockResolvedValue({
         kind: 'success',
         review: {
           reviewId: 'old',
@@ -290,7 +424,7 @@ describe('registerReviewTools', () => {
         },
       });
       const { server, tools } = createFakeServer();
-      registerReviewTools(server, createOptions({ getReview }), resolveTarget);
+      registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
 
       // When
       const result = await tools.get('wait_for_turn')!({ role: 'reviewer' });
@@ -307,12 +441,12 @@ describe('registerReviewTools', () => {
   it('reports needs-user after the reviewer observed the review while active', async () => {
     // Given
     const review = { reviewId: 'r1', round: 2, verdict: 'request_changes' };
-    const getReview = vi
+    const waitForReview = vi
       .fn()
       .mockResolvedValueOnce({ kind: 'success', review: { ...review, state: 'awaiting-review' } })
       .mockResolvedValueOnce({ kind: 'success', review: { ...review, state: 'needs-user' } });
     const { server, tools } = createFakeServer();
-    registerReviewTools(server, createOptions({ getReview }), resolveTarget);
+    registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
     const checkTurn = tools.get('wait_for_turn')!;
     await checkTurn({ role: 'reviewer' });
 
@@ -328,7 +462,7 @@ describe('registerReviewTools', () => {
     async (state) => {
       // Given
       const review = { reviewId: 'r1', round: 1, verdict: 'request_changes' };
-      const getReview = vi
+      const waitForReview = vi
         .fn()
         .mockResolvedValueOnce({
           kind: 'success',
@@ -341,7 +475,7 @@ describe('registerReviewTools', () => {
         .mockResolvedValueOnce({ kind: 'success', review: { ...review, state: 'awaiting-review' } })
         .mockResolvedValueOnce({ kind: 'success', review: { ...review, state } });
       const { server, tools } = createFakeServer();
-      registerReviewTools(server, createOptions({ getReview }), resolveTarget);
+      registerReviewTools(server, createOptions({ waitForReview }), resolveTarget);
       const checkTurn = tools.get('wait_for_turn')!;
 
       // When

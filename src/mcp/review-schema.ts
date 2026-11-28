@@ -1,5 +1,10 @@
 import { z } from 'zod';
-import { REVIEW_STATES, REVIEW_VERDICTS, type ReviewSession } from '../domain/notes/review-session';
+import {
+  REVIEW_ROLES,
+  REVIEW_STATES,
+  REVIEW_VERDICTS,
+  type ReviewSession,
+} from '../domain/notes/review-session';
 import { RESPONSE_RESOLUTIONS } from '../domain/notes/types';
 
 export const nonEmptyIdSchema = z.string().regex(/\S/, 'Expected a non-empty ID.');
@@ -18,7 +23,10 @@ export const reviewSessionSchema: z.ZodType<ReviewSession> = reviewSubmissionRes
   lastResponse: z.strictObject({ round: roundSchema, body: z.string().optional() }).optional(),
 });
 
-export const reviewSnapshotSchema = z.strictObject({ review: reviewSessionSchema.nullable() });
+export const reviewPollResponseSchema = z.strictObject({
+  review: reviewSessionSchema.nullable(),
+  observedReviewId: nonEmptyIdSchema.optional(),
+});
 
 export const submitResponseInputSchema = z.strictObject({
   reviewId: nonEmptyIdSchema,
@@ -32,13 +40,20 @@ export const submitResponseInputSchema = z.strictObject({
   ),
 });
 
-const roleSchema = z.enum(['reviewer', 'implementer']);
-export type ReviewRole = z.infer<typeof roleSchema>;
+const roleSchema = z.enum(REVIEW_ROLES);
 export const waitForTurnInputSchema = z.strictObject({ role: roleSchema });
 // Legacy MCP requires an object-rooted output schema to return the fields directly.
 export const waitForTurnResultSchema = z
   .strictObject({
-    status: z.enum(['your-turn', 'waiting', 'no-review', 'approved', 'needs-user', 'peer-gone']),
+    status: z.enum([
+      'your-turn',
+      'waiting',
+      'no-review',
+      'approved',
+      'needs-user',
+      'peer-gone',
+      'timeout',
+    ]),
     reviewId: nonEmptyIdSchema.optional(),
     round: roundSchema.optional(),
     verdict: verdictSchema.optional(),

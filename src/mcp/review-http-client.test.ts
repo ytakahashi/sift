@@ -1,10 +1,10 @@
 import { describe, expect, it, vi } from 'vitest';
-import { getReview, submitResponse, submitReview } from './review-http-client';
+import { submitResponse, submitReview, waitForReview } from './review-http-client';
 
 const url = 'http://127.0.0.1:49321/api/repositories/repo%2Fone/review';
 
 describe('review HTTP client', () => {
-  it('reads a current snapshot and preserves its optional fields', async () => {
+  it('long polls the review and preserves the observed review ID and optional fields', async () => {
     // Given
     const review = {
       reviewId: 'r1',
@@ -13,14 +13,28 @@ describe('review HTTP client', () => {
       verdict: 'request_changes',
       lastResponse: { round: 1, body: 'Updated the call sites.' },
     };
-    const fetchImpl = vi.fn().mockResolvedValue(Response.json({ review }));
+    const request = { role: 'reviewer' as const, waitMs: 45_000 };
+    const signal = new AbortController().signal;
+    const fetchImpl = vi.fn().mockResolvedValue(Response.json({ review, observedReviewId: 'r1' }));
 
     // When
-    const result = await getReview(49321, 'repo/one', fetchImpl);
+    const result = await waitForReview(
+      49321,
+      'repo/one',
+      request,
+      'participant',
+      signal,
+      fetchImpl,
+    );
 
     // Then
-    expect(fetchImpl).toHaveBeenCalledWith(url);
-    expect(result).toEqual({ kind: 'success', review });
+    expect(fetchImpl).toHaveBeenCalledWith(`${url}/wait`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-sift-review-participant': 'participant' },
+      body: JSON.stringify(request),
+      signal,
+    });
+    expect(result).toEqual({ kind: 'success', review, observedReviewId: 'r1' });
   });
 
   it('posts nested review comments and preserves the rejected comment index', async () => {
@@ -45,12 +59,12 @@ describe('review HTTP client', () => {
     );
 
     // When
-    const result = await submitReview(49321, 'repo/one', request, fetchImpl);
+    const result = await submitReview(49321, 'repo/one', request, 'participant', fetchImpl);
 
     // Then
     expect(fetchImpl).toHaveBeenCalledWith(`${url}/submit-review`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-sift-review-participant': 'participant' },
       body: JSON.stringify(request),
     });
     expect(result).toMatchObject({
@@ -75,12 +89,12 @@ describe('review HTTP client', () => {
       );
 
     // When
-    const result = await submitResponse(49321, 'repo/one', request, fetchImpl);
+    const result = await submitResponse(49321, 'repo/one', request, 'participant', fetchImpl);
 
     // Then
     expect(fetchImpl).toHaveBeenCalledWith(`${url}/submit-response`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', 'x-sift-review-participant': 'participant' },
       body: JSON.stringify(request),
     });
     expect(result).toMatchObject({ kind: 'http-error', code: 'REVIEW_CONFLICT', noteIds: ['n1'] });

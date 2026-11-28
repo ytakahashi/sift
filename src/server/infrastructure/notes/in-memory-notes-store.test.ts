@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { ConfirmedFileGeneration, FileGeneration } from '../../../domain/diff/file-generation';
 import type { DiffFile } from '../../../domain/diff/types';
 import type { AnchoredNote } from '../../../domain/notes/anchored-note';
@@ -641,5 +641,216 @@ describe('InMemoryNotesStore reviews', () => {
     // Then: stale deletion removes only threads belonging to the replaced review
     await expect(store.deleteStale(repoId, current)).resolves.toMatchObject({ deletedCount: 2 });
     await expect(store.list(repoId)).resolves.toMatchObject([{ reviewId: next.reviewId }]);
+  });
+});
+
+describe('review participant presence', () => {
+  const repoId = 'repo';
+  const signal = new AbortController().signal;
+  const implementerPoll = {
+    role: 'implementer',
+    participantId: 'implementer',
+    waitMs: 45_000,
+  } as const;
+  const reviewerPoll = { role: 'reviewer', participantId: 'reviewer', waitMs: 45_000 } as const;
+
+  it('wakes an implementer waiting before a review exists as soon as the reviewer submits', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+    store.connectReviewParticipant(repoId, 'implementer');
+    store.connectReviewParticipant(repoId, 'reviewer');
+    const waiting = store.waitForReview(repoId, implementerPoll, signal);
+
+    // When
+    const review = await store.submitReview(
+      repoId,
+      { verdict: 'comment', threads: [] },
+      [],
+      'reviewer',
+    );
+
+    // Then
+    await expect(waiting).resolves.toEqual({ review, observedReviewId: review.reviewId });
+  });
+
+  it('wakes a reviewer when the implementer submits a response', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+    store.connectReviewParticipant(repoId, 'implementer');
+    store.connectReviewParticipant(repoId, 'reviewer');
+    const review = await store.submitReview(
+      repoId,
+      { verdict: 'comment', threads: [] },
+      [],
+      'reviewer',
+    );
+    const waiting = store.waitForReview(repoId, reviewerPoll, signal);
+
+    // When
+    const response = await store.submitResponse(
+      repoId,
+      { reviewId: review.reviewId, replies: [] },
+      'implementer',
+    );
+
+    // Then
+    await expect(waiting).resolves.toEqual({ review: response, observedReviewId: review.reviewId });
+  });
+
+  it('wakes a reviewer with peer-gone when the implementer disconnects', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+    const disconnect = store.connectReviewParticipant(repoId, 'implementer');
+    store.connectReviewParticipant(repoId, 'reviewer');
+    const review = await store.submitReview(
+      repoId,
+      { verdict: 'comment', threads: [] },
+      [],
+      'reviewer',
+    );
+    await store.waitForReview(repoId, implementerPoll, signal);
+    const waiting = store.waitForReview(repoId, reviewerPoll, signal);
+
+    // When
+    const changed = disconnect();
+
+    // Then
+    expect(changed).toBe(true);
+    await expect(waiting).resolves.toEqual({
+      review: { ...review, state: 'peer-gone' },
+      observedReviewId: review.reviewId,
+    });
+    expect(disconnect()).toBe(false);
+    await expect(store.getReview(repoId)).resolves.toMatchObject({ state: 'peer-gone' });
+  });
+
+  it('returns the observed review ID when the first poll sees a disconnect', async () => {
+    // Given: an HTTP caller created a review without claiming the reviewer role
+    const store = new InMemoryNotesStore();
+    const disconnect = store.connectReviewParticipant(repoId, 'implementer');
+    store.connectReviewParticipant(repoId, 'reviewer');
+    const review = await store.submitReview(repoId, { verdict: 'comment', threads: [] }, []);
+    await store.waitForReview(repoId, implementerPoll, signal);
+    const firstPoll = store.waitForReview(repoId, reviewerPoll, signal);
+
+    // When
+    disconnect();
+
+    // Then
+    await expect(firstPoll).resolves.toMatchObject({
+      review: { state: 'peer-gone' },
+      observedReviewId: review.reviewId,
+    });
+  });
+
+  it('rejects taking both roles or taking a role held by another live process', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+    store.connectReviewParticipant(repoId, 'reviewer');
+    store.connectReviewParticipant(repoId, 'other');
+    const review = await store.submitReview(
+      repoId,
+      { verdict: 'comment', threads: [] },
+      [],
+      'reviewer',
+    );
+
+    // When / Then
+    await expect(
+      store.submitResponse(repoId, { reviewId: review.reviewId, replies: [] }, 'reviewer'),
+    ).rejects.toThrow('cannot take both roles');
+    await expect(
+      store.waitForReview(repoId, { ...reviewerPoll, participantId: 'other' }, signal),
+    ).rejects.toThrow('already holds this role');
+    await expect(store.getReview(repoId)).resolves.toEqual(review);
+  });
+
+  it('preserves a replacement review when a participant from the old review disconnects', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+    store.connectReviewParticipant(repoId, 'reviewer');
+    const disconnect = store.connectReviewParticipant(repoId, 'implementer');
+    const previous = await store.submitReview(
+      repoId,
+      { verdict: 'comment', threads: [] },
+      [],
+      'reviewer',
+    );
+    await store.waitForReview(repoId, implementerPoll, signal);
+    const next = await store.submitReview(
+      repoId,
+      { verdict: 'comment', abandonReviewId: previous.reviewId, threads: [] },
+      [],
+      'reviewer',
+    );
+
+    // When
+    const changed = disconnect();
+
+    // Then
+    expect(changed).toBe(false);
+    await expect(store.getReview(repoId)).resolves.toEqual(next);
+  });
+
+  it('keeps a paused review resumable and rejects a role switch after reconnecting', async () => {
+    // Given
+    const store = new InMemoryNotesStore();
+    const disconnectReviewer = store.connectReviewParticipant(repoId, 'reviewer');
+    const disconnectImplementer = store.connectReviewParticipant(repoId, 'implementer');
+    const submission = { verdict: 'comment', threads: [] } as const;
+    let review = await store.submitReview(repoId, submission, [], 'reviewer');
+    for (let round = 0; round < 2; round++) {
+      await store.submitResponse(repoId, { reviewId: review.reviewId, replies: [] }, 'implementer');
+      review = await store.submitReview(repoId, submission, [], 'reviewer');
+    }
+    expect(review.state).toBe('needs-user');
+
+    // When
+    disconnectReviewer();
+    disconnectImplementer();
+    const disconnectReconnected = store.connectReviewParticipant(repoId, 'implementer');
+    store.connectReviewParticipant(repoId, 'replacement');
+    const continuation = { ...submission, reviewId: review.reviewId, continueAfterLimit: true };
+
+    // Then
+    await expect(store.submitReview(repoId, continuation, [], 'implementer')).rejects.toThrow(
+      'cannot take both roles',
+    );
+    await expect(
+      store.submitReview(repoId, continuation, [], 'replacement'),
+    ).resolves.toMatchObject({
+      reviewId: review.reviewId,
+      state: 'awaiting-response',
+    });
+    expect(disconnectReconnected()).toBe(false);
+  });
+
+  it('ends a poll at its deadline and clears cancelled waiters', async () => {
+    vi.useFakeTimers();
+    try {
+      // Given
+      const store = new InMemoryNotesStore();
+      store.connectReviewParticipant(repoId, 'implementer');
+      const cancellation = new AbortController();
+      const cancelled = store.waitForReview(repoId, implementerPoll, cancellation.signal);
+      const cancellationResult = expect(cancelled).rejects.toHaveProperty('name', 'AbortError');
+      const waiting = store.waitForReview(repoId, implementerPoll, signal);
+      const timed = vi.fn();
+      void waiting.then(timed);
+
+      // When
+      cancellation.abort();
+      await cancellationResult;
+      await vi.advanceTimersByTimeAsync(44_999);
+
+      // Then
+      expect(vi.getTimerCount()).toBe(1);
+      expect(timed).not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(1);
+      await expect(waiting).resolves.toEqual({ review: undefined, observedReviewId: undefined });
+      expect(vi.getTimerCount()).toBe(0);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
