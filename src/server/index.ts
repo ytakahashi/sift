@@ -117,7 +117,14 @@ export async function startServerWithHandle(options: {
     owned: true,
     stop: async () => {
       server.close();
-      await runtime.stop();
+      try {
+        await runtime.stop();
+      } finally {
+        // Participant streams remain open until the client or server closes the connection.
+        if ('closeAllConnections' in server) {
+          server.closeAllConnections();
+        }
+      }
     },
   };
 }

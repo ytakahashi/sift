@@ -3,6 +3,7 @@ import type { AnchoredNote } from '../../../domain/notes/anchored-note';
 import type { NoteReconcileRecord } from '../../../domain/notes/reconcile-notes';
 import { reconcileNotes } from '../../../domain/notes/reconcile-notes';
 import {
+  isActiveReview,
   isProtectedReviewThread,
   ReviewConflict,
   submitResponse,
@@ -20,8 +21,11 @@ import type {
   NotesCurrentState,
   NotesStore,
   ReviewCommentDraft,
+  ReviewObservation,
+  ReviewWaitOptions,
 } from '../../services/notes-store';
 import { NoteNotFoundError } from '../../services/notes-store';
+import { ReviewParticipants } from './review-participants';
 
 function createRecord(
   { draft, anchor }: ReviewCommentDraft,
@@ -67,6 +71,8 @@ function applyThreadChanges(
 export class InMemoryNotesStore implements NotesStore {
   private readonly records = new Map<RepositoryId, NoteReconcileRecord[]>();
   private readonly reviews = new Map<RepositoryId, ReviewSession>();
+  private readonly participants = new ReviewParticipants();
+  private readonly reviewWaiters = new Map<RepositoryId, Set<() => void>>();
 
   async reconcile(repoId: RepositoryId, current: NotesCurrentState): Promise<boolean> {
     const existing = this.records.get(repoId);
@@ -110,10 +116,90 @@ export class InMemoryNotesStore implements NotesStore {
     return this.reviews.get(repoId);
   }
 
+  connectReviewParticipant(repoId: RepositoryId, participantId: string): () => boolean {
+    const disconnect = this.participants.connect(repoId, participantId);
+    return () => {
+      const reviewId = disconnect();
+      const current = this.reviews.get(repoId);
+      // A paused review can still be resumed or approved after the user intervenes.
+      if (!isActiveReview(current) || reviewId !== current.reviewId) {
+        return false;
+      }
+      this.setReview(repoId, { ...current, state: 'peer-gone' });
+      return true;
+    };
+  }
+
+  async waitForReview(
+    repoId: RepositoryId,
+    { participantId, role, knownReviewId, waitMs }: ReviewWaitOptions,
+    signal: AbortSignal,
+  ): Promise<ReviewObservation> {
+    signal.throwIfAborted();
+
+    const observe = (): ReviewObservation => {
+      const observedReviewId = this.participants.getObservedReview(repoId, participantId, role);
+      const review = this.reviews.get(repoId);
+      if (isActiveReview(review)) {
+        this.participants.claim(repoId, participantId, review.reviewId, role);
+        return { review, observedReviewId: review.reviewId };
+      }
+      return { review, observedReviewId };
+    };
+
+    const observation = observe();
+    const current = observation.review;
+    const active = isActiveReview(current);
+    const waiting = active
+      ? current.state === (role === 'reviewer' ? 'awaiting-response' : 'awaiting-review')
+      : role === 'implementer' &&
+        (!current ||
+          (current.reviewId !== knownReviewId &&
+            current.reviewId !== observation.observedReviewId));
+    if (!waiting || waitMs === 0) {
+      return observation;
+    }
+
+    return new Promise((resolve, reject) => {
+      const waiters = this.reviewWaiters.get(repoId) ?? new Set<() => void>();
+      const cleanup = (): void => {
+        clearTimeout(timer);
+        signal.removeEventListener('abort', abort);
+        waiters.delete(readCurrent);
+        if (waiters.size === 0) {
+          this.reviewWaiters.delete(repoId);
+        }
+      };
+      const readCurrent = (): void => {
+        cleanup();
+        try {
+          resolve(observe());
+        } catch (error: unknown) {
+          reject(error);
+        }
+      };
+      const abort = (): void => {
+        cleanup();
+        reject(signal.reason);
+      };
+      // No asynchronous work separates reading the current state from subscribing.
+      const timer = setTimeout(readCurrent, waitMs);
+      waiters.add(readCurrent);
+      this.reviewWaiters.set(repoId, waiters);
+      signal.addEventListener('abort', abort, { once: true });
+    });
+  }
+
+  private setReview(repoId: RepositoryId, review: ReviewSession): void {
+    this.reviews.set(repoId, review);
+    this.reviewWaiters.get(repoId)?.forEach((readCurrent) => readCurrent());
+  }
+
   async submitReview(
     repoId: RepositoryId,
     submission: ReviewSubmission,
     comments: readonly ReviewCommentDraft[],
+    participantId?: string,
   ): Promise<ReviewSession> {
     const existing = this.records.get(repoId) ?? [];
     const transition = submitReview(
@@ -126,15 +212,19 @@ export class InMemoryNotesStore implements NotesStore {
       ...applyThreadChanges(existing, transition.changes),
       ...comments.map((comment) => createRecord(comment, transition.newThread)),
     ];
-    // Validation, thread writes and the turn change share one synchronous operation.
+    // The role claim and the commit share one synchronous operation.
+    if (participantId !== undefined) {
+      this.participants.claim(repoId, participantId, transition.session.reviewId, 'reviewer');
+    }
     this.records.set(repoId, records);
-    this.reviews.set(repoId, transition.session);
+    this.setReview(repoId, transition.session);
     return transition.session;
   }
 
   async submitResponse(
     repoId: RepositoryId,
     submission: ReviewResponseSubmission,
+    participantId?: string,
   ): Promise<ReviewSession> {
     const existing = this.records.get(repoId) ?? [];
     const transition = submitResponse(
@@ -142,8 +232,11 @@ export class InMemoryNotesStore implements NotesStore {
       existing.map(({ note }) => note),
       submission,
     );
+    if (participantId !== undefined) {
+      this.participants.claim(repoId, participantId, transition.session.reviewId, 'implementer');
+    }
     this.records.set(repoId, applyThreadChanges(existing, transition.changes));
-    this.reviews.set(repoId, transition.session);
+    this.setReview(repoId, transition.session);
     return transition.session;
   }
 

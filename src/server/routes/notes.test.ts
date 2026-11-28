@@ -5,6 +5,7 @@ import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
 import { ReviewConflict } from '../../domain/notes/review-session';
 import type { Note, NoteStaleness } from '../../domain/notes/types';
+import { REVIEW_PARTICIPANT_HEADER } from '../contract/review-transport';
 import type { Env } from './env';
 import { NoteNotFoundError } from '../services/notes-store';
 import { RepositoryNotFoundError } from '../services/repository-resolver';
@@ -89,6 +90,8 @@ describe('notesRoutes', () => {
     clear: Mock;
     deleteStale: Mock;
     getReview: Mock;
+    connectReviewParticipant: Mock;
+    waitForReview: Mock;
     submitReview: Mock;
     submitResponse: Mock;
   };
@@ -112,6 +115,8 @@ describe('notesRoutes', () => {
       clear: vi.fn().mockResolvedValue(undefined),
       deleteStale: vi.fn().mockResolvedValue({ deletedCount: 0, changed: false }),
       getReview: vi.fn().mockResolvedValue(undefined),
+      connectReviewParticipant: vi.fn(),
+      waitForReview: vi.fn(),
       submitReview: vi.fn(),
       submitResponse: vi.fn(),
     };
@@ -155,6 +160,14 @@ describe('notesRoutes', () => {
     const reviewUrl = '/api/repositories/my-repo/review';
     const validComment = { target: { kind: 'file', path: 'a.ts' }, body: 'Add coverage.' };
     const submission = { verdict: 'request_changes', comments: [validComment], threads: [] };
+    const participantId = 'e48d0fc1-6166-46b8-8d32-feba8130ea0e';
+
+    async function connectReviewParticipant(id: string): Promise<Response> {
+      return app.request(`${reviewUrl}/participants`, {
+        method: 'POST',
+        headers: { [REVIEW_PARTICIPANT_HEADER]: id },
+      });
+    }
 
     async function postReview(action: string, body: unknown): Promise<Response> {
       return app.request(`${reviewUrl}/${action}`, {
@@ -163,6 +176,77 @@ describe('notesRoutes', () => {
         body: JSON.stringify(body),
       });
     }
+
+    it('rejects a poll longer than 45 seconds', async () => {
+      // When
+      const response = await app.request(`${reviewUrl}/wait`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          [REVIEW_PARTICIPANT_HEADER]: participantId,
+        },
+        body: JSON.stringify({ role: 'implementer', waitMs: 45_001 }),
+      });
+
+      // Then
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({
+        code: 'NOTE_REQUEST_INVALID',
+        error: expect.stringContaining('waitMs'),
+      });
+      expect(notesStore.waitForReview).not.toHaveBeenCalled();
+    });
+
+    it('rejects a participant header that is not a UUID', async () => {
+      // When
+      const response = await connectReviewParticipant('not-a-uuid');
+
+      // Then
+      expect(response.status).toBe(400);
+      await expect(response.json()).resolves.toMatchObject({ code: 'NOTE_REQUEST_INVALID' });
+      expect(notesStore.connectReviewParticipant).not.toHaveBeenCalled();
+    });
+
+    it('returns 409 when a participant already has a connection', async () => {
+      // Given
+      const message = 'This review participant already has an open connection.';
+      notesStore.connectReviewParticipant.mockReturnValueOnce(vi.fn().mockReturnValue(false));
+      notesStore.connectReviewParticipant.mockImplementationOnce(() => {
+        throw new ReviewConflict(message);
+      });
+      const first = await connectReviewParticipant(participantId);
+      try {
+        // When
+        const second = await connectReviewParticipant(participantId);
+
+        // Then
+        expect(first.status).toBe(200);
+        expect(second.status).toBe(409);
+        await expect(second.json()).resolves.toEqual({ code: 'REVIEW_CONFLICT', error: message });
+        expect(notesStore.connectReviewParticipant.mock.calls).toEqual([
+          ['my-repo', participantId],
+          ['my-repo', participantId],
+        ]);
+      } finally {
+        await first.body?.cancel();
+      }
+    });
+
+    it.each([true, false])('notifies on disconnect if the review changed (%s)', async (changed) => {
+      // Given
+      const disconnect = vi.fn().mockReturnValue(changed);
+      notesStore.connectReviewParticipant.mockReturnValue(disconnect);
+      const response = await connectReviewParticipant(participantId);
+      const reader = response.body!.getReader();
+      await reader.read();
+
+      // When
+      await reader.cancel();
+
+      // Then
+      await vi.waitFor(() => expect(disconnect).toHaveBeenCalledOnce());
+      expect(notifyNotesChanged.mock.calls).toEqual(changed ? [['my-repo']] : []);
+    });
 
     it('validates all comments before handing off the review', async () => {
       // Given

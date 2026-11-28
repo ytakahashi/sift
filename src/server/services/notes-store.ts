@@ -3,6 +3,7 @@ import type { DiffFile } from '../../domain/diff/types';
 import type { AnchoredNote } from '../../domain/notes/anchored-note';
 import type {
   ReviewResponseSubmission,
+  ReviewRole,
   ReviewSession,
   ReviewSubmission,
 } from '../../domain/notes/review-session';
@@ -91,6 +92,18 @@ export interface DeleteStaleNotesResult {
   changed: boolean;
 }
 
+export interface ReviewObservation {
+  review: ReviewSession | undefined;
+  observedReviewId?: string;
+}
+
+export interface ReviewWaitOptions {
+  participantId: string;
+  role: ReviewRole;
+  knownReviewId?: string;
+  waitMs: number;
+}
+
 export interface NotesStore {
   /**
    * Revalidates stored notes against current pane diffs and worktree
@@ -115,15 +128,24 @@ export interface NotesStore {
   /** Clears notes except for threads in the current active or paused review. */
   clear(repoId: RepositoryId): Promise<void>;
   getReview(repoId: RepositoryId): Promise<ReviewSession | undefined>;
+  /** Registers a live connection and returns a cleanup that reports a review state change. */
+  connectReviewParticipant(repoId: RepositoryId, participantId: string): () => boolean;
+  waitForReview(
+    repoId: RepositoryId,
+    options: ReviewWaitOptions,
+    signal: AbortSignal,
+  ): Promise<ReviewObservation>;
   /** Validates the current turn and commits the session and its threads atomically. */
   submitReview(
     repoId: RepositoryId,
     submission: ReviewSubmission,
     comments: readonly ReviewCommentDraft[],
+    participantId?: string,
   ): Promise<ReviewSession>;
   submitResponse(
     repoId: RepositoryId,
     submission: ReviewResponseSubmission,
+    participantId?: string,
   ): Promise<ReviewSession>;
   /**
    * Reconciles against `current` and removes stale notes, retaining threads in

@@ -1,4 +1,5 @@
 import { Hono, type Context } from 'hono';
+import { stream } from 'hono/streaming';
 import type { DiffProvider } from '../../domain/diff/diff-provider';
 import { createDiffFileId } from '../../domain/diff/file-id';
 import type { ConfirmedFileGeneration } from '../../domain/diff/file-generation';
@@ -9,6 +10,7 @@ import { resolveLineNoteTarget } from '../../domain/notes/resolve-line-note-targ
 import type { NoteCreateTarget } from '../../domain/notes/types';
 import type { RepositoryId } from '../../domain/repository/repository';
 import type { Env } from './env';
+import { REVIEW_PARTICIPANT_HEADER } from '../contract/review-transport';
 import type { FileGenerationProvider } from '../services/file-generation-provider';
 import type { NotesCurrentState, NotesStore, ReviewCommentDraft } from '../services/notes-store';
 import {
@@ -26,6 +28,8 @@ import { toNoteResponse } from './note-response';
 import {
   parseReviewRequest,
   ReviewCommentError,
+  reviewParticipantIdSchema,
+  reviewPollRequestSchema,
   reviewRequestSchema,
   reviewResponseRequestSchema,
 } from './review-request';
@@ -506,6 +510,57 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
     }
   });
 
+  notesRoutes.post('/repositories/:repoId/review/participants', async (c) => {
+    try {
+      const participantId = parseReviewRequest(
+        reviewParticipantIdSchema,
+        c.req.header(REVIEW_PARTICIPANT_HEADER),
+      );
+      const repository = await resolver.resolveRepository(c.req.param('repoId'));
+      c.req.raw.signal.throwIfAborted();
+      const disconnect = options.notesStore.connectReviewParticipant(repository.id, participantId);
+      c.header('Content-Type', 'application/octet-stream');
+      c.header('Cache-Control', 'no-store');
+      return stream(c, async (connection) => {
+        // Install cleanup before acknowledging registration. Closing the stream is the
+        // only signal required, including when the MCP process is killed.
+        const closed = new Promise<void>((resolve) => connection.onAbort(resolve));
+        // Keep HTTP clients with body idle timeouts connected between turns.
+        const keepalive = setInterval(() => void connection.write('\0'), 15_000);
+        try {
+          await connection.write('ready');
+          await closed;
+        } finally {
+          clearInterval(keepalive);
+          if (disconnect()) {
+            options.notifyNotesChanged(repository.id);
+          }
+        }
+      });
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
+    }
+  });
+
+  notesRoutes.post('/repositories/:repoId/review/wait', async (c) => {
+    try {
+      const participantId = parseReviewRequest(
+        reviewParticipantIdSchema,
+        c.req.header(REVIEW_PARTICIPANT_HEADER),
+      );
+      const poll = parseReviewRequest(reviewPollRequestSchema, await readJsonBody(c));
+      const repository = await resolver.resolveRepository(c.req.param('repoId'));
+      const { review, observedReviewId } = await options.notesStore.waitForReview(
+        repository.id,
+        { ...poll, participantId },
+        c.req.raw.signal,
+      );
+      return c.json({ review: review ?? null, observedReviewId });
+    } catch (error: unknown) {
+      return handleRouteError(c, error);
+    }
+  });
+
   notesRoutes.post('/repositories/:repoId/review/submit-review', async (c) => {
     try {
       const { comments, ...submission } = parseReviewRequest(
@@ -536,7 +591,16 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
         : [];
       const repoId =
         context?.repoId ?? (await resolver.resolveRepository(c.req.param('repoId'))).id;
-      const session = await options.notesStore.submitReview(repoId, submission, drafts);
+      const participantId = c.req.header(REVIEW_PARTICIPANT_HEADER);
+      const session =
+        participantId === undefined
+          ? await options.notesStore.submitReview(repoId, submission, drafts)
+          : await options.notesStore.submitReview(
+              repoId,
+              submission,
+              drafts,
+              parseReviewRequest(reviewParticipantIdSchema, participantId),
+            );
       options.notifyNotesChanged(repoId);
       return c.json(session);
     } catch (error: unknown) {
@@ -548,7 +612,15 @@ export function createNotesRoutes(options: CreateNotesRoutesOptions): Hono<Env> 
     try {
       const submission = parseReviewRequest(reviewResponseRequestSchema, await readJsonBody(c));
       const repository = await resolver.resolveRepository(c.req.param('repoId'));
-      const session = await options.notesStore.submitResponse(repository.id, submission);
+      const participantId = c.req.header(REVIEW_PARTICIPANT_HEADER);
+      const session =
+        participantId === undefined
+          ? await options.notesStore.submitResponse(repository.id, submission)
+          : await options.notesStore.submitResponse(
+              repository.id,
+              submission,
+              parseReviewRequest(reviewParticipantIdSchema, participantId),
+            );
       options.notifyNotesChanged(repository.id);
       return c.json(session);
     } catch (error: unknown) {

@@ -1,5 +1,8 @@
 import type { NoteAuthor, NoteMetadata, NoteReply, ResponseResolution } from './types';
 
+export const REVIEW_ROLES = ['reviewer', 'implementer'] as const;
+export type ReviewRole = (typeof REVIEW_ROLES)[number];
+
 export const REVIEW_VERDICTS = ['request_changes', 'comment', 'approve'] as const;
 export type ReviewVerdict = (typeof REVIEW_VERDICTS)[number];
 
@@ -21,6 +24,12 @@ export interface ReviewSession {
   verdict: ReviewVerdict;
   reviewBody?: string;
   lastResponse?: { round: number; body?: string };
+}
+
+export function isActiveReview(
+  review: ReviewSession | undefined,
+): review is ReviewSession & { state: 'awaiting-review' | 'awaiting-response' } {
+  return review?.state === 'awaiting-review' || review?.state === 'awaiting-response';
 }
 
 export type ReviewThreadAction =

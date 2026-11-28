@@ -1,10 +1,19 @@
 import { z } from 'zod';
-import { REVIEW_VERDICTS } from '../../domain/notes/review-session';
+import { REVIEW_ROLES, REVIEW_VERDICTS } from '../../domain/notes/review-session';
 import { RESPONSE_RESOLUTIONS } from '../../domain/notes/types';
+import { REVIEW_POLL_LIMIT_MS } from '../contract/review-transport';
 import { NoteRequestValidationError } from '../services/notes-store';
 
 const nonEmpty = z.string().refine((value) => value.trim() !== '', 'Expected a non-empty string.');
 const submissionFields = { body: z.string().optional(), client: z.string().optional() };
+
+export const reviewParticipantIdSchema = z.uuid();
+
+export const reviewPollRequestSchema = z.strictObject({
+  role: z.enum(REVIEW_ROLES),
+  knownReviewId: nonEmpty.optional(),
+  waitMs: z.number().int().min(0).max(REVIEW_POLL_LIMIT_MS),
+});
 
 export const reviewRequestSchema = z.strictObject({
   ...submissionFields,
