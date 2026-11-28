@@ -157,6 +157,15 @@ Example requests after the MCP server is connected:
 - _"Check Sift Notes using Sift MCP and address the review comments for this repository."_
 - _"Review the local diff and record each finding as a Sift Note via Sift MCP."_
 
+With [MCP skills](https://code.claude.com/docs/en/mcp#use-skills-from-mcp-servers) enabled in Claude
+Code v2.1.331 or later, register the server as `sift` and run one command per session.
+
+- `/sift:review` starts a review and follows up on the implementer's replies.
+- `/sift:respond` waits for a review and submits replies to its open threads.
+
+In Codex, ask in plain language to start a Sift review or to wait for and respond to one using the
+Sift MCP tools.
+
 ## Development
 
 ### Prerequisites

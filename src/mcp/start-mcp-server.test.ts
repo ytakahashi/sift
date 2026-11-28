@@ -1,15 +1,21 @@
 import type { McpServer } from '@modelcontextprotocol/server';
 import type { StdioServerHandle } from '@modelcontextprotocol/server/stdio';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ResolveToolTarget } from './tool-target';
 
-const { mcpServerCtor, registerNotesToolsMock, registerReviewToolsMock, serveStdioMock } =
-  vi.hoisted(() => ({
-    mcpServerCtor: vi.fn(),
-    registerNotesToolsMock: vi.fn(),
-    registerReviewToolsMock: vi.fn(),
-    serveStdioMock: vi.fn(),
-  }));
+const {
+  mcpServerCtor,
+  registerNotesToolsMock,
+  registerReviewToolsMock,
+  loadReviewSkillsMock,
+  serveStdioMock,
+} = vi.hoisted(() => ({
+  mcpServerCtor: vi.fn(),
+  registerNotesToolsMock: vi.fn(),
+  registerReviewToolsMock: vi.fn(),
+  loadReviewSkillsMock: vi.fn(),
+  serveStdioMock: vi.fn(),
+}));
 
 vi.mock('@modelcontextprotocol/server', () => ({
   McpServer: vi.fn().mockImplementation(function (serverInfo: unknown, options: unknown) {
@@ -31,6 +37,10 @@ vi.mock('./register-review-tools', () => ({
   registerReviewTools: registerReviewToolsMock,
 }));
 
+vi.mock('./review-skills', () => ({
+  loadReviewSkills: loadReviewSkillsMock,
+}));
+
 const { startMcpServer } = await import('./start-mcp-server');
 const { APP_INFO } = await import('../server/app-info');
 
@@ -44,16 +54,16 @@ interface ServeStdioOptionsUnderTest {
  * Runs `startMcpServer` and hands back what it passed to `serveStdio`, so each
  * test can drive the factory the way the SDK does.
  */
-function startAndCaptureFactory(repoPath: string): {
+async function startAndCaptureFactory(repoPath: string): Promise<{
   resolveRepoRoot: ReturnType<typeof vi.fn>;
   factory: ServerFactory;
   serveStdioOptions: ServeStdioOptionsUnderTest;
-} {
+}> {
   const handle: StdioServerHandle = { close: vi.fn().mockResolvedValue(undefined) };
   serveStdioMock.mockReturnValue(handle);
   const resolveRepoRoot = vi.fn().mockReturnValue('/repo/sift');
 
-  startMcpServer({
+  await startMcpServer({
     repoPath,
     resolveRepoRoot,
     findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
@@ -71,13 +81,20 @@ function lastResolveTarget(): ResolveToolTarget {
 }
 
 describe('startMcpServer', () => {
-  it('serves stdio from a server factory and returns the SDK connection handle', () => {
+  const attach = vi.fn();
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    loadReviewSkillsMock.mockResolvedValue({ attach });
+  });
+
+  it('serves stdio from a server factory and returns the SDK connection handle', async () => {
     // Given
     const handle: StdioServerHandle = { close: vi.fn().mockResolvedValue(undefined) };
     serveStdioMock.mockReturnValue(handle);
 
     // When
-    const returned = startMcpServer({
+    const returned = await startMcpServer({
       repoPath: '/repo/sift',
       resolveRepoRoot: vi.fn(),
       findRegisteredRepositoryByPath: vi.fn(),
@@ -88,9 +105,9 @@ describe('startMcpServer', () => {
     expect(returned).toBe(handle);
   });
 
-  it('builds an McpServer with the app name/version and registers Notes and Review tools with the same target resolver', () => {
+  it('builds an McpServer with the app name/version and registers Notes and Review tools with the same target resolver', async () => {
     // Given
-    const { factory, resolveRepoRoot } = startAndCaptureFactory('/repo/sift');
+    const { factory, resolveRepoRoot } = await startAndCaptureFactory('/repo/sift');
 
     // When
     const server = factory();
@@ -119,9 +136,9 @@ describe('startMcpServer', () => {
     expect(resolveRepoRoot).not.toHaveBeenCalled();
   });
 
-  it('gives every instance its own server and repo root resolver', () => {
+  it('gives every instance its own server and repo root resolver', async () => {
     // Given
-    const { factory } = startAndCaptureFactory('/repo/sift');
+    const { factory } = await startAndCaptureFactory('/repo/sift');
 
     // When
     // A probe-then-fallback opening builds two instances from the one factory.
@@ -135,9 +152,22 @@ describe('startMcpServer', () => {
     expect(pinnedResolveTarget).not.toBe(probeResolveTarget);
   });
 
+  it('loads one catalog and attaches it to both the probe and pinned server', async () => {
+    // Given
+    const { factory } = await startAndCaptureFactory('/repo/sift');
+
+    // When
+    const probeServer = factory();
+    const pinnedServer = factory();
+
+    // Then
+    expect(loadReviewSkillsMock).toHaveBeenCalledOnce();
+    expect(attach.mock.calls).toEqual([[probeServer], [pinnedServer]]);
+  });
+
   it('resolves the repo root lazily, and caches it per instance', async () => {
     // Given
-    const { factory, resolveRepoRoot } = startAndCaptureFactory('/repo/sift/nested');
+    const { factory, resolveRepoRoot } = await startAndCaptureFactory('/repo/sift/nested');
 
     // When
     factory();
@@ -156,9 +186,9 @@ describe('startMcpServer', () => {
     expect(resolveRepoRoot).toHaveBeenCalledTimes(2);
   });
 
-  it('reports out-of-band errors on stderr, never on stdout', () => {
+  it('reports out-of-band errors on stderr, never on stdout', async () => {
     // Given
-    const { serveStdioOptions } = startAndCaptureFactory('/repo/sift');
+    const { serveStdioOptions } = await startAndCaptureFactory('/repo/sift');
     const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {});
     const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {});
     const error = new Error('transport failed');

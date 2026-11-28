@@ -15,7 +15,7 @@ const repository = { id: 'repo', name: 'repo', path: '/repo' };
 const mcpScript = `
   import { startMcpServer } from './src/mcp/start-mcp-server.ts';
   const repository = ${JSON.stringify(repository)};
-  startMcpServer({
+  await startMcpServer({
     repoPath: repository.path,
     resolveRepoRoot: () => repository.path,
     findRegisteredRepositoryByPath: async () => repository,

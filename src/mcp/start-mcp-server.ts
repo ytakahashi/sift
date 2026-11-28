@@ -10,6 +10,7 @@ import { registerReviewTools } from './register-review-tools';
 import { createRepoRootResolver } from './repo-target';
 import { submitResponse, submitReview, waitForReview } from './review-http-client';
 import { createReviewPresence } from './review-presence';
+import { loadReviewSkills } from './review-skills';
 import { createToolTargetResolver } from './tool-target';
 
 export interface StartMcpServerOptions {
@@ -40,7 +41,10 @@ export type McpServerHandle = StdioServerHandle;
  * is never shared across instances), and this function must stay free of
  * side effects so that a discarded instance leaves nothing behind.
  */
-function createNotesServer(options: StartMcpServerOptions): McpServer {
+function createNotesServer(
+  options: StartMcpServerOptions,
+  skills: Awaited<ReturnType<typeof loadReviewSkills>>,
+): McpServer {
   const server = new McpServer(
     { name: APP_INFO.productName, version: APP_INFO.version },
     {
@@ -66,6 +70,7 @@ function createNotesServer(options: StartMcpServerOptions): McpServer {
     resolveTarget,
   );
 
+  skills.attach(server);
   return server;
 }
 
@@ -75,8 +80,9 @@ function createNotesServer(options: StartMcpServerOptions): McpServer {
  * envelope. `serveStdio` owns the era decision — the opening message selects
  * the era, and one instance from the factory is pinned for the connection.
  */
-export function startMcpServer(options: StartMcpServerOptions): McpServerHandle {
-  return serveStdio(() => createNotesServer(options), {
+export async function startMcpServer(options: StartMcpServerOptions): Promise<McpServerHandle> {
+  const skills = await loadReviewSkills();
+  return serveStdio(() => createNotesServer(options, skills), {
     // stdout carries JSON-RPC framing exclusively, so out-of-band errors
     // (transport failures, throws while building or connecting an instance,
     // failures while discarding a probe instance) are reported on stderr.
