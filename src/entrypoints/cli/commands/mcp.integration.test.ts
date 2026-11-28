@@ -1,8 +1,10 @@
 import { execSync } from 'node:child_process';
 import path from 'node:path';
 import { Client } from '@modelcontextprotocol/client';
+import { SKILLS_EXTENSION_ID, SkillsClient } from '@modelcontextprotocol/client/ext/skills';
 import { StdioClientTransport } from '@modelcontextprotocol/client/stdio';
 import { beforeAll, describe, expect, it } from 'vitest';
+import { readReviewSkillFiles } from '../../../mcp/review-skill-files';
 
 const PROJECT_ROOT = process.cwd();
 const CLI_BUNDLE = path.resolve(PROJECT_ROOT, 'dist/cli/index.js');
@@ -107,10 +109,13 @@ describe('sift mcp (real stdio child process)', () => {
   // 2026-07-28 revision: pinning fails loudly when the server cannot serve that
   // era, whereas `'auto'` would silently fall back to `initialize` and pass even
   // if modern support regressed.
-  it('serves a client pinned to the 2026-07-28 revision over the same stdio entry point', async () => {
+  it('serves tools and verifies embedded skills over the 2026-07-28 revision', async () => {
     const client = new Client(
       { name: 'sift-mcp-stdio-modern-test', version: '0.0.0' },
-      { versionNegotiation: { mode: { pin: '2026-07-28' } } },
+      {
+        capabilities: { extensions: { [SKILLS_EXTENSION_ID]: {} } },
+        versionNegotiation: { mode: { pin: '2026-07-28' } },
+      },
     );
     const transport = new StdioClientTransport({
       command: process.execPath,
@@ -143,6 +148,24 @@ describe('sift mcp (real stdio child process)', () => {
         'update_note',
         'wait_for_turn',
       ]);
+
+      const skills = new SkillsClient(client);
+      expect(skills.supported).toBe(true);
+      const { skills: entries } = await skills.list();
+      const sourceFiles = await readReviewSkillFiles();
+      expect(Object.keys(sourceFiles)).toEqual(
+        expect.arrayContaining(['review/SKILL.md', 'respond/SKILL.md']),
+      );
+      const sourceByUri = new Map(
+        Object.entries(sourceFiles).map(([file, content]) => [`skill://sift/${file}`, content]),
+      );
+      expect(entries.map((entry) => entry.uri).sort()).toEqual([...sourceByUri.keys()].sort());
+      for (const entry of entries) {
+        await expect(skills.read(entry)).resolves.toMatchObject({
+          verified: true,
+          text: sourceByUri.get(entry.uri),
+        });
+      }
     } finally {
       await client.close().catch(() => {});
     }

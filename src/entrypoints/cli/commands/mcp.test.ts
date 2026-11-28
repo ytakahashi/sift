@@ -6,7 +6,7 @@ function createDependencies(): McpCommandDependencies {
   return {
     resolveRepoRoot: vi.fn().mockReturnValue('/repo/sift'),
     findRegisteredRepositoryByPath: vi.fn().mockResolvedValue(null),
-    startMcpServer: vi.fn().mockReturnValue({ close: vi.fn().mockResolvedValue(undefined) }),
+    startMcpServer: vi.fn().mockResolvedValue({ close: vi.fn().mockResolvedValue(undefined) }),
   };
 }
 
